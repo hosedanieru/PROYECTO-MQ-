@@ -1,0 +1,5 @@
+# Código generado por Prisma: no se formatea ni se edita a mano.
+src/generated/
+dist/
+node_modules/
+coverage/

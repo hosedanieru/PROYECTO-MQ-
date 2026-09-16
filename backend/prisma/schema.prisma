@@ -1,0 +1,392 @@
+// ============================================================
+// APLICATIVO MAQUILA (MQ) — Inlotrans S.A.S.
+// Fase 0: catálogos, usuarios, permisos, auditoría
+// Fase 1: Remisiones
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+enum EstadoRemision {
+  BORRADOR
+  ENTREGADA
+  APROBADA
+  RECHAZADA
+  EN_RECTIFICACION
+  VALIDADA
+}
+
+/// Tipo de proceso del producto. Valores tomados de la hoja PRODUCTOS
+/// del Excel actual. PENDIENTE: confirmar si existen otros valores.
+enum ProcesoProducto {
+  MANUAL
+  AUTOMATICA
+}
+
+enum AccionAuditoria {
+  CREAR
+  ACTUALIZAR
+  CAMBIO_ESTADO
+  ELIMINAR
+}
+
+// ============================================================
+// USUARIOS Y PERMISOS
+// ============================================================
+
+model Usuario {
+  id           String   @id @default(uuid())
+  documento    String   @unique
+  nombre       String
+  email        String?  @unique
+  passwordHash String   @map("password_hash")
+  activo       Boolean  @default(true)
+
+  rolId String @map("rol_id")
+  rol   Rol    @relation(fields: [rolId], references: [id])
+
+  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  // Relaciones con Remisión (nombradas por ser múltiples hacia Usuario)
+  remisionesCreadas    Remision[] @relation("RemisionCreadaPor")
+  remisionesEntregadas Remision[] @relation("RemisionEntregadaPor")
+  remisionesValidadas  Remision[] @relation("RemisionValidadaPor")
+  rectificaciones      RemisionVersion[]
+  auditorias           Auditoria[]
+
+  @@map("usuario")
+}
+
+model Rol {
+  id          String  @id @default(uuid())
+  codigo      String  @unique // COORDINADOR_MQ, PATINADOR, ADMINISTRADOR
+  nombre      String
+  descripcion String?
+  activo      Boolean @default(true)
+
+  usuarios  Usuario[]
+  permisos  RolPermiso[]
+
+  @@map("rol")
+}
+
+model Permiso {
+  id          String  @id @default(uuid())
+  codigo      String  @unique // remision.crear, remision.aprobar, catalogo.editar
+  modulo      String            // remision, catalogo, mfr, admin
+  descripcion String?
+
+  roles RolPermiso[]
+
+  @@index([modulo])
+  @@map("permiso")
+}
+
+model RolPermiso {
+  rolId     String @map("rol_id")
+  permisoId String @map("permiso_id")
+
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
+  @@map("rol_permiso")
+}
+
+// ============================================================
+// CATÁLOGOS
+// ============================================================
+
+model Lugar {
+  id     String  @id @default(uuid())
+  codigo String  @unique
+  nombre String // "MAQUILA PEPSICO SANTO DOMINGO"
+  activo Boolean @default(true)
+
+  remisiones Remision[]
+
+  @@map("lugar")
+}
+
+/// Empresas que operan los turnos.
+/// Valores actuales: LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX
+model Proveedor {
+  id     String  @id @default(uuid())
+  codigo String  @unique
+  nombre String
+  activo Boolean @default(true)
+
+  remisiones Remision[]
+
+  @@map("proveedor")
+}
+
+/// Catálogo de productos. Administrable desde el panel.
+/// PENDIENTE: sincronización con SAP (ver plan-desarrollo-mq.md, pendiente 7).
+/// El estándar por hora es atributo del SKU; las horas del turno NO
+/// (ver decisión 2.2 del plan de desarrollo).
+model Producto {
+  id          String          @id @default(uuid())
+  codigo      String          @unique // código de ítem, ej. 300058141
+  descripcion String
+  proceso     ProcesoProducto?
+
+  unidadesPorCaja  Int? @map("unidades_por_caja")
+  cajasPorEstiba   Int? @map("cajas_por_estiba")
+
+  // Estándar de producción (base del cálculo de capacidad en Fase 2)
+  unidadesPorHora Decimal? @map("unidades_por_hora") @db.Decimal(12, 2)
+  cajasPorHora    Decimal? @map("cajas_por_hora") @db.Decimal(12, 2)
+
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  remisiones Remision[]
+
+  @@index([activo])
+  @@map("producto")
+}
+
+model Turno {
+  id     String  @id @default(uuid())
+  codigo String  @unique // T1, T2, T3
+  nombre String
+  activo Boolean @default(true)
+
+  horarios   TurnoHorario[]
+  remisiones Remision[]
+
+  @@map("turno")
+}
+
+/// Los horarios varían por día de la semana, por eso son configuración
+/// y no valores fijos en código.
+///
+///        LUNES        MAR-VIE      SÁBADO
+///   T1   08:00-14:00  06:00-14:00  06:00-10:00
+///   T2   14:00-20:00  14:00-22:00  10:00-14:00
+///   T3   20:00-06:00  22:00-06:00  N/A
+model TurnoHorario {
+  id      String    @id @default(uuid())
+  turnoId String    @map("turno_id")
+  turno   Turno     @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  diaSemana DiaSemana @map("dia_semana")
+
+  horaInicio String @map("hora_inicio") // "HH:mm"
+  horaFin    String @map("hora_fin")    // "HH:mm"
+
+  /// true cuando horaFin < horaInicio (T3)
+  cruzaMedianoche Boolean @default(false) @map("cruza_medianoche")
+
+  vigenteDesde DateTime  @map("vigente_desde") @db.Date
+  vigenteHasta DateTime? @map("vigente_hasta") @db.Date
+
+  @@unique([turnoId, diaSemana, vigenteDesde])
+  @@map("turno_horario")
+}
+
+// ============================================================
+// REMISIONES
+// ============================================================
+
+/// Documento formal de entrega de Producto Terminado ("llevo o recibo").
+/// Una remisión corresponde a UN SOLO producto (SKU).
+/// El consecutivo reinicia cada año → clave única (anio, numero).
+///
+/// Nunca se elimina físicamente: es un documento firmado.
+/// Un rechazo se corrige mediante rectificación (nueva versión),
+/// conservando el mismo consecutivo.
+model Remision {
+  id     String @id @default(uuid())
+  anio   Int
+  numero Int
+  version Int   @default(1)
+
+  // --- Temporalidad ---
+  /// Día productivo al que pertenece. Corte 6:00 a 6:00.
+  /// fechaOperativa = fecha(fechaHoraRegistro − 6h) en zona America/Bogota.
+  /// TODAS las agregaciones y reportes se agrupan por este campo.
+  fechaOperativa    DateTime @map("fecha_operativa") @db.Date
+  fechaHoraRegistro DateTime @map("fecha_hora_registro") @db.Timestamptz(3)
+
+  turnoId String @map("turno_id")
+  turno   Turno  @relation(fields: [turnoId], references: [id])
+
+  // --- Contexto ---
+  proveedorId String    @map("proveedor_id")
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+
+  lugarId String @map("lugar_id")
+  lugar   Lugar  @relation(fields: [lugarId], references: [id])
+
+  // --- Producto (uno solo) ---
+  productoId String   @map("producto_id")
+  producto   Producto @relation(fields: [productoId], references: [id])
+
+  /// Copia congelada al momento de crear. La remisión es un documento
+  /// firmado: si el catálogo cambia después, el documento debe seguir
+  /// mostrando lo que decía cuando se firmó.
+  codigoSnapshot      String @map("codigo_snapshot")
+  descripcionSnapshot String @map("descripcion_snapshot")
+
+  fechaVencimiento DateTime @map("fecha_vencimiento") @db.Date
+  cantidadCajas    Int      @map("cantidad_cajas")
+  cantidadUnidades Int      @map("cantidad_unidades")
+
+  /// Reemplaza el texto libre del Excel ("2 ESTIBAS+ 21 CAJAS").
+  /// El sistema compone el texto para mostrar; no lo almacena.
+  estibasCompletas Int @default(0) @map("estibas_completas")
+  cajasSueltas     Int @default(0) @map("cajas_sueltas")
+
+  /// Notas humanas reales. Los números de estiba van en RemisionEstiba.
+  observaciones String?
+
+  // --- Flujo ---
+  estado EstadoRemision @default(BORRADOR)
+
+  motivoUltimoRechazo String? @map("motivo_ultimo_rechazo")
+
+  creadaPorId String  @map("creada_por_id")
+  creadaPor   Usuario @relation("RemisionCreadaPor", fields: [creadaPorId], references: [id])
+
+  entregadaPorId String?  @map("entregada_por_id")
+  entregadaPor   Usuario? @relation("RemisionEntregadaPor", fields: [entregadaPorId], references: [id])
+  fechaEntrega   DateTime? @map("fecha_entrega") @db.Timestamptz(3)
+
+  /// El OPA es personal de PepsiCo: NO es usuario del sistema.
+  /// Su participación se registra como dato, no como cuenta.
+  opaNombre       String?   @map("opa_nombre")
+  opaCargo        String?   @map("opa_cargo")
+  fechaAprobacion DateTime? @map("fecha_aprobacion") @db.Timestamptz(3)
+
+  /// Validación = conciliación administrativa interna (cuaderno virtual).
+  /// Es un evento DISTINTO de la aprobación del OPA.
+  validadaPorId   String?   @map("validada_por_id")
+  validadaPor     Usuario?  @relation("RemisionValidadaPor", fields: [validadaPorId], references: [id])
+  fechaValidacion DateTime? @map("fecha_validacion") @db.Timestamptz(3)
+  /// Contacto de PepsiCo con quien se concilió. Se guarda como dato
+  /// y no como entidad, para no acoplar el sistema a una persona.
+  conciliadoCon   String?   @map("conciliado_con")
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  estibas  RemisionEstiba[]
+  versiones RemisionVersion[]
+
+  @@unique([anio, numero])
+  @@index([fechaOperativa, turnoId])
+  @@index([estado])
+  @@index([productoId, fechaOperativa])
+  @@index([proveedorId, fechaOperativa])
+  @@map("remision")
+}
+
+/// Números de estiba física. Reemplaza el texto "EST: 31,32,33..."
+/// que hoy vive en el campo de observaciones del Excel.
+/// Base de la trazabilidad de ubicación para el módulo de inventario.
+model RemisionEstiba {
+  id         String   @id @default(uuid())
+  remisionId String   @map("remision_id")
+  remision   Remision @relation(fields: [remisionId], references: [id], onDelete: Cascade)
+
+  numeroEstiba Int @map("numero_estiba")
+
+  @@unique([remisionId, numeroEstiba])
+  @@index([numeroEstiba])
+  @@map("remision_estiba")
+}
+
+/// Historial del documento. Cada rectificación agrega un registro
+/// con el estado anterior completo y el motivo del rechazo.
+model RemisionVersion {
+  id         String   @id @default(uuid())
+  remisionId String   @map("remision_id")
+  remision   Remision @relation(fields: [remisionId], references: [id], onDelete: Cascade)
+
+  version       Int
+  motivoRechazo String? @map("motivo_rechazo")
+
+  /// Snapshot completo de la versión previa.
+  datosAnteriores Json @map("datos_anteriores")
+
+  rectificadaPorId String  @map("rectificada_por_id")
+  rectificadaPor   Usuario @relation(fields: [rectificadaPorId], references: [id])
+
+  fechaRectificacion DateTime @default(now()) @map("fecha_rectificacion") @db.Timestamptz(3)
+
+  @@unique([remisionId, version])
+  @@map("remision_version")
+}
+
+// ============================================================
+// AUDITORÍA TRANSVERSAL
+// ============================================================
+
+/// Registro de toda acción sobre entidades sensibles.
+/// Requisito de la sección 13 del documento maestro: la trazabilidad
+/// forma parte del diseño inicial, no se agrega al final.
+model Auditoria {
+  id String @id @default(uuid())
+
+  entidad   String          // "remision", "producto", "turno_horario"
+  entidadId String          @map("entidad_id")
+  accion    AccionAuditoria
+
+  valorAnterior Json? @map("valor_anterior")
+  valorNuevo    Json? @map("valor_nuevo")
+
+  /// Obligatorio en cambios sensibles (rectificación, edición de estándares).
+  motivo String?
+
+  usuarioId String  @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  ip        String?
+  creadoEn  DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId, creadoEn])
+  @@map("auditoria")
+}
+
+// ============================================================
+// CONSECUTIVO
+// ============================================================
+
+/// Control del consecutivo anual de remisiones.
+/// Se usa con bloqueo de fila (SELECT ... FOR UPDATE) dentro de la
+/// transacción de creación, para evitar números duplicados cuando dos
+/// coordinadores crean remisiones al mismo tiempo.
+model Consecutivo {
+  id     String @id @default(uuid())
+  tipo   String // "REMISION"
+  anio   Int
+  ultimo Int    @default(0)
+
+  @@unique([tipo, anio])
+  @@map("consecutivo")
+}
