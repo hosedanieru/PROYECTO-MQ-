@@ -25,7 +25,10 @@ import {
 import type { Response } from 'express';
 
 import {
+  AsignacionExcedeAsistenciaError,
   AsignacionNoEncontradaError,
+  AsignacionSinAsistenciaError,
+  AsistenciaMenorQueAsignadasError,
   BloqueNoEncontradoError,
   BloquesSolapadosError,
   CodigoLineaDuplicadoError,
@@ -115,6 +118,10 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   [FaltanteSinMotivoError, HttpStatus.BAD_REQUEST],
   [TurnoCerradoError, HttpStatus.CONFLICT],
   [BloquesSolapadosError, HttpStatus.CONFLICT],
+  // Trazabilidad del personal: los datos están bien, pero contradicen la asistencia.
+  [AsignacionSinAsistenciaError, HttpStatus.CONFLICT],
+  [AsignacionExcedeAsistenciaError, HttpStatus.CONFLICT],
+  [AsistenciaMenorQueAsignadasError, HttpStatus.CONFLICT],
   [DiaConProgramacionError, HttpStatus.CONFLICT],
   [CodigoLineaDuplicadoError, HttpStatus.CONFLICT],
   [BloqueNoEncontradoError, HttpStatus.NOT_FOUND],

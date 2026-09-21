@@ -3,14 +3,17 @@
  * =====================================
  *
  * Asignar: crea o corrige (fecha, turno, línea, grupo) con su número de
- * personas; exige grupo activo y línea existente. Quitar: elimina una
- * asignación por id. Ambos se auditan.
+ * personas; exige grupo activo, línea existente y que la suma de lo
+ * asignado del grupo en el turno no supere las personas que llegaron
+ * (asistencia registrada antes). Quitar: elimina una asignación por id.
+ * Ambos se auditan.
  */
 
 import type { Reloj } from '../remision/crear-remision.use-case.js';
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
 import {
   validarAsignacion,
+  verificarTopeAsignacion,
   type AsignacionLinea,
   type DatosAsignacion,
 } from '../../domain/mfr/asignacion-linea.js';
@@ -30,7 +33,7 @@ export class AsignarGrupoLineaUseCase {
   async ejecutar(comando: AsignarGrupoLineaComando): Promise<AsignacionLinea> {
     const datos = validarAsignacion(comando);
 
-    return this.uow.ejecutar(async ({ asignaciones, grupos, lineas, auditoria }) => {
+    return this.uow.ejecutar(async ({ asignaciones, asistencias, grupos, lineas, auditoria }) => {
       const grupo = await grupos.buscarPorId(datos.grupoId);
       if (!grupo || !grupo.activo) {
         throw new GrupoNoEncontradoError(`El grupo "${datos.grupoId}" no existe o está inactivo.`);
@@ -40,7 +43,14 @@ export class AsignarGrupoLineaUseCase {
         throw new LineaNoEncontradaError(`La línea "${datos.lineaId}" no existe.`);
       }
 
-      const anterior = await asignaciones.buscarPorIdentidad(datos.fechaOperativa, datos.turnoId, datos.lineaId, datos.grupoId);
+      // Tope: lo asignado del grupo en el turno no puede superar lo que llegó.
+      const asistencia = await asistencias.buscarPorIdentidad(datos.fechaOperativa, datos.turnoId, datos.grupoId);
+      const delGrupo = (await asignaciones.listarPorFecha(datos.fechaOperativa)).filter(
+        (a) => a.turnoId === datos.turnoId && a.grupoId === datos.grupoId,
+      );
+      verificarTopeAsignacion(datos, asistencia?.personasLlegaron ?? null, delGrupo);
+
+      const anterior = delGrupo.find((a) => a.lineaId === datos.lineaId) ?? null;
       const guardada = await asignaciones.guardar(datos, comando.usuarioId, this.reloj.ahora());
 
       await auditoria.registrar({

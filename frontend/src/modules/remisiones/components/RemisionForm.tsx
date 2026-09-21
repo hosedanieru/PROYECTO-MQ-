@@ -8,9 +8,10 @@
  *     cajas sueltas y unidades usando `cajasPorEstiba` y `unidadesPorCaja`
  *     del catálogo. Son sugerencias: se pueden sobrescribir.
  *   - Los números de estiba se escriben separados por coma o espacio.
- *   - Muestra lo programado en el DPP del día para el producto (tope:
- *     "ni una caja más de lo programado", área 2026-09-18) y permite
- *     marcar la remisión como extraoficial (pedido de emergencia).
+ *   - El selector de producto solo ofrece los SKU del DPP del día (tope:
+ *     "ni una caja más de lo programado", área 2026-09-18), con lo que
+ *     queda por remisionar. Marcar "extraoficial" (pedido de emergencia)
+ *     va PRIMERO y despliega el catálogo completo (área 2026-09-21).
  *
  * En modo edición la fecha operativa NO cambia (es la del registro
  * original), así que el vencimiento se compara contra ella.
@@ -193,18 +194,40 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
     }
   }, [producto, cantidadCajas, setValue, inicial])
 
+  /**
+   * Regla del área (2026-09-21): la remisión se ajusta al DPP. Sin la
+   * marca de extraoficial solo se ofrecen los SKU programados ese día;
+   * con la marca, el catálogo completo. En edición, el producto actual
+   * se conserva en la lista aunque no cumpla el filtro.
+   */
+  const programadosHoy = useMemo(
+    () => new Map((dia.data?.mfr.porProducto ?? []).map((p) => [p.productoId, p])),
+    [dia.data],
+  )
   const productosFiltrados = useMemo(() => {
     const t = busquedaProducto.trim().toLowerCase()
     const lista = productos.data ?? []
-    // En edición, el producto actual se muestra aunque no coincida con la búsqueda.
     return lista.filter(
       (p) =>
         p.id === productoId ||
-        !t ||
-        p.codigo.toLowerCase().includes(t) ||
-        p.descripcion.toLowerCase().includes(t),
+        ((extraoficial || programadosHoy.has(p.id)) &&
+          (!t || p.codigo.toLowerCase().includes(t) || p.descripcion.toLowerCase().includes(t))),
     )
-  }, [productos.data, busquedaProducto, productoId])
+  }, [productos.data, busquedaProducto, productoId, extraoficial, programadosHoy])
+
+  // Si se quita la marca y el producto elegido no está en el DPP, se limpia la selección.
+  useEffect(() => {
+    if (!extraoficial && productoId && dia.data && !programadosHoy.has(productoId) && productoId !== inicial?.producto.id) {
+      setValue('productoId', '')
+    }
+  }, [extraoficial, productoId, dia.data, programadosHoy, inicial, setValue])
+
+  const etiquetaProducto = (p: Producto) => {
+    const prog = programadosHoy.get(p.id)
+    if (!prog || extraoficial) return `${p.codigo} · ${p.descripcion}`
+    const quedan = Math.max(0, prog.programadoCajas - prog.producidoCajas)
+    return `${p.codigo} · ${p.descripcion} — quedan ${quedan} de ${prog.programadoCajas} cajas`
+  }
 
   const enviar = handleSubmit(async (datos) => {
     await onEnviar({
@@ -255,8 +278,34 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
         </Select>
       </fieldset>
 
+      <fieldset className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
+        <legend className="px-1 text-sm font-semibold text-amber-800">Pedido de emergencia (fuera del DPP)</legend>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="mt-0.5" {...register('extraoficial')} />
+          <span>
+            Remisión <strong>extraoficial</strong>: PepsiCo la pidió por fuera del schedule. Al marcarla se habilita el catálogo
+            completo de productos; no cuenta para el MFR ni para el tope de lo programado del día, y queda auditada con su motivo.
+          </span>
+        </label>
+        {extraoficial && (
+          <Campo
+            etiqueta="Motivo (obligatorio)"
+            placeholder="Ej.: pedido de emergencia del OPA Carlos, 14:30"
+            error={errors.motivoExtraoficial?.message}
+            {...register('motivoExtraoficial')}
+          />
+        )}
+      </fieldset>
+
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-sm font-semibold text-slate-700">Producto</legend>
+        <legend className="mb-2 text-sm font-semibold text-slate-700">
+          Producto {extraoficial ? '(catálogo completo)' : `(solo lo programado en el DPP del ${fechaOperativa})`}
+        </legend>
+        {!extraoficial && dia.data && !hayDpp && (
+          <Alerta tipo="error">
+            El {fechaOperativa} no tiene programación (DPP) cargada: no hay productos para remisionar salvo como pedido de emergencia.
+          </Alerta>
+        )}
         <Campo
           etiqueta="Buscar por código o descripción"
           value={busquedaProducto}
@@ -264,9 +313,9 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
           placeholder="300058141 o LONCHERA"
         />
         <Select etiqueta="Producto" error={errors.productoId?.message} {...register('productoId')}>
-          <option value="">Seleccione…</option>
+          <option value="">{dia.isLoading && !extraoficial ? 'Cargando el DPP…' : 'Seleccione…'}</option>
           {productosFiltrados.map((p) => (
-            <option key={p.id} value={p.id}>{p.codigo} · {p.descripcion}</option>
+            <option key={p.id} value={p.id}>{etiquetaProducto(p)}</option>
           ))}
         </Select>
         {producto && (
@@ -275,12 +324,8 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
             {producto.proceso && ` · proceso ${producto.proceso}`}
           </p>
         )}
-        {producto && dia.data && !extraoficial && (
-          !hayDpp ? (
-            <Alerta tipo="error">
-              El {fechaOperativa} no tiene programación (DPP) cargada: no se puede remisionar salvo como pedido de emergencia.
-            </Alerta>
-          ) : programadoHoy ? (
+        {producto && dia.data && !extraoficial && hayDpp && (
+          programadoHoy ? (
             <p className="text-xs text-slate-600">
               DPP del {fechaOperativa}: programadas <strong>{programadoHoy.programadoCajas}</strong> cajas, aprobadas{' '}
               <strong>{programadoHoy.producidoCajas}</strong> → quedan{' '}
@@ -317,25 +362,6 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
         <div className="md:col-span-2">
           <AreaTexto etiqueta="Observaciones" rows={2} error={errors.observaciones?.message} {...register('observaciones')} />
         </div>
-      </fieldset>
-
-      <fieldset className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
-        <legend className="px-1 text-sm font-semibold text-amber-800">Pedido de emergencia (fuera del DPP)</legend>
-        <label className="flex items-start gap-2 text-sm text-slate-700">
-          <input type="checkbox" className="mt-0.5" {...register('extraoficial')} />
-          <span>
-            Remisión <strong>extraoficial</strong>: PepsiCo la pidió por fuera del schedule. No cuenta para el MFR ni para el tope de
-            lo programado del día, y queda auditada con su motivo.
-          </span>
-        </label>
-        {extraoficial && (
-          <Campo
-            etiqueta="Motivo (obligatorio)"
-            placeholder="Ej.: pedido de emergencia del OPA Carlos, 14:30"
-            error={errors.motivoExtraoficial?.message}
-            {...register('motivoExtraoficial')}
-          />
-        )}
       </fieldset>
 
       {Boolean(error) && <Alerta tipo="error">{comoErrorApi(error).mensaje}</Alerta>}

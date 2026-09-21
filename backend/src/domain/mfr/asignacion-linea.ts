@@ -18,7 +18,12 @@
  * corrige el número de personas.
  */
 
-import { DatosMfrInvalidosError } from './mfr.errors.js';
+import {
+  AsignacionExcedeAsistenciaError,
+  AsignacionSinAsistenciaError,
+  AsistenciaMenorQueAsignadasError,
+  DatosMfrInvalidosError,
+} from './mfr.errors.js';
 import type { BloqueCalculado } from './calculo-mfr.js';
 
 export interface DatosAsignacion {
@@ -45,6 +50,46 @@ export function validarAsignacion(datos: DatosAsignacion): DatosAsignacion {
   exigir((datos.grupoId ?? '').length > 0, 'El grupo es obligatorio.');
   exigir(Number.isInteger(datos.personas) && datos.personas > 0, 'Las personas asignadas deben ser un entero mayor que cero.');
   return datos;
+}
+
+// ------------------------------------------------------------
+// Regla: no asignar más personas de las que llegaron (área, 2026-09-21)
+// ------------------------------------------------------------
+
+/**
+ * Antes de asignar `personas` de un grupo a una línea:
+ *   1. la asistencia del grupo en ese turno debe estar registrada
+ *      (sin ella "llegaron" es desconocido → se bloquea);
+ *   2. lo ya asignado a OTRAS líneas + esta asignación ≤ llegaron.
+ *
+ * `asignacionesGrupoTurno` son las del mismo grupo y turno; la que se
+ * está corrigiendo (misma línea) no cuenta porque se reemplaza.
+ */
+export function verificarTopeAsignacion(
+  nueva: DatosAsignacion,
+  llegaron: number | null,
+  asignacionesGrupoTurno: Array<{ lineaId: string; personas: number }>,
+): void {
+  if (llegaron === null) {
+    throw new AsignacionSinAsistenciaError(nueva.grupoId, nueva.turnoId);
+  }
+  const enOtrasLineas = asignacionesGrupoTurno
+    .filter((a) => a.lineaId !== nueva.lineaId)
+    .reduce((s, a) => s + a.personas, 0);
+  if (enOtrasLineas + nueva.personas > llegaron) {
+    throw new AsignacionExcedeAsistenciaError(llegaron, enOtrasLineas, nueva.personas);
+  }
+}
+
+/**
+ * Antes de corregir la asistencia hacia abajo: no puede quedar por
+ * debajo de lo que el grupo ya tiene asignado en líneas. Primero se
+ * ajustan las líneas, después la asistencia.
+ */
+export function verificarAsistenciaContraAsignadas(personasLlegaron: number, asignadas: number): void {
+  if (personasLlegaron < asignadas) {
+    throw new AsistenciaMenorQueAsignadasError(personasLlegaron, asignadas);
+  }
 }
 
 export interface AsignacionRepository {

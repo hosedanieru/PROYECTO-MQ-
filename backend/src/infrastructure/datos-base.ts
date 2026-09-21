@@ -67,6 +67,9 @@ export const ROLES: ReadonlyArray<{
     permisos: [
       'remision.crear', 'remision.consultar', 'remision.editar', 'remision.registrar_aprobacion',
       'remision.rectificar', 'remision.validar', 'remision.exportar', 'catalogo.consultar',
+      // Grupos: el coordinador puede crearlos y editarlos (área, 2026-09-21).
+      // Se le da `catalogo.editar` completo por decisión del usuario.
+      'catalogo.editar',
       // MFR: el coordinador carga la programación y arma su turno.
       'mfr.consultar', 'mfr.cargar_programacion', 'mfr.configurar_turno',
     ],

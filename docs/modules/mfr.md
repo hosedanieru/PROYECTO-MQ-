@@ -69,7 +69,7 @@ Lo remisionado de un SKU en un día debe ser exactamente lo que el DPP programó
 | **Sin DPP cargado** | Se bloquea la remisión (decisión del área). | 409 `REMISION_SIN_PROGRAMACION` |
 | **SKU fuera del DPP** | Se bloquea. | 409 `REMISION_PRODUCTO_NO_PROGRAMADO` |
 | **Ni menos** | No se puede impedir; al **cerrar el turno** con SKU por debajo de su target el cierre exige `motivoFaltante`, que queda auditado junto con la lista de faltantes. | 400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes[]` |
-| **Excepción: extraoficial** | Pedido de emergencia por fuera del schedule. La remisión lleva `extraoficial: true` + `motivoExtraoficial` (obligatorio, ≥ 5). No entra en el tope ni en el MFR; el tablero la muestra aparte ("Pedidos de emergencia"); el PDF es idéntico (decisión del área); en el listado lleva una etiqueta. | — |
+| **Excepción: extraoficial** | Pedido de emergencia por fuera del schedule. La remisión lleva `extraoficial: true` + `motivoExtraoficial` (obligatorio, ≥ 5). No entra en el tope ni en el MFR; el tablero la muestra aparte ("Pedidos de emergencia"); el PDF es idéntico (decisión del área); en el listado lleva una etiqueta. **Formulario (2026-09-21):** el selector de producto solo ofrece los SKU del DPP del día con lo que queda por remisionar; la marca "extraoficial" va primero y, al activarla, despliega el catálogo completo. | — |
 
 Código: `domain/remision/tope-programacion.ts` (regla pura), `application/remision/control-programacion.ts` (arma la situación: bloques + estándares + remisiones aprobadas), usado por `crear-remision`, `editar-remision` y `AprobarRemisionUseCase` (`antes` de la transición). `faltantesDelTurno` en `calculo-mfr.ts`; `CerrarTurnoUseCase` lo aplica.
 
@@ -108,7 +108,17 @@ Además de la asistencia, por día y turno el coordinador **asigna grupos a lín
 - `INCOMPLETA`: faltan personas (se muestra cuántas);
 - `SIN_DATO`: nadie asignado, o el DPP no trae línea ideal para esa línea.
 
-Cada grupo muestra además cuántas personas tiene "en líneas" frente a las que llegaron; si asigna más de las que llegaron se resalta (aviso, no bloqueo). Se decidió no ligar la asignación al bloque (SKU) sino a la línea y turno, para que cuadre con la asistencia, que también es por turno.
+**Trazabilidad (regla dura, área 2026-09-21): no se pueden asignar más personas de las que llegaron.**
+
+1. Para asignar un grupo a una línea, su asistencia del turno debe estar registrada (409 `MFR_ASIGNACION_SIN_ASISTENCIA`). Orden del flujo: primero "llegaron", después "asignar".
+2. Lo asignado del grupo en otras líneas + la nueva asignación ≤ personas que llegaron (409 `MFR_ASIGNACION_EXCEDE_ASISTENCIA`, con `llegaron`, `enOtrasLineas`, `solicitadas`). Corregir la misma línea no cuenta contra sí misma.
+3. La asistencia no puede corregirse por debajo de lo ya asignado (409 `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS`): primero se bajan las asignaciones.
+
+La pantalla refleja la regla: el selector de grupo solo muestra grupos con asistencia y cuántas personas quedan libres. Se decidió no ligar la asignación al bloque (SKU) sino a la línea y turno, para que cuadre con la asistencia, que también es por turno.
+
+`PENDIENTE DE DEFINIR`: cómo traducir el faltante de personas en una línea a **tiempo o productividad** (¿proporcional? ¿tabla por SKU?). Hoy se muestra CUBIERTA / INCOMPLETA con el número de personas que faltan; no se estima retraso.
+
+**Permisos**: crear/editar grupos exige `catalogo.editar`; el COORDINADOR_MQ lo tiene desde el 2026-09-21 (decisión del usuario: permiso completo de catálogo, no uno específico de grupos).
 
 ## Gobierno
 
@@ -145,9 +155,9 @@ Migraciones Prisma: `20260918140000_mfr_bloques_dpp_pepsico` (elimina `programac
 | `POST /mfr/dpp/analizar` (multipart `archivo`) | `mfr.cargar_programacion` | PDF → propuesta cruzada con el catálogo; no escribe |
 | `POST /mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante? }` (400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes` si hay SKU bajo target) |
 | `GET /mfr/asistencia?fecha=` | `mfr.consultar` | Asistencia registrada del día (turno, grupo, personas) |
-| `PUT /mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige |
+| `PUT /mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige (409 `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS` si baja de lo asignado en líneas) |
 | `GET /mfr/asignaciones?fecha=` | `mfr.consultar` | Grupos asignados a líneas por turno |
-| `PUT /mfr/asignaciones` · `DELETE /mfr/asignaciones/:id` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, lineaId, grupoId, personas }`; crea o corrige / quita (404 `MFR_ASIGNACION_NO_ENCONTRADA`) |
+| `PUT /mfr/asignaciones` · `DELETE /mfr/asignaciones/:id` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, lineaId, grupoId, personas }`; crea o corrige / quita (404 `MFR_ASIGNACION_NO_ENCONTRADA`; 409 `MFR_ASIGNACION_SIN_ASISTENCIA` / `MFR_ASIGNACION_EXCEDE_ASISTENCIA`) |
 | `GET/POST/PATCH /api/grupos` | `catalogo.consultar` / `catalogo.editar` | Catálogo de grupos (`descripcion`, `personasEsperadas`) |
 | `GET/POST/PATCH /mfr/lineas` | `mfr.consultar` / `catalogo.editar` | Catálogo de líneas |
 | `GET /mfr/estandares` · `PUT /mfr/estandares/:productoId` | `mfr.consultar` / `catalogo.editar_estandares` | Incluye `pesoSugeridoKg`; `{ cajasPorHora, pesoNetoKg, motivo }` |

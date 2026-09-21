@@ -4,10 +4,13 @@
  *
  * Cuántas personas de un grupo llegaron a un turno. Crea o corrige el
  * registro de (fecha, turno, grupo); la corrección se audita con el
- * valor anterior. Exige que el grupo exista y esté activo.
+ * valor anterior. Exige que el grupo exista y esté activo, y que el
+ * número no quede por debajo de lo que el grupo ya tiene asignado en
+ * líneas (trazabilidad: primero se ajustan las líneas).
  */
 
 import type { Reloj } from '../remision/crear-remision.use-case.js';
+import { asignadasPorGrupo, verificarAsistenciaContraAsignadas } from '../../domain/mfr/asignacion-linea.js';
 import { validarAsistencia, type AsistenciaTurno, type DatosAsistencia } from '../../domain/mfr/asistencia-turno.js';
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
@@ -25,11 +28,14 @@ export class RegistrarAsistenciaUseCase {
   async ejecutar(comando: RegistrarAsistenciaComando): Promise<AsistenciaTurno> {
     const datos = validarAsistencia(comando);
 
-    return this.uow.ejecutar(async ({ asistencias, grupos, auditoria }) => {
+    return this.uow.ejecutar(async ({ asistencias, asignaciones, grupos, auditoria }) => {
       const grupo = await grupos.buscarPorId(datos.grupoId);
       if (!grupo || !grupo.activo) {
         throw new GrupoNoEncontradoError(`El grupo "${datos.grupoId}" no existe o está inactivo.`);
       }
+
+      const asignadas = asignadasPorGrupo(datos.turnoId, await asignaciones.listarPorFecha(datos.fechaOperativa)).get(datos.grupoId) ?? 0;
+      verificarAsistenciaContraAsignadas(datos.personasLlegaron, asignadas);
 
       const anterior = await asistencias.buscarPorIdentidad(datos.fechaOperativa, datos.turnoId, datos.grupoId);
       const guardada = await asistencias.guardar(datos, comando.usuarioId, this.reloj.ahora());

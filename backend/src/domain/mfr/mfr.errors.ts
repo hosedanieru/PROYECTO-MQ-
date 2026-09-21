@@ -49,6 +49,43 @@ export class AsignacionNoEncontradaError extends ErrorMfr {
   readonly codigo = 'MFR_ASIGNACION_NO_ENCONTRADA';
 }
 
+/** Para asignar un grupo a una línea primero hay que registrar cuántas personas llegaron. */
+export class AsignacionSinAsistenciaError extends ErrorMfr {
+  readonly codigo = 'MFR_ASIGNACION_SIN_ASISTENCIA';
+
+  constructor(grupoId: string, turnoId: string) {
+    super(`Registre primero la asistencia del grupo "${grupoId}" en el turno "${turnoId}"; sin ella no se sabe cuántas personas llegaron.`);
+  }
+}
+
+/** Lo asignado a líneas no puede superar las personas que llegaron del grupo. */
+export class AsignacionExcedeAsistenciaError extends ErrorMfr {
+  readonly codigo = 'MFR_ASIGNACION_EXCEDE_ASISTENCIA';
+
+  constructor(
+    readonly llegaron: number,
+    readonly enOtrasLineas: number,
+    readonly solicitadas: number,
+  ) {
+    super(
+      `Del grupo llegaron ${llegaron} persona(s) y ya hay ${enOtrasLineas} en otras líneas: ` +
+        `solo quedan ${Math.max(0, llegaron - enOtrasLineas)} por asignar, no ${solicitadas}.`,
+    );
+  }
+}
+
+/** La asistencia no puede corregirse por debajo de lo ya asignado en líneas. */
+export class AsistenciaMenorQueAsignadasError extends ErrorMfr {
+  readonly codigo = 'MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS';
+
+  constructor(
+    readonly personasLlegaron: number,
+    readonly asignadas: number,
+  ) {
+    super(`El grupo ya tiene ${asignadas} persona(s) asignadas en líneas; primero baje las asignaciones antes de registrar ${personasLlegaron}.`);
+  }
+}
+
 export class CodigoLineaDuplicadoError extends ErrorMfr {
   readonly codigo = 'MFR_LINEA_CODIGO_DUPLICADO';
 

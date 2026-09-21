@@ -15,8 +15,7 @@ import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
-import type { Grupo } from '../../../shared/types/catalogo'
-import type { EstadoLinea, PersonalLinea } from '../../../shared/types/mfr'
+import type { EstadoLinea, PersonalGrupo, PersonalLinea } from '../../../shared/types/mfr'
 import { useAsignarGrupoLinea, useQuitarAsignacion } from '../hooks/useMfr'
 
 const ESTILO: Record<EstadoLinea, { texto: string; clase: string }> = {
@@ -31,11 +30,12 @@ interface Props {
   lineas: PersonalLinea[]
   /** Catálogo de líneas para el selector (id, código, nombre). */
   catalogoLineas: Array<{ lineaId: string; codigo: string; nombre: string }>
-  grupos: Grupo[]
+  /** Solo los grupos con asistencia registrada en el turno: sin "llegaron" no se puede asignar. */
+  gruposConAsistencia: PersonalGrupo[]
   puedeRegistrar: boolean
 }
 
-export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, grupos, puedeRegistrar }: Props) {
+export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConAsistencia, puedeRegistrar }: Props) {
   const asignar = useAsignarGrupoLinea()
   const quitar = useQuitarAsignacion()
   const [lineaId, setLineaId] = useState('')
@@ -43,6 +43,9 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, grupos, pu
   const [personas, setPersonas] = useState('')
 
   const yaAsignada = lineas.find((l) => l.lineaId === lineaId)?.grupos.find((g) => g.grupoId === grupoId)
+  const grupoElegido = gruposConAsistencia.find((g) => g.grupoId === grupoId)
+  /** Personas del grupo que aún no están en otra línea (la que se corrige se libera). */
+  const disponibles = grupoElegido ? grupoElegido.llegaron - (grupoElegido.asignadas ?? 0) + (yaAsignada?.personas ?? 0) : null
 
   /** Al escoger una pareja línea+grupo ya asignada se precarga su valor para corregirlo. */
   const escoger = (nuevaLinea: string, nuevoGrupo: string) => {
@@ -123,7 +126,10 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, grupos, pu
         <p className="mt-1 text-slate-500">Este turno no tiene bloques ni grupos asignados a líneas.</p>
       )}
 
-      {puedeRegistrar && (
+      {puedeRegistrar && gruposConAsistencia.length === 0 && (
+        <p className="mt-2 text-xs text-amber-700">Registre primero la asistencia de los grupos: solo se pueden asignar personas que llegaron.</p>
+      )}
+      {puedeRegistrar && gruposConAsistencia.length > 0 && (
         <form onSubmit={(e) => void enviar(e)} className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_7rem_auto] md:items-end">
           <Select etiqueta="Línea" value={lineaId} onChange={(e) => escoger(e.target.value, grupoId)} required>
             <option value="">Seleccione…</option>
@@ -133,11 +139,22 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, grupos, pu
           </Select>
           <Select etiqueta="Grupo" value={grupoId} onChange={(e) => escoger(lineaId, e.target.value)} required>
             <option value="">Seleccione…</option>
-            {grupos.filter((g) => g.activo).map((g) => (
-              <option key={g.id} value={g.id}>{g.nombre}</option>
+            {gruposConAsistencia.map((g) => (
+              <option key={g.grupoId} value={g.grupoId}>
+                {g.nombre} (llegaron {g.llegaron}, libres {g.llegaron - (g.asignadas ?? 0)})
+              </option>
             ))}
           </Select>
-          <Campo etiqueta="Personas" type="number" min={1} step={1} value={personas} onChange={(e) => setPersonas(e.target.value)} required />
+          <Campo
+            etiqueta={disponibles !== null ? `Personas (máx. ${disponibles})` : 'Personas'}
+            type="number"
+            min={1}
+            max={disponibles ?? undefined}
+            step={1}
+            value={personas}
+            onChange={(e) => setPersonas(e.target.value)}
+            required
+          />
           <Boton type="submit" variante="secundario" cargando={asignar.isPending} disabled={!lineaId || !grupoId || personas === ''}>
             {yaAsignada ? 'Corregir' : 'Asignar'}
           </Boton>

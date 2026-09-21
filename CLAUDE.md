@@ -430,7 +430,7 @@ Decisión del usuario (2026-09-16). Requiere un Chrome/Chromium: `PUPPETEER_EXEC
 ### Catálogos sembrados
 
 - **Roles:** `ADMINISTRADOR`, `COORDINADOR_MQ`, `PATINADOR`, `CONSULTA`
-- **Grupos** (antes "proveedores"; renombrados el 2026-09-21 sin excepción, el proveedor real se escribe a mano en `descripcion`): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX. Cada grupo tiene `personasEsperadas` (personas que debe enviar por turno). En la programación se registra, por turno y grupo, cuántas llegaron (`asistencia_turno`); el tablero marca el personal como A_FIN / AFECTADA comparando **solo** contra las esperadas del grupo (la línea ideal del DPP es referencia). Ver `docs/modules/mfr.md`.
+- **Grupos** (antes "proveedores"; renombrados el 2026-09-21 sin excepción, el proveedor real se escribe a mano en `descripcion`): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX. Cada grupo tiene `personasEsperadas` (personas que debe enviar por turno). En la programación se registra, por turno y grupo, cuántas llegaron (`asistencia_turno`); el tablero marca el personal como A_FIN / AFECTADA comparando **solo** contra las esperadas del grupo (la línea ideal del DPP es referencia). Los grupos se asignan a líneas por día y turno con número de personas (`asignacion_linea`; CUBIERTA / INCOMPLETA contra la línea ideal) y **nunca más personas de las que llegaron** (asistencia primero; 409 si excede o si la asistencia baja de lo asignado). El coordinador tiene `catalogo.editar` para gestionar grupos. Ver `docs/modules/mfr.md`.
 - **Lugar:** MAQUILA PEPSICO SANTO DOMINGO
 
 ---

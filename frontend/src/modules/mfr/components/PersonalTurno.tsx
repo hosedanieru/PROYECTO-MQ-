@@ -109,11 +109,8 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
                 <td className="py-1 text-right">{g.esperadas ?? '—'}</td>
                 <td className="py-1 text-right">{g.llegaron}</td>
                 <td className={`py-1 text-right ${g.faltante > 0 ? 'font-semibold text-red-700' : ''}`}>{g.faltante}</td>
-                <td
-                  className={`py-1 text-right ${g.asignadas !== null && g.asignadas > g.llegaron ? 'font-semibold text-amber-700' : ''}`}
-                  title={g.asignadas !== null && g.asignadas > g.llegaron ? 'Hay más personas asignadas a líneas que las que llegaron' : undefined}
-                >
-                  {g.asignadas ?? '—'}
+                <td className="py-1 text-right" title="Personas del grupo repartidas en líneas / las que llegaron">
+                  {g.asignadas ?? 0}/{g.llegaron}
                 </td>
                 <td className="py-1"><span className={`rounded-full px-2 py-0.5 text-xs ${ESTILO[g.estado].clase}`}>{ESTILO[g.estado].texto}</span></td>
                 <td className="py-1 text-slate-600">{g.observacion ?? ''}</td>
@@ -163,7 +160,7 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
         turnoId={turnoId}
         lineas={personal.lineas}
         catalogoLineas={lineas}
-        grupos={grupos}
+        gruposConAsistencia={personal.grupos}
         puedeRegistrar={puedeRegistrar}
       />
     </div>

@@ -22,6 +22,7 @@ const ENLACES: Enlace[] = [
   { a: '/mfr', texto: 'MFR', permiso: 'mfr.consultar' },
   { a: '/admin/productos', texto: 'Productos', permiso: 'catalogo.editar' },
   { a: '/admin/lineas', texto: 'Líneas', permiso: 'catalogo.editar' },
+  { a: '/admin/grupos', texto: 'Grupos', permiso: 'catalogo.editar' },
   { a: '/admin/usuarios', texto: 'Usuarios', permiso: 'admin.usuarios' },
 ]
 

@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { CatalogoRepository } from '../../domain/catalogo/catalogo.repository.js';
 import {
+  AsignacionExcedeAsistenciaError,
   AsignacionNoEncontradaError,
+  AsignacionSinAsistenciaError,
   BloqueNoEncontradoError,
   BloquesSolapadosError,
   DatosMfrInvalidosError,
@@ -298,7 +300,9 @@ describe('MFR — casos de uso', () => {
         ]),
       } as unknown as CatalogoRepository;
 
-      await new RegistrarAsistenciaUseCase(uow, RELOJ).ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', grupoId: 'G1', personasLlegaron: 8, observacion: null, usuarioId: 'coord' });
+      const asistencia = new RegistrarAsistenciaUseCase(uow, RELOJ);
+      await asistencia.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', grupoId: 'G1', personasLlegaron: 8, observacion: null, usuarioId: 'coord' });
+      await asistencia.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', grupoId: 'G2', personasLlegaron: 8, observacion: null, usuarioId: 'coord' });
       const asignar = new AsignarGrupoLineaUseCase(uow, RELOJ);
       await asignar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', lineaId: 'L1', grupoId: 'G1', personas: 5, usuarioId: 'coord' });
       await asignar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', lineaId: 'L2', grupoId: 'G1', personas: 3, usuarioId: 'coord' });
@@ -307,10 +311,13 @@ describe('MFR — casos de uso', () => {
       const tablero = await new IndicadoresDiaUseCase(bloques, lineas, estandares, horarios, remisiones, catalogos, asistencias, grupos, asignaciones).ejecutar(FECHA);
 
       expect(tablero.meta).toBe(95);
-      // Personal: LOGICMARD esperaba 10 y llegaron 8 → afectada. Referencia DPP: L1 13 + L2 12 = 25.
-      expect(t1Personal(tablero)).toMatchObject({ esperadas: 10, llegaron: 8, faltante: 2, requeridasDpp: 25, estado: 'AFECTADA' });
-      // LOGICMARD tiene 5 + 3 = 8 personas repartidas en líneas.
-      expect(t1Personal(tablero).grupos[0]).toMatchObject({ codigo: 'LOGICMARD', nombre: 'LOGICMARD', llegaron: 8, asignadas: 8 });
+      // Personal: LOGICMARD esperaba 10 y llegaron 8 → afectada; MIX (sin esperadas) llegaron 8. Referencia DPP: L1 13 + L2 12 = 25.
+      expect(t1Personal(tablero)).toMatchObject({ esperadas: 10, llegaron: 16, faltante: 2, requeridasDpp: 25, estado: 'AFECTADA' });
+      // LOGICMARD tiene 5 + 3 = 8 personas repartidas en líneas; MIX no tiene esperadas (sin dato) pero sí 8 en L1.
+      expect(t1Personal(tablero).grupos.map((g) => [g.codigo, g.llegaron, g.asignadas, g.estado])).toEqual([
+        ['LOGICMARD', 8, 8, 'AFECTADA'],
+        ['MIX', 8, 8, 'SIN_DATO'],
+      ]);
       // L1 necesita 13 (LNC) y tiene 5 + 8 = 13 → cubierta; L2 necesita 12 y tiene 3 → incompleta.
       expect(t1Personal(tablero).lineas.map((l) => [l.codigo, l.personas, l.requeridasDpp, l.estado])).toEqual([
         ['L1', 13, 13, 'CUBIERTA'],
@@ -388,7 +395,12 @@ describe('MFR — casos de uso', () => {
       fechaOperativa: FECHA, turnoId: 'T1', lineaId: 'L1', grupoId: 'G1', personas: 6, usuarioId: 'coord', ...extra,
     });
 
+    const llegaron = (grupoId: string, personasLlegaron: number) =>
+      new RegistrarAsistenciaUseCase(uow, RELOJ).ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', grupoId, personasLlegaron, observacion: null, usuarioId: 'coord' });
+
     it('asigna, corrige y quita con auditoría', async () => {
+      await llegaron('G1', 10);
+      auditoria.entradas.length = 0;
       const asignar = new AsignarGrupoLineaUseCase(uow, RELOJ);
 
       const primera = await asignar.ejecutar(comando());
@@ -402,7 +414,32 @@ describe('MFR — casos de uso', () => {
       expect(auditoria.entradas[1].valorAnterior).toEqual({ personas: 6 });
     });
 
+    it('no deja asignar sin asistencia ni más personas de las que llegaron (trazabilidad)', async () => {
+      const asignar = new AsignarGrupoLineaUseCase(uow, RELOJ);
+
+      // 1. Sin asistencia registrada no se sabe cuántas llegaron → bloqueo.
+      await expect(asignar.ejecutar(comando())).rejects.toBeInstanceOf(AsignacionSinAsistenciaError);
+
+      // 2. Llegaron 10: 6 en L1 caben; 5 más en L2 ya no (6 + 5 > 10).
+      await llegaron('G1', 10);
+      await asignar.ejecutar(comando({ lineaId: 'L1', personas: 6 }));
+      await expect(asignar.ejecutar(comando({ lineaId: 'L2', personas: 5 }))).rejects.toMatchObject({
+        codigo: 'MFR_ASIGNACION_EXCEDE_ASISTENCIA', llegaron: 10, enOtrasLineas: 6, solicitadas: 5,
+      });
+      await asignar.ejecutar(comando({ lineaId: 'L2', personas: 4 }));
+
+      // 3. Corregir la misma línea no cuenta contra sí misma: L1 puede pasar de 6 a 6 (no a 7).
+      await asignar.ejecutar(comando({ lineaId: 'L1', personas: 6 }));
+      await expect(asignar.ejecutar(comando({ lineaId: 'L1', personas: 7 }))).rejects.toBeInstanceOf(AsignacionExcedeAsistenciaError);
+
+      // 4. La asistencia no puede bajar por debajo de lo asignado (10) sin ajustar líneas antes.
+      await expect(llegaron('G1', 9)).rejects.toMatchObject({ codigo: 'MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS', personasLlegaron: 9, asignadas: 10 });
+      await new QuitarAsignacionUseCase(uow).ejecutar(asignaciones.items.find((a) => a.lineaId === 'L2')!.id, 'coord');
+      await expect(llegaron('G1', 9)).resolves.toMatchObject({ personasLlegaron: 9 });
+    });
+
     it('rechaza grupo inactivo, línea inexistente, personas inválidas y quitar lo que no existe', async () => {
+      await llegaron('G1', 10);
       const asignar = new AsignarGrupoLineaUseCase(uow, RELOJ);
 
       await expect(asignar.ejecutar(comando({ grupoId: 'G3' }))).rejects.toBeInstanceOf(GrupoNoEncontradoError);
