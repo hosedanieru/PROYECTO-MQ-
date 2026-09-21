@@ -16,8 +16,9 @@
 
 import { Injectable } from '@nestjs/common';
 
-import type { Remision } from '../../../domain/remision/remision.entity.js';
+import type { EstadoRemision, Remision } from '../../../domain/remision/remision.entity.js';
 import type {
+  CajasAgrupadas,
   FiltroRemisiones,
   RemisionRepository,
   ResultadoPaginado,
@@ -184,6 +185,53 @@ export class RemisionPrismaRepository implements RemisionRepository {
     };
   }
 
+  /** Tope de filas para exportar/imprimir; ~2 años de operación. */
+  private static readonly TOPE_EXPORTACION = 5000;
+
+  async listarTodas(
+    filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina'>,
+  ): Promise<Remision[]> {
+    const registros = await this.cliente.remision.findMany({
+      where: this.construirWhere(filtro),
+      include: INCLUIR_ESTIBAS,
+      orderBy: [{ fechaOperativa: 'asc' }, { anio: 'asc' }, { numero: 'asc' }],
+      take: RemisionPrismaRepository.TOPE_EXPORTACION,
+    });
+    return registros.map((r: RegistroRemision) => RemisionMapper.aDominio(r));
+  }
+
+  async buscarPorIds(ids: string[]): Promise<Remision[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const registros = await this.cliente.remision.findMany({
+      where: { id: { in: ids } },
+      include: INCLUIR_ESTIBAS,
+    });
+    const porId = new Map(registros.map((r) => [r.id, RemisionMapper.aDominio(r)]));
+    return ids.map((id) => porId.get(id)).filter((r): r is Remision => r !== undefined);
+  }
+
+  async totalizarCajas(
+    fechaOperativa: Date,
+    estados: readonly EstadoRemision[],
+  ): Promise<CajasAgrupadas[]> {
+    const grupos = await this.cliente.remision.groupBy({
+      by: ['turnoId', 'productoId', 'extraoficial'],
+      where: {
+        fechaOperativa,
+        estado: { in: estados.map((e) => RemisionMapper.estadoAPrisma(e)) },
+      },
+      _sum: { cantidadCajas: true },
+    });
+    return grupos.map((g) => ({
+      turnoId: g.turnoId,
+      productoId: g.productoId,
+      extraoficial: g.extraoficial,
+      cajas: g._sum.cantidadCajas ?? 0,
+    }));
+  }
+
   private construirWhere(filtro: FiltroRemisiones): Prisma.RemisionWhereInput {
     const where: Prisma.RemisionWhereInput = {};
 
@@ -193,8 +241,8 @@ export class RemisionPrismaRepository implements RemisionRepository {
     if (filtro.turnoId) {
       where.turnoId = filtro.turnoId;
     }
-    if (filtro.proveedorId) {
-      where.proveedorId = filtro.proveedorId;
+    if (filtro.grupoId) {
+      where.grupoId = filtro.grupoId;
     }
     if (filtro.productoId) {
       where.productoId = filtro.productoId;

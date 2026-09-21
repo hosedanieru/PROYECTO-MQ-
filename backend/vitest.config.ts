@@ -10,5 +10,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['src/**/*.spec.ts'],
+    // app.controller.spec importa AppModule completo (Puppeteer, exceljs…);
+    // en arranque frío puede superar los 5 s por defecto.
+    testTimeout: 30_000,
   },
 });

@@ -161,6 +161,20 @@ describe('PermisosGuard', () => {
     expect(() => guard.canActivate(ctx)).toThrow('"admin.usuarios"');
   });
 
+  it('el administrador pasa aunque no tenga el permiso listado', () => {
+    const admin = Usuario.desdePersistencia({
+      ...usuario().aObjeto(),
+      rolCodigo: 'ADMINISTRADOR',
+      permisos: [],
+    });
+    const ctx = contexto(
+      { usuario: admin },
+      conDecorador(RequierePermisos('mfr.permiso_futuro', 'admin.auditoria')),
+    );
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
   it('rechaza si no hay usuario en la petición', () => {
     const ctx = contexto({}, conDecorador(RequierePermisos('remision.crear')));
 

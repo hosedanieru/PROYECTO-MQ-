@@ -4,6 +4,7 @@ import { Remision, type DatosNuevaRemision } from './remision.entity.js';
 import {
   DatosRemisionInvalidosError,
   InformacionIncompletaError,
+  RemisionNoEditableError,
   TransicionEstadoInvalidaError,
 } from './remision.errors.js';
 
@@ -19,7 +20,7 @@ function datosValidos(
     fechaOperativa: FECHA_OPERATIVA,
     fechaHoraRegistro: MOMENTO,
     turnoId: 'turno-t1',
-    proveedorId: 'prov-logicmard',
+    grupoId: 'prov-logicmard',
     lugarId: 'lugar-mq',
     productoId: 'prod-1',
     codigoSnapshot: '300058141',
@@ -268,5 +269,94 @@ describe('flujo de estados', () => {
         InformacionIncompletaError,
       );
     });
+  });
+});
+
+describe('Remision.editar', () => {
+  it('corrige cantidades y estibas en BORRADOR y revalida el documento completo', () => {
+    const remision = Remision.crear(datosValidos());
+
+    remision.editar({
+      cantidadCajas: 72,
+      cantidadUnidades: 288,
+      estibasCompletas: 2,
+      numerosEstiba: [33, 31],
+      observaciones: '  corregida  ',
+    });
+
+    const datos = remision.aObjeto();
+    expect(datos.cantidadCajas).toBe(72);
+    expect(datos.numerosEstiba).toEqual([31, 33]);
+    expect(datos.observaciones).toBe('corregida');
+    expect(remision.estado).toBe('BORRADOR');
+    expect(remision.version).toBe(1);
+  });
+
+  it('cambia el producto con su snapshot', () => {
+    const remision = Remision.crear(datosValidos());
+
+    remision.editar({
+      producto: { id: 'prod-2', codigo: '300099999', descripcion: 'OTRO PRODUCTO' },
+    });
+
+    expect(remision.aObjeto()).toMatchObject({
+      productoId: 'prod-2',
+      codigoSnapshot: '300099999',
+      descripcionSnapshot: 'OTRO PRODUCTO',
+    });
+  });
+
+  it('permite editar en EN_RECTIFICACION sin tocar la versión', () => {
+    const remision = remisionEn('RECHAZADA');
+    remision.iniciarRectificacion();
+
+    remision.editar({ cantidadCajas: 34, cajasSueltas: 34, estibasCompletas: 0 });
+
+    expect(remision.estado).toBe('EN_RECTIFICACION');
+    expect(remision.version).toBe(2);
+    expect(remision.aObjeto().cantidadCajas).toBe(34);
+  });
+
+  it('rechaza editar una remisión ENTREGADA, APROBADA, RECHAZADA o VALIDADA', () => {
+    for (const estado of ['ENTREGADA', 'APROBADA', 'RECHAZADA'] as const) {
+      expect(() => remisionEn(estado).editar({ cantidadCajas: 1 })).toThrow(
+        RemisionNoEditableError,
+      );
+    }
+    const validada = remisionEn('APROBADA');
+    validada.validar('user-coordinador', 'Maria', MOMENTO);
+    expect(() => validada.editar({ cantidadCajas: 1 })).toThrow(RemisionNoEditableError);
+  });
+
+  it('no deja el documento en un estado que crear habría rechazado', () => {
+    const remision = Remision.crear(datosValidos());
+
+    expect(() => remision.editar({ cantidadCajas: 0 })).toThrow(DatosRemisionInvalidosError);
+    expect(() => remision.editar({ estibasCompletas: 0, cajasSueltas: 0 })).toThrow(
+      DatosRemisionInvalidosError,
+    );
+    expect(() => remision.editar({ numerosEstiba: [31, 31] })).toThrow(
+      DatosRemisionInvalidosError,
+    );
+    expect(() =>
+      remision.editar({ fechaVencimiento: new Date('2026-09-14T00:00:00.000Z') }),
+    ).toThrow(DatosRemisionInvalidosError);
+  });
+
+  it('si una edición falla, no cambia nada', () => {
+    const remision = Remision.crear(datosValidos());
+
+    expect(() => remision.editar({ cantidadCajas: 99, cantidadUnidades: 0 })).toThrow();
+
+    expect(remision.aObjeto().cantidadCajas).toBe(36);
+  });
+
+  it('ignora claves con undefined y borra observaciones con null', () => {
+    const remision = Remision.crear(datosValidos({ observaciones: 'algo' }));
+
+    remision.editar({ cantidadCajas: undefined, observaciones: null });
+
+    expect(remision.aObjeto().cantidadCajas).toBe(36);
+    expect(remision.aObjeto().observaciones).toBeNull();
   });
 });

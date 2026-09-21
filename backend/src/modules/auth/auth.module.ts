@@ -22,6 +22,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, type JwtSignOptions } from '@nestjs/jwt';
 
+import { ActualizarUsuarioUseCase } from '../../application/auth/actualizar-usuario.use-case.js';
 import { CrearUsuarioUseCase } from '../../application/auth/crear-usuario.use-case.js';
 import { IniciarSesionUseCase } from '../../application/auth/iniciar-sesion.use-case.js';
 import {
@@ -44,7 +45,7 @@ import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service
 import { JwtAuthGuard } from '../../infrastructure/auth/jwt-auth.guard.js';
 import { JwtEmisorTokenService } from '../../infrastructure/auth/jwt-emisor-token.service.js';
 import { PermisosGuard } from '../../infrastructure/auth/permisos.guard.js';
-import { PersistenciaModule } from '../../infrastructure/persistence/prisma/persistencia.module.js';
+import { PersistenciaModule } from '../../infrastructure/persistence/persistencia.module.js';
 import { AuthController } from './auth.controller.js';
 import { UsuariosController } from './usuarios.controller.js';
 
@@ -109,6 +110,12 @@ function leerSecretoJwt(): string {
       inject: [UNIDAD_DE_TRABAJO, HASH_CONTRASENA],
       useFactory: (uow: UnidadDeTrabajo, hash: HashContrasena) =>
         new CrearUsuarioUseCase(uow, hash),
+    },
+    {
+      provide: ActualizarUsuarioUseCase,
+      inject: [UNIDAD_DE_TRABAJO, HASH_CONTRASENA],
+      useFactory: (uow: UnidadDeTrabajo, hash: HashContrasena) =>
+        new ActualizarUsuarioUseCase(uow, hash),
     },
 
     // ------------------------------------------------------

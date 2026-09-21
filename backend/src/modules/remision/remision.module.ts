@@ -27,6 +27,28 @@ import {
   RELOJ,
   type Reloj,
 } from '../../application/remision/crear-remision.use-case.js';
+import { EditarRemisionUseCase } from '../../application/remision/editar-remision.use-case.js';
+import { ExportarRemisionesUseCase } from '../../application/remision/exportar-remisiones.use-case.js';
+import { ImprimirRemisionesUseCase } from '../../application/remision/imprimir-remisiones.use-case.js';
+import {
+  CATALOGO_REPOSITORY,
+  type CatalogoRepository,
+} from '../../domain/catalogo/catalogo.repository.js';
+import { GRUPO_REPOSITORY, type GrupoRepository } from '../../domain/grupo/grupo.repository.js';
+import {
+  EXPORTADOR_EXCEL_REMISION,
+  type ExportadorExcelRemision,
+} from '../../domain/remision/exportador-excel.js';
+import {
+  GENERADOR_PDF_REMISION,
+  type GeneradorPdfRemision,
+} from '../../domain/remision/generador-pdf.js';
+import {
+  REMISION_REPOSITORY,
+  type RemisionRepository,
+} from '../../domain/remision/remision.repository.js';
+import { ExceljsExportadorService } from '../../infrastructure/excel/exceljs-exportador.service.js';
+import { PuppeteerPdfService } from '../../infrastructure/pdf/puppeteer-pdf.service.js';
 import {
   AprobarRemisionUseCase,
   EntregarRemisionUseCase,
@@ -42,7 +64,7 @@ import {
   UNIDAD_DE_TRABAJO,
   type UnidadDeTrabajo,
 } from '../../domain/shared/unidad-de-trabajo.js';
-import { PersistenciaModule } from '../../infrastructure/persistence/prisma/persistencia.module.js';
+import { PersistenciaModule } from '../../infrastructure/persistence/persistencia.module.js';
 import { RelojSistema } from '../../infrastructure/shared/reloj-sistema.js';
 import { RemisionController } from './remision.controller.js';
 
@@ -68,6 +90,28 @@ const casosUsoFlujo = [
   controllers: [RemisionController],
   providers: [
     { provide: RELOJ, useClass: RelojSistema },
+    { provide: GENERADOR_PDF_REMISION, useClass: PuppeteerPdfService },
+    { provide: EXPORTADOR_EXCEL_REMISION, useClass: ExceljsExportadorService },
+    {
+      provide: ImprimirRemisionesUseCase,
+      inject: [REMISION_REPOSITORY, CATALOGO_REPOSITORY, GRUPO_REPOSITORY, GENERADOR_PDF_REMISION],
+      useFactory: (
+        remisiones: RemisionRepository,
+        catalogos: CatalogoRepository,
+        grupos: GrupoRepository,
+        generador: GeneradorPdfRemision,
+      ) => new ImprimirRemisionesUseCase(remisiones, { catalogos, grupos }, generador),
+    },
+    {
+      provide: ExportarRemisionesUseCase,
+      inject: [REMISION_REPOSITORY, CATALOGO_REPOSITORY, GRUPO_REPOSITORY, EXPORTADOR_EXCEL_REMISION],
+      useFactory: (
+        remisiones: RemisionRepository,
+        catalogos: CatalogoRepository,
+        grupos: GrupoRepository,
+        exportador: ExportadorExcelRemision,
+      ) => new ExportarRemisionesUseCase(remisiones, { catalogos, grupos }, exportador),
+    },
     {
       provide: CrearRemisionUseCase,
       inject: [UNIDAD_DE_TRABAJO, PRODUCTO_REPOSITORY, RELOJ],
@@ -76,6 +120,12 @@ const casosUsoFlujo = [
         productos: ProductoRepository,
         reloj: Reloj,
       ) => new CrearRemisionUseCase(uow, productos, reloj),
+    },
+    {
+      provide: EditarRemisionUseCase,
+      inject: [UNIDAD_DE_TRABAJO, PRODUCTO_REPOSITORY],
+      useFactory: (uow: UnidadDeTrabajo, productos: ProductoRepository) =>
+        new EditarRemisionUseCase(uow, productos),
     },
     ...casosUsoFlujo,
   ],

@@ -18,7 +18,16 @@ import type {
   UnidadDeTrabajo,
 } from '../../../domain/shared/unidad-de-trabajo.js';
 import { PrismaService } from '../../database/prisma/prisma.service.js';
+import { AsignacionPrismaRepository } from './asignacion.prisma.repository.js';
 import { AuditoriaPrismaRepository } from './auditoria.prisma.repository.js';
+import { AsistenciaPrismaRepository } from './asistencia.prisma.repository.js';
+import { GrupoPrismaRepository } from './grupo.prisma.repository.js';
+import {
+  BloquePrismaRepository,
+  EstandarPrismaRepository,
+  LineaPrismaRepository,
+} from './mfr.prisma.repositories.js';
+import { ProductoPrismaRepository } from './producto.prisma.repository.js';
 import { RemisionPrismaRepository } from './remision.prisma.repository.js';
 import { UsuarioPrismaRepository } from './usuario.prisma.repository.js';
 
@@ -42,7 +51,14 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
         trabajo({
           remisiones: new RemisionPrismaRepository(tx),
           usuarios: new UsuarioPrismaRepository(tx),
+          productos: new ProductoPrismaRepository(tx),
+          grupos: new GrupoPrismaRepository(tx),
           auditoria: new AuditoriaPrismaRepository(tx),
+          bloques: new BloquePrismaRepository(tx),
+          lineas: new LineaPrismaRepository(tx),
+          estandares: new EstandarPrismaRepository(tx),
+          asistencias: new AsistenciaPrismaRepository(tx),
+          asignaciones: new AsignacionPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

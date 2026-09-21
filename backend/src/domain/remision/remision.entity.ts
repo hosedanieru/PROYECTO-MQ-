@@ -22,6 +22,7 @@
 import {
   DatosRemisionInvalidosError,
   InformacionIncompletaError,
+  RemisionNoEditableError,
   TransicionEstadoInvalidaError,
 } from './remision.errors.js';
 
@@ -52,7 +53,7 @@ export interface DatosNuevaRemision {
   fechaOperativa: Date;
   fechaHoraRegistro: Date;
   turnoId: string;
-  proveedorId: string;
+  grupoId: string;
   lugarId: string;
   productoId: string;
   codigoSnapshot: string;
@@ -64,7 +65,39 @@ export interface DatosNuevaRemision {
   cajasSueltas: number;
   numerosEstiba: number[];
   observaciones?: string | null;
+  /**
+   * Pedido de emergencia por fuera del DPP de PepsiCo (decisión del área,
+   * 2026-09-18). No cuenta para el MFR ni para el tope de lo programado;
+   * exige motivo. Por defecto, false.
+   */
+  extraoficial?: boolean;
+  motivoExtraoficial?: string | null;
   creadaPorId: string;
+}
+
+/**
+ * Lo que un coordinador puede corregir mientras el documento no ha
+ * salido a entrega. Quedan FUERA a propósito: consecutivo, fecha
+ * operativa, fecha de registro, autor, estado y versión.
+ *
+ * Si cambia el producto, el snapshot debe venir junto: la remisión no
+ * conoce el catálogo, así que quien la edita (el caso de uso) resuelve
+ * código y descripción y los entrega aquí.
+ */
+export interface DatosEditablesRemision {
+  turnoId?: string;
+  grupoId?: string;
+  lugarId?: string;
+  producto?: { id: string; codigo: string; descripcion: string };
+  fechaVencimiento?: Date;
+  cantidadCajas?: number;
+  cantidadUnidades?: number;
+  estibasCompletas?: number;
+  cajasSueltas?: number;
+  numerosEstiba?: number[];
+  observaciones?: string | null;
+  extraoficial?: boolean;
+  motivoExtraoficial?: string | null;
 }
 
 /** Estado completo de una remisión existente, tal como se persiste. */
@@ -72,6 +105,8 @@ export interface EstadoPersistidoRemision extends DatosNuevaRemision {
   id: string;
   version: number;
   estado: EstadoRemision;
+  extraoficial: boolean;
+  motivoExtraoficial: string | null;
   entregadaPorId?: string | null;
   fechaEntrega?: Date | null;
   opaNombre?: string | null;
@@ -102,6 +137,13 @@ const TRANSICIONES_PERMITIDAS: Record<EstadoRemision, EstadoRemision[]> = {
   VALIDADA: [],
 };
 
+/** Quita las claves con `undefined` para que no pisen valores al hacer spread. */
+function sinIndefinidos<T extends object>(objeto: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(objeto).filter(([, valor]) => valor !== undefined),
+  ) as Partial<T>;
+}
+
 // ============================================================
 // ENTIDAD
 // ============================================================
@@ -125,6 +167,8 @@ export class Remision {
       estado: 'BORRADOR',
       observaciones: datos.observaciones?.trim() || null,
       numerosEstiba: [...datos.numerosEstiba].sort((a, b) => a - b),
+      extraoficial: datos.extraoficial ?? false,
+      motivoExtraoficial: datos.extraoficial ? datos.motivoExtraoficial!.trim() : null,
     });
   }
 
@@ -190,6 +234,12 @@ export class Remision {
       'La fecha de vencimiento debe ser posterior a la fecha operativa.',
     );
 
+    // Un pedido de emergencia sale del MFR: debe quedar explicado.
+    exigir(
+      !datos.extraoficial || (datos.motivoExtraoficial?.trim().length ?? 0) >= 5,
+      'Una remisión extraoficial exige el motivo (mínimo 5 caracteres).',
+    );
+
     Remision.validarEstibas(datos.numerosEstiba);
   }
 
@@ -207,6 +257,44 @@ export class Remision {
         'Hay números de estiba repetidos en la remisión.',
       );
     }
+  }
+
+  // ---------- Edición ----------
+
+  /**
+   * Corrige los datos del documento. Solo en BORRADOR o EN_RECTIFICACION.
+   *
+   * Se valida el documento COMPLETO resultante con las mismas reglas de
+   * la creación: una edición parcial no puede dejar la remisión en un
+   * estado que `crear` habría rechazado.
+   */
+  editar(cambios: DatosEditablesRemision): void {
+    if (!this.esEditable) {
+      throw new RemisionNoEditableError(this.estadoInterno.estado);
+    }
+
+    const { producto, ...resto } = cambios;
+    const propuesto: EstadoPersistidoRemision = {
+      ...this.estadoInterno,
+      ...sinIndefinidos(resto),
+      ...(producto
+        ? {
+            productoId: producto.id,
+            codigoSnapshot: producto.codigo,
+            descripcionSnapshot: producto.descripcion,
+          }
+        : {}),
+    };
+
+    Remision.validarDatos(propuesto);
+
+    this.estadoInterno = {
+      ...propuesto,
+      observaciones: propuesto.observaciones?.trim() || null,
+      numerosEstiba: [...propuesto.numerosEstiba].sort((a, b) => a - b),
+      extraoficial: propuesto.extraoficial ?? false,
+      motivoExtraoficial: propuesto.extraoficial ? propuesto.motivoExtraoficial!.trim() : null,
+    };
   }
 
   // ---------- Transiciones de estado ----------
@@ -333,6 +421,11 @@ export class Remision {
       this.estadoInterno.estado === 'BORRADOR' ||
       this.estadoInterno.estado === 'EN_RECTIFICACION'
     );
+  }
+
+  /** Pedido de emergencia fuera del DPP: no cuenta para el MFR ni para el tope. */
+  get esExtraoficial(): boolean {
+    return this.estadoInterno.extraoficial;
   }
 
   /** Aprobada por PepsiCo pero aún sin conciliar internamente. */

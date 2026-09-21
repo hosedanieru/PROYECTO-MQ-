@@ -24,7 +24,8 @@ import type { AuditoriaRepository } from '../../domain/auditoria/auditoria.repos
 import type { Remision } from '../../domain/remision/remision.entity.js';
 import { RemisionNoEncontradaError } from '../../domain/remision/remision.errors.js';
 import type { RemisionRepository } from '../../domain/remision/remision.repository.js';
-import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import { verificarContraProgramacion } from './control-programacion.js';
 import type { Reloj } from './crear-remision.use-case.js';
 
 // ============================================================
@@ -46,19 +47,26 @@ abstract class CasoUsoFlujoRemision {
     protected async aplicar(parametros: {
         remisionId: string;
         usuarioId: string;
+        /** Verificaciones que necesitan leer otros datos, antes de mutar (dentro de la transacción). */
+        antes?: (remision: Remision, contexto: ContextoTransaccional) => Promise<void>;
         transicion: (remision: Remision) => string | null | void;
         despues?: (
             remision: Remision,
             repos: RemisionRepository,
         ) => Promise<void>;
     }): Promise<Remision> {
-        return this.uow.ejecutar(async ({ remisiones, auditoria }) => {
+        return this.uow.ejecutar(async (contexto) => {
+            const { remisiones, auditoria } = contexto;
             const remision = await remisiones.buscarPorId(parametros.remisionId);
 
             if (!remision) {
                 throw new RemisionNoEncontradaError(
                     `No existe la remisión "${parametros.remisionId}".`,
                 );
+            }
+
+            if (parametros.antes) {
+                await parametros.antes(remision, contexto);
             }
 
             const estadoAnterior = remision.estado;
@@ -142,6 +150,26 @@ export class AprobarRemisionUseCase extends CasoUsoFlujoRemision {
         return this.aplicar({
             remisionId: comando.remisionId,
             usuarioId: comando.registradaPorId,
+            /**
+             * Solo las APROBADAS/VALIDADAS cuentan contra el DPP (área,
+             * 2026-09-18): al aprobar es cuando la remisión entra en la
+             * cuenta, así que aquí se vuelve a verificar el tope. Dos
+             * borradores del mismo SKU no pueden terminar aprobados por
+             * encima de lo programado.
+             */
+            antes: async (remision, { bloques, estandares, remisiones }) => {
+                const d = remision.aObjeto();
+                await verificarContraProgramacion(
+                    { bloques, estandares, remisiones },
+                    {
+                        fechaOperativa: d.fechaOperativa,
+                        productoId: d.productoId,
+                        codigoProducto: d.codigoSnapshot,
+                        cantidadCajas: d.cantidadCajas,
+                        extraoficial: d.extraoficial,
+                    },
+                );
+            },
             transicion: (remision) => {
                 // El OPA no es usuario del sistema: se registra como dato.
                 remision.aprobar(

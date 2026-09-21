@@ -15,7 +15,7 @@ Objetivo: reemplazar un conjunto de formularios en Excel por un sistema integrad
 ```text
 REMISIONES
    ├── MFR (Manufacturing Fill Rate — cumplimiento de lo programado)
-   ├── Averías (% por día / turno / proveedor)
+   ├── Averías (% por día / turno / grupo)
    ├── Calidad (muestreos, controles PI/PT/insumos/rotulado)
    ├── Inventario (conciliación contra el WMS de bodega)
    ├── Planes de trabajo
@@ -24,7 +24,7 @@ REMISIONES
    └── Alertas por desviación (general y por SKU)
 ```
 
-No diseñar ni implementar esos módulos sin levantamiento previo. Solo Remisiones está cerrado.
+No diseñar ni implementar esos módulos sin levantamiento previo. Remisiones está cerrado y MFR implementado (con la naturaleza de la línea pendiente de confirmar).
 
 ### Perfil del usuario
 
@@ -63,9 +63,9 @@ Vienen del documento maestro del proyecto. Se cumplen sin excepción:
 | Capa | Tecnología |
 |---|---|
 | Backend | Node.js + TypeScript + NestJS |
-| ORM | **Prisma 7** |
-| Base de datos | PostgreSQL 18 (local en Windows, usuario `postgres`) |
-| Frontend | React + TypeScript + Vite (scaffold, sin desarrollar) |
+| ORM | **Prisma 7** (solo con PostgreSQL) |
+| Base de datos | **Seleccionable con `PERSISTENCIA`**: PostgreSQL 18 (`postgres`, por defecto) o **Firestore** (`firestore`, vía `firebase-admin`). Decisión del usuario (2026-09-17): Firebase por familiaridad y por no tener servidor de BD; PostgreSQL se conserva íntegro. |
+| Frontend | React 19 + TypeScript + Vite 8 · Tailwind v4 · axios · TanStack Query · react-hook-form + zod · react-router 7 |
 | Pruebas | Vitest |
 | Infraestructura | Git, Docker (solo para despliegue futuro) |
 
@@ -117,6 +117,18 @@ DOMINIO        entidades, reglas, interfaces de repositorio
       ↑
 INFRAESTRUCTURA  Prisma, PostgreSQL, adaptadores
 ```
+
+### Dos bases de datos, una sola aplicación
+
+`infrastructure/persistence/persistencia.module.ts` es el **único** lugar que decide la implementación de cada puerto según `PERSISTENCIA`. Ningún módulo de negocio importa `PrismaService` ni `FirestoreService`. Al agregar un repositorio nuevo hay que implementarlo **dos veces** (`persistence/prisma/` y `firestore/repositorios/`) y registrarlo en ese módulo.
+
+Reglas de la implementación Firestore (`infrastructure/firestore/`):
+- Dentro de una transacción, **todas las lecturas antes que cualquier escritura**; por eso los repositorios nunca releen lo que acaban de escribir: devuelven el objeto construido.
+- Consecutivo: transacción optimista con reintento sobre `consecutivos/REMISION-{anio}`.
+- Listados: consulta por fecha operativa (`fechaOperativaTexto`) y resto de filtros en memoria (tope 5.000). Búsqueda de productos en memoria.
+- Roles con permisos embebidos; horarios embebidos en el turno. Ids de catálogo = código.
+- Sin migraciones: `npm run seed:firestore`. Reglas e índices en `infrastructure/firebase/`.
+- Pruebas: `npm run test:firestore` contra un proyecto de pruebas (id con "test"/"prueba") o el emulador (requiere Java).
 
 ### Regla estructural inviolable
 
@@ -212,6 +224,7 @@ Tokens existentes: `REMISION_REPOSITORY`, `PRODUCTO_REPOSITORY`, `USUARIO_REPOSI
 - **Protegido por defecto.** `JwtAuthGuard` y `PermisosGuard` son globales (`APP_GUARD`). Toda ruta exige `Authorization: Bearer <token>` salvo que lleve `@Publico()`. Una ruta nueva sin decorador queda protegida, no expuesta.
 - **Quién ejecuta la acción sale del token** (`@UsuarioActual()`), nunca del cuerpo. Los DTOs no reciben identificadores de usuario.
 - **Permisos por endpoint** con `@RequierePermisos('remision.crear')`. Sin permiso → `PermisoDenegadoError` → 403.
+- **El ADMINISTRADOR es superusuario**: `Usuario.tienePermiso()` devuelve `true` para ese rol aunque el permiso no exista en la base; el frontend hace lo mismo. Todo lo que el sistema haga, el administrador lo puede hacer. Los permisos finos del resto de roles se ajustarán cuando el área defina las vistas por rol × área.
 - **Los permisos NO viajan en el token**; el guard carga el usuario de la base en cada petición. Un cambio de rol o una desactivación aplican de inmediato, no cuando el token expire.
 - **Token JWT de 12 h**, sin refresh (cubre el turno más largo, 10 h). Login por `documento`. Contraseñas con bcrypt (10 rondas), mínimo 8 caracteres.
 - Sin Passport: `@nestjs/jwt` + guards propios. No había un problema que Passport resolviera.
@@ -236,13 +249,15 @@ Los actores de PepsiCo se registran como **dato** (nombre, cargo, fecha), no com
 
 ### Turnos y horarios
 
-Los horarios varían por día de la semana. Son configuración (`turno_horario`), no valores en código.
+Son configuración (`turno_horario`), no valores en código. **Decisión del 2026-09-18: se usan los horarios del DPP de PepsiCo, todos los días de la semana**:
 
-| Turno | Lunes | Mar–Vie | Sábado |
-|---|---|---|---|
-| T1 | 08:00–14:00 | 06:00–14:00 | 06:00–10:00 |
-| T2 | 14:00–20:00 | 14:00–22:00 | 10:00–14:00 |
-| T3 | 20:00–06:00 | 22:00–06:00 | N/A |
+| Turno | Horario | Horas productivas |
+|---|---|---|
+| T1 | 06:00–13:30 | 7,5 |
+| T2 | 14:00–21:30 | 7,5 |
+| T3 | 22:00–05:30 | 7,5 |
+
+Los horarios anteriores por día de la semana (lunes 08:00–14:00, sábado sin T3…) quedaron en pausa: `PENDIENTE DE DEFINIR` si algún día opera distinto. El turno de un bloque del DPP se deriva de su hora de inicio (`turnoDeHora` en `domain/mfr/horas-turno.ts`).
 
 ### Fecha operativa — el corte 6:00 a 6:00
 
@@ -285,6 +300,8 @@ Implementado y probado en `src/domain/shared/fecha-operativa.ts`.
 
 Las transiciones válidas están en una tabla (`TRANSICIONES_PERMITIDAS`) dentro de la entidad, no en condicionales. Nada fuera de ese diagrama está permitido.
 
+**Edición:** `Remision.editar(cambios)` solo funciona en BORRADOR o EN_RECTIFICACION (`RemisionNoEditableError` → 409 en los demás). Revalida el documento completo con las mismas reglas de `crear`. Editables: turno, grupo, lugar, producto (con snapshot nuevo que resuelve el caso de uso), vencimiento, cantidades, estibas, observaciones. NO editables: consecutivo, fecha operativa, fecha de registro, autor, estado, versión. Cada edición se audita con valor anterior y nuevo.
+
 ### Invariantes del negocio
 
 1. **Una remisión = un solo producto (SKU).** En el Excel se imprimen dos por hoja, pero eso es solo formato de impresión.
@@ -293,6 +310,7 @@ Las transiciones válidas están en una tabla (`TRANSICIONES_PERMITIDAS`) dentro
 4. **Aprobación ≠ validación.** Dos eventos distintos, con responsables y momentos distintos. Mantenerlas separadas permite detectar remisiones aprobadas sin conciliar (fuente probable de descuadres actuales).
 5. **Snapshot de producto.** La remisión guarda copia congelada del código y descripción, además de la referencia al catálogo. Si el catálogo cambia, el documento debe seguir mostrando lo que decía al firmarse. Duplicación intencional.
 6. **Estibas como dato estructurado.** En el Excel, `N° Estibas` mezclaba número y texto (`"2 ESTIBAS+ 21 CAJAS"`), y las observaciones contenían los números de estiba (`"EST: 31,32,33"`). Ahora: `estibas_completas` + `cajas_sueltas` (enteros) y tabla `remision_estiba`. El texto se calcula para mostrar, no se almacena.
+7. **Ni una caja más de lo programado** (área, 2026-09-18). Lo remisionado de un SKU en un día debe ser exactamente lo que el DPP de PepsiCo programó. Al crear, editar y aprobar se verifica `aprobadas + esta ≤ Σ T del SKU` (solo APROBADAS/VALIDADAS cuentan); sin DPP cargado o con un SKU fuera del DPP se bloquea (409). "Ni menos" se controla al cerrar el turno: exige motivo del faltante. Excepción: remisión **extraoficial** (pedido de emergencia, con motivo), que no entra en el tope ni en el MFR. Ver `docs/modules/mfr.md`.
 
 ### Auditoría — requisito estricto
 
@@ -324,40 +342,95 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 ### Terminado
 
 - Base de datos: 14 tablas (`schema.prisma`), migraciones aplicadas
-- Seed idempotente: 13 permisos, 4 roles, 3 turnos con 14 horarios, 1 lugar, 4 proveedores
+- Seed idempotente: 13 permisos, 4 roles, 3 turnos con 14 horarios, 1 lugar, 4 grupos
 - Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
 - Regla `fecha_operativa` con pruebas de casos borde
 - 6 casos de uso: crear + las 5 transiciones
 - Infraestructura: unidad de trabajo, mapeador, 4 repositorios Prisma, reloj
 - API HTTP completa con validación y traducción de errores de dominio
 - Autenticación JWT + permisos por endpoint (B1 del ROADMAP), verificada por HTTP
-- 92 pruebas, todas sin base de datos
+- Catálogos de referencia, productos (crear/editar/desactivar) y usuarios (listar/editar/restablecer clave)
+- Frontend: login, sesión, listado/detalle/creación de remisiones, las 5 acciones de flujo, administración de usuarios y productos
+- Edición de remisiones en BORRADOR / EN_RECTIFICACION (backend + pantalla), con lo que rectificar sí corrige
+- Historial de versiones y auditoría en el detalle; "Recordar sesión" (localStorage / sessionStorage)
+- PDF (Puppeteer, dos por hoja, marca de estado) y exportación a Excel (exceljs) con los filtros del listado
+- **MFR regido por el DPP de PepsiCo** (2026-09-18): bloques por línea y hora (producto, **cajas/hora**, E) con `Mx = cajasPorHora × h`, `T = Mx × E` (decisión 2026-09-19: el ritmo se maneja por hora, no en BPM; al importar el PDF, cajas/h = Mx ÷ horas del bloque, así T queda exacto; el estándar del producto —hoja TIEMPOS— es solo el valor por defecto para bloques a mano y se puede dar al crear el producto); 8 líneas físicas con tipo y capacidad kg/h; importador del PDF del DPP (`pdf-parse`, lector puro en `domain/mfr/dpp-pepsico.ts`), copiar día, corregir con motivo, cerrar turno; tablero con MFR por SKU, turnos (eficiencia planeada/real) y vista horaria en kg (Target/Instant/Capacity/Overpull). Decisiones: cajas; cuenta al aprobar el OPA; meta 95 %; la remisión NO registra línea. Ver `docs/modules/mfr.md`. Archivos obsoletos vacíos por borrar: `domain/mfr/{programacion,config-turno}.ts`, `application/mfr/{programacion,config-turno}.use-cases.ts`, `frontend/.../ConfigTurnoPage.tsx`.
+- 152 pruebas unitarias sin base de datos + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`)
+- Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
+- Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
+
+### Frontend — estructura
+
+```text
+frontend/src/
+├── app/            providers (Query → Sesión → Router), router, layout, InicioPage (panel)
+├── modules/
+│   ├── auth/       api, SesionContext (provider), useSesion, RutaProtegida, LoginPage
+│   ├── remisiones/ api, hooks (useRemisiones, useAccionRemision), pages (lista, detalle, crear), AccionesRemision
+│   ├── catalogo/   api, hooks (useTurnos, useGrupos, useLugares, useRoles, useProductos)
+│   └── admin/      UsuariosPage, ProductosPage
+├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando
+├── services/       http.ts (axios: token, 401 → cerrar sesión, ErrorApi), almacen-token.ts (localStorage)
+└── shared/         types (api, remision, catalogo), utils/fechas (fechaOperativaDe espejo del backend)
+```
+
+Reglas del frontend: nada llama a axios fuera de `services/http.ts`; los permisos solo OCULTAN acciones (la autorización real es del backend); los filtros del listado viven en la URL; las mutaciones invalidan exactamente las claves de caché que tocan.
 
 ### API existente
 
 ```text
 POST   /api/auth/login                  público → { token, usuario }
 GET    /api/auth/perfil                 usuario del token con sus permisos
+
+GET    /api/usuarios                    admin.usuarios
+GET    /api/usuarios/:id                admin.usuarios
 POST   /api/usuarios                    admin.usuarios
+PATCH  /api/usuarios/:id                admin.usuarios  (nombre, email, rol, activo, contraseña)
+
+GET    /api/catalogos/turnos            catalogo.consultar
+GET    /api/grupos                      catalogo.consultar  (POST/PATCH con catalogo.editar: descripcion, personasEsperadas)
+GET    /api/catalogos/lugares           catalogo.consultar
+GET    /api/catalogos/roles             admin.usuarios
+
+GET    /api/productos?texto=&soloActivos=   catalogo.consultar
+GET    /api/productos/:id               catalogo.consultar
+POST   /api/productos                   catalogo.editar
+PATCH  /api/productos/:id               catalogo.editar  (datos, activo; NO estándares)
 
 POST   /api/remisiones                  remision.crear
+PATCH  /api/remisiones/:id              remision.editar  (solo BORRADOR / EN_RECTIFICACION → 409 si no)
 POST   /api/remisiones/:id/entregar     remision.entregar
 POST   /api/remisiones/:id/aprobar      remision.registrar_aprobacion
 POST   /api/remisiones/:id/rechazar     remision.registrar_aprobacion
 POST   /api/remisiones/:id/rectificar   remision.rectificar
 POST   /api/remisiones/:id/validar      remision.validar
 
-GET    /api/remisiones?anio=&turnoId=&proveedorId=&productoId=&estado=&desde=&hasta=&pagina=&porPagina=
+GET    /api/remisiones?anio=&turnoId=&grupoId=&productoId=&estado=&desde=&hasta=&pagina=&porPagina=
+GET    /api/remisiones/pdf?ids=a,b,c                  remision.consultar  (PDF, dos por hoja)
+GET    /api/remisiones/exportar?…filtros              remision.exportar   (.xlsx)
+GET    /api/remisiones/:id/pdf                        remision.consultar
 GET    /api/remisiones/consecutivo/:anio/:numero      remision.consultar
+GET    /api/remisiones/:id/versiones                  remision.consultar
+GET    /api/remisiones/:id/auditoria                  remision.consultar + admin.auditoria
 GET    /api/remisiones/:id                            remision.consultar
 ```
+
+Detalle completo de la API en `docs/api.md`.
+
+### Fechas: regla de formato
+
+Las fechas de solo día (`fechaOperativa`, `fechaVencimiento`) se guardan a medianoche UTC y **se formatean en UTC**; formatearlas en zona Bogotá retrocede un día. Los instantes reales (`fechaHoraRegistro`, entrega, aprobación, validación) se muestran en `America/Bogota`. Aplica a PDF, Excel y frontend.
+
+### PDF con Puppeteer
+
+Decisión del usuario (2026-09-16). Requiere un Chrome/Chromium: `PUPPETEER_EXECUTABLE_PATH` en `.env` (en este equipo, Google Chrome instalado; la descarga automática de Puppeteer falla porque la ruta del perfil tiene acentos). En Docker, `chromium` del sistema. El navegador se abre una vez y se reutiliza.
 
 `GET /:id` va **al final** del controlador: si estuviera antes de `consecutivo/:anio/:numero`, NestJS interpretaría "consecutivo" como un id.
 
 ### Catálogos sembrados
 
 - **Roles:** `ADMINISTRADOR`, `COORDINADOR_MQ`, `PATINADOR`, `CONSULTA`
-- **Proveedores** (empresas que operan los turnos): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX
+- **Grupos** (antes "proveedores"; renombrados el 2026-09-21 sin excepción, el proveedor real se escribe a mano en `descripcion`): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX. Cada grupo tiene `personasEsperadas` (personas que debe enviar por turno). En la programación se registra, por turno y grupo, cuántas llegaron (`asistencia_turno`); el tablero marca el personal como A_FIN / AFECTADA comparando **solo** contra las esperadas del grupo (la línea ideal del DPP es referencia). Ver `docs/modules/mfr.md`.
 - **Lugar:** MAQUILA PEPSICO SANTO DOMINGO
 
 ---
@@ -370,10 +443,17 @@ Los DTOs ya no reciben `*PorId` del cliente. El usuario sale del token y cada en
 
 ### Pendientes técnicos
 
-- No hay pruebas de integración contra PostgreSQL real. La atomicidad se simula en las pruebas unitarias.
-- Catálogo de productos vacío: la carga se hará con un script de importación, no con seed.
-- No hay endpoints para listar/editar/desactivar usuarios ni para cambiar contraseña. Solo crear. Los necesitará el frontend de administración.
 - Un JWT no se puede revocar antes de expirar (12 h). Si el área lo exige, habría que agregar refresh token o lista de revocación.
+- `infrastructure/docker-compose.yml` se escribió sin poder ejecutarlo (Docker sin plugin Compose en el equipo de desarrollo). Validar con `docker compose config` antes del primer despliegue.
+- La imagen del backend instala también las dependencias de desarrollo (la CLI de Prisma y `tsx` corren en el arranque para migrar y sembrar). Se puede adelgazar después.
+- Los usuarios no pueden cambiar su propia contraseña; solo el administrador la restablece.
+
+### Bugs corregidos el 2026-09-16 (para no repetirlos)
+
+- El mapeador de remisión no persistía `motivo_ultimo_rechazo` ni los cambios de turno/grupo/lugar/producto.
+- El cliente Prisma generado estaba desactualizado respecto al schema (falta de `prisma generate`).
+- Un DTO con claves `undefined` pisaba valores reales al hacer spread (`sinIndefinidos` en los casos de uso de edición).
+- Fechas de solo día formateadas en zona Bogotá retrocedían un día en el PDF.
 
 ---
 
@@ -383,19 +463,20 @@ No implementar nada que dependa de estos puntos sin confirmarlos.
 
 | # | Pregunta | Bloquea |
 |---|---|---|
-| 1 | ¿La programación de PepsiCo viene en cajas o en unidades? | MFR |
-| 2 | ¿El MFR cuenta remisiones aprobadas o creadas? | MFR |
-| 3 | ¿La línea de producción es un activo físico fijo o un armado diario? | MFR |
-| 4 | ¿Qué es `LINEA IDEAL` en la hoja TIEMPOS? (valores 0–13; ¿personas por línea?) | Catálogo / MFR |
-| 5 | ¿Qué es `PC` en la hoja TIEMPOS? (casi constante: 280.49 y 10.05) | Catálogo |
+| 1 | ~~¿Programación en cajas o unidades?~~ **Respondido 2026-09-17: cajas.** | — |
+| 2 | ~~¿El MFR cuenta aprobadas o creadas?~~ **Respondido: al aprobar el OPA. Meta 95 %.** | — |
+| 3 | ~~¿La línea es activo físico o armado diario?~~ **Respondido 2026-09-18 por el DPP: activo físico** (8 plataformas). | — |
+| 4 | ~~¿Qué es `LINEA IDEAL`?~~ **Respondido 2026-09-19: personas necesarias en la línea para ese SKU** → `producto.personasIdeal`, por defecto en los bloques del DPP. `SUBDESCRIPCION` → `producto.subdescripcion` (familia; agrupa el Flavor Breakdown). | — |
+| 5 | ~~¿Qué es `PC`?~~ **Respondido 2026-09-19: se ignora por ahora.** | — |
 | 6 | ¿`LINEA` y `AUTOMATICA` son el mismo proceso con dos nombres? | Catálogo |
-| 7 | ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? | Catálogo |
+| 7 | ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? (2026-09-19: el catálogo se completó a mano en el panel; `npm run importar:tiempos` simula y reporta diferencias sin resolverlas) | Catálogo |
 | 8 | ¿Qué es el "cuaderno virtual"? | Módulo posterior |
 | 9 | ¿El módulo de inventario lleva inventario propio o concilia contra el WMS? | Inventario |
 | 10 | ¿El WMS registra el número de remisión de origen? | Inventario |
-| 11 | ¿Quién registra la respuesta del OPA: coordinador, patinador o ambos? | Permisos |
+| 11 | ~~¿Quién registra la respuesta del OPA?~~ **Respondido 2026-09-16: solo el coordinador.** Aplicado en el seed. | — |
 | 12 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) | Validación |
-| 13 | ¿Se produce los domingos? ¿Y el lunes entre 06:00 y 08:00? | Turnos |
+| 13 | Turnos: se adoptaron los del DPP (06:00/14:00/22:00, 7,5 h) todos los días. ¿Algún día opera distinto? | Turnos |
+| 18 | Peso neto por caja de los productos del DPP (el sistema lo sugiere desde la descripción; lo confirma el administrador) | Kilos en el MFR |
 | 14 | ¿Qué significan PT y PI? (PT = Producto Terminado, presumible; PI sin confirmar) | Terminología |
 | 15 | Acceso a SAP para sincronizar el catálogo | Ninguna (catálogo local funciona) |
 | 16 | Política de contraseñas: ¿complejidad, rotación, bloqueo por intentos? (hoy solo mínimo 8) | Ninguna |

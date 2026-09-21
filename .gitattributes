@@ -1,0 +1,2 @@
+# Los scripts de shell deben ir con LF: con CRLF el `#!/bin/sh` falla en Linux/Docker.
+*.sh text eol=lf

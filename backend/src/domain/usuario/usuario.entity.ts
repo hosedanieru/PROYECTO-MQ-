@@ -22,6 +22,9 @@ import { DatosUsuarioInvalidosError } from './usuario.errors.js';
 // TIPOS DEL DOMINIO
 // ============================================================
 
+/** Código del rol con acceso total. Debe coincidir con el seed. */
+export const ROL_ADMINISTRADOR = 'ADMINISTRADOR';
+
 /** Datos necesarios para registrar un usuario nuevo. */
 export interface DatosNuevoUsuario {
   documento: string;
@@ -61,7 +64,7 @@ export interface PerfilUsuario {
 // ============================================================
 
 export class Usuario {
-  private constructor(private readonly estadoInterno: EstadoPersistidoUsuario) {}
+  private constructor(private estadoInterno: EstadoPersistidoUsuario) {}
 
   // ---------- Construcción ----------
 
@@ -119,6 +122,48 @@ export class Usuario {
     exigir((datos.rolId ?? '').length > 0, 'El rol es obligatorio.');
   }
 
+  // ---------- Cambios (solo administrador) ----------
+
+  /** Nombre, correo y rol. Los permisos nuevos los resuelve el repositorio al guardar. */
+  actualizarDatos(cambios: {
+    nombre?: string;
+    email?: string | null;
+    rolId?: string;
+  }): void {
+    if (cambios.nombre !== undefined) {
+      const nombre = cambios.nombre.trim();
+      if (!nombre) {
+        throw new DatosUsuarioInvalidosError('El nombre es obligatorio.');
+      }
+      this.estadoInterno.nombre = nombre;
+    }
+    if (cambios.email !== undefined) {
+      const email = cambios.email?.trim().toLowerCase() || null;
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new DatosUsuarioInvalidosError('El correo no es válido.');
+      }
+      this.estadoInterno.email = email;
+    }
+    if (cambios.rolId !== undefined) {
+      if (!cambios.rolId) {
+        throw new DatosUsuarioInvalidosError('El rol es obligatorio.');
+      }
+      this.estadoInterno.rolId = cambios.rolId;
+    }
+  }
+
+  cambiarActivo(activo: boolean): void {
+    this.estadoInterno.activo = activo;
+  }
+
+  /** Recibe el hash ya calculado; la contraseña en claro nunca llega aquí. */
+  cambiarContrasena(passwordHash: string): void {
+    if (!passwordHash) {
+      throw new DatosUsuarioInvalidosError('El hash de la contraseña es obligatorio.');
+    }
+    this.estadoInterno.passwordHash = passwordHash;
+  }
+
   // ---------- Consultas ----------
 
   get id(): string {
@@ -146,8 +191,19 @@ export class Usuario {
     return this.estadoInterno.passwordHash;
   }
 
+  /** El administrador puede ejecutar cualquier acción del sistema, sin excepción. */
+  get esAdministrador(): boolean {
+    return this.estadoInterno.rolCodigo === ROL_ADMINISTRADOR;
+  }
+
+  /**
+   * El administrador pasa cualquier verificación aunque el permiso no
+   * exista todavía en la base: así un módulo nuevo nunca lo deja por
+   * fuera por olvidar correr el seed. Es la misma regla del aplicativo
+   * de recepción de Inlotrans ("el administrador es superusuario").
+   */
   tienePermiso(codigo: string): boolean {
-    return this.estadoInterno.permisos.includes(codigo);
+    return this.esAdministrador || this.estadoInterno.permisos.includes(codigo);
   }
 
   /** Estado sin el hash, apto para devolver por HTTP o meter en el token. */

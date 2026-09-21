@@ -3,6 +3,13 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.test.example
+!.env.firestore.test.example
 coverage/
 *.log
 .DS_Store
+
+# Reportes de importación (se generan al correr importar:tiempos)
+backend/informes/
+# Scripts temporales del asistente
+backend/*.tmp.mjs

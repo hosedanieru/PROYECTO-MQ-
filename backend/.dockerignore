@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+coverage
+*.log
+.agents
+.claude
+.cursor
+.devin
+.windsurf
+test
+**/*.spec.ts

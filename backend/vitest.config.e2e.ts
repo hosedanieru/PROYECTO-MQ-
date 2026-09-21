@@ -1,5 +1,13 @@
 import { defineConfig } from 'vitest/config';
 
+/**
+ * Pruebas de integración: tocan PostgreSQL de verdad (base `mq_test`).
+ *
+ *   npm run test:e2e
+ *
+ * Corren en un solo hilo porque comparten la base y la vacían entre
+ * casos; en paralelo se pisarían.
+ */
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
@@ -8,8 +16,9 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],
-    // Las pruebas e2e levantan la app completa (incluida la conexión a la
-    // base de datos), así que necesitan las variables de .env.
-    setupFiles: ['dotenv/config'],
+    setupFiles: ['./test/setup-e2e.ts'],
+    fileParallelism: false,
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
   },
 });

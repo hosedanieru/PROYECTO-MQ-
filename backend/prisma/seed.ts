@@ -3,7 +3,7 @@
  * ===================================
  *
  * Carga los catálogos que no dependen del levantamiento pendiente:
- * roles, permisos, turnos con sus horarios, lugar y proveedores.
+ * roles, permisos, turnos con sus horarios, lugar y grupos.
  *
  * El catálogo de PRODUCTOS se carga por separado mediante un script de
  * importación desde Excel, porque los datos de origen tienen duplicados
@@ -18,232 +18,25 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 
-import { DiaSemana, PrismaClient } from '../src/generated/prisma/client.js';
+import { PrismaClient } from '../src/generated/prisma/client.js';
+// Los datos base (permisos, roles, turnos, lugar, grupos) viven en un
+// archivo neutral compartido con el seed de Firestore.
+import {
+  cruzaMedianoche,
+  LINEAS_PRODUCCION,
+  LUGARES,
+  PERMISOS,
+  GRUPOS,
+  ROLES,
+  TURNOS,
+  VIGENTE_DESDE,
+} from '../src/infrastructure/datos-base.js';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
 });
 
 const prisma = new PrismaClient({ adapter });
-
-// ============================================================
-// PERMISOS
-// ============================================================
-
-const PERMISOS = [
-  // Remisiones
-  {
-    codigo: 'remision.crear',
-    modulo: 'remision',
-    descripcion: 'Crear remisiones',
-  },
-  {
-    codigo: 'remision.consultar',
-    modulo: 'remision',
-    descripcion: 'Consultar remisiones',
-  },
-  {
-    codigo: 'remision.editar',
-    modulo: 'remision',
-    descripcion: 'Editar remisiones en borrador',
-  },
-  {
-    codigo: 'remision.entregar',
-    modulo: 'remision',
-    descripcion: 'Registrar la entrega al OPA',
-  },
-  {
-    codigo: 'remision.registrar_aprobacion',
-    modulo: 'remision',
-    descripcion: 'Registrar la aprobación o rechazo del OPA',
-  },
-  {
-    codigo: 'remision.rectificar',
-    modulo: 'remision',
-    descripcion: 'Rectificar una remisión rechazada',
-  },
-  {
-    codigo: 'remision.validar',
-    modulo: 'remision',
-    descripcion: 'Validar y conciliar remisiones',
-  },
-  {
-    codigo: 'remision.exportar',
-    modulo: 'remision',
-    descripcion: 'Exportar remisiones a Excel o PDF',
-  },
-
-  // Catálogos
-  {
-    codigo: 'catalogo.consultar',
-    modulo: 'catalogo',
-    descripcion: 'Consultar catálogos',
-  },
-  {
-    codigo: 'catalogo.editar',
-    modulo: 'catalogo',
-    descripcion: 'Crear y editar catálogos',
-  },
-  {
-    codigo: 'catalogo.editar_estandares',
-    modulo: 'catalogo',
-    descripcion: 'Editar estándares de producción por SKU',
-  },
-
-  // Administración
-  {
-    codigo: 'admin.usuarios',
-    modulo: 'admin',
-    descripcion: 'Administrar usuarios y roles',
-  },
-  {
-    codigo: 'admin.auditoria',
-    modulo: 'admin',
-    descripcion: 'Consultar el registro de auditoría',
-  },
-] as const;
-
-// ============================================================
-// ROLES
-// ============================================================
-
-const ROLES = [
-  {
-    codigo: 'ADMINISTRADOR',
-    nombre: 'Administrador',
-    descripcion: 'Acceso total. Único rol que edita estándares de producción.',
-    permisos: PERMISOS.map((p) => p.codigo),
-  },
-  {
-    codigo: 'COORDINADOR_MQ',
-    nombre: 'Coordinador de Maquila',
-    descripcion:
-      'Coordinador en turno. Crea remisiones, registra el resultado del OPA, rectifica y concilia.',
-    permisos: [
-      'remision.crear',
-      'remision.consultar',
-      'remision.editar',
-      'remision.registrar_aprobacion',
-      'remision.rectificar',
-      'remision.validar',
-      'remision.exportar',
-      'catalogo.consultar',
-    ],
-  },
-  {
-    codigo: 'PATINADOR',
-    nombre: 'Patinador / Auxiliar logístico',
-    descripcion:
-      'Entrega la remisión al OPA, firma como verificador e ingresa el PT al WMS de bodega.',
-    permisos: [
-      'remision.consultar',
-      'remision.entregar',
-      'remision.registrar_aprobacion',
-      'catalogo.consultar',
-    ],
-  },
-  {
-    codigo: 'CONSULTA',
-    nombre: 'Consulta',
-    descripcion: 'Solo lectura. No modifica información.',
-    permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar'],
-  },
-] as const;
-
-// ============================================================
-// TURNOS Y HORARIOS
-// ============================================================
-
-/**
- *        LUNES        MAR-VIE      SÁBADO
- *   T1   08:00-14:00  06:00-14:00  06:00-10:00
- *   T2   14:00-20:00  14:00-22:00  10:00-14:00
- *   T3   20:00-06:00  22:00-06:00  N/A
- *
- * PENDIENTE DE DEFINIR: si se produce los domingos, y si hay actividad
- * los lunes entre las 06:00 y las 08:00.
- */
-const DIAS_HABILES_MEDIO = [
-  DiaSemana.MARTES,
-  DiaSemana.MIERCOLES,
-  DiaSemana.JUEVES,
-  DiaSemana.VIERNES,
-];
-
-const VIGENTE_DESDE = new Date('2026-01-01T00:00:00.000Z');
-
-type HorarioSeed = {
-  diaSemana: DiaSemana;
-  horaInicio: string;
-  horaFin: string;
-};
-
-const TURNOS: Array<{
-  codigo: string;
-  nombre: string;
-  horarios: HorarioSeed[];
-}> = [
-  {
-    codigo: 'T1',
-    nombre: 'Turno 1',
-    horarios: [
-      { diaSemana: DiaSemana.LUNES, horaInicio: '08:00', horaFin: '14:00' },
-      ...DIAS_HABILES_MEDIO.map((d) => ({
-        diaSemana: d,
-        horaInicio: '06:00',
-        horaFin: '14:00',
-      })),
-      { diaSemana: DiaSemana.SABADO, horaInicio: '06:00', horaFin: '10:00' },
-    ],
-  },
-  {
-    codigo: 'T2',
-    nombre: 'Turno 2',
-    horarios: [
-      { diaSemana: DiaSemana.LUNES, horaInicio: '14:00', horaFin: '20:00' },
-      ...DIAS_HABILES_MEDIO.map((d) => ({
-        diaSemana: d,
-        horaInicio: '14:00',
-        horaFin: '22:00',
-      })),
-      { diaSemana: DiaSemana.SABADO, horaInicio: '10:00', horaFin: '14:00' },
-    ],
-  },
-  {
-    codigo: 'T3',
-    nombre: 'Turno 3',
-    horarios: [
-      { diaSemana: DiaSemana.LUNES, horaInicio: '20:00', horaFin: '06:00' },
-      ...DIAS_HABILES_MEDIO.map((d) => ({
-        diaSemana: d,
-        horaInicio: '22:00',
-        horaFin: '06:00',
-      })),
-      // Sábado: no hay T3
-    ],
-  },
-];
-
-/** Un turno cruza la medianoche cuando su hora de fin es menor que la de inicio. */
-function cruzaMedianoche(horaInicio: string, horaFin: string): boolean {
-  return horaFin < horaInicio;
-}
-
-// ============================================================
-// LUGAR Y PROVEEDORES
-// ============================================================
-
-const LUGARES = [
-  { codigo: 'MQ_PEPSICO_SD', nombre: 'MAQUILA PEPSICO SANTO DOMINGO' },
-];
-
-/** Empresas que operan los turnos. Tomadas del histórico 2026. */
-const PROVEEDORES = [
-  { codigo: 'LOGICMARD', nombre: 'LOGICMARD' },
-  { codigo: 'MAXISERVICE', nombre: 'MAXISERVICE' },
-  { codigo: 'APOYOS_MAXI', nombre: 'APOYOS MAXI' },
-  { codigo: 'MIX', nombre: 'MIX' },
-];
 
 // ============================================================
 // EJECUCIÓN
@@ -338,15 +131,28 @@ async function sembrarLugares(): Promise<void> {
   console.log(`  Lugares: ${LUGARES.length}`);
 }
 
-async function sembrarProveedores(): Promise<void> {
-  for (const proveedor of PROVEEDORES) {
-    await prisma.proveedor.upsert({
-      where: { codigo: proveedor.codigo },
-      update: { nombre: proveedor.nombre },
-      create: proveedor,
+async function sembrarGrupos(): Promise<void> {
+  for (const grupo of GRUPOS) {
+    // Solo se asegura que exista: descripción y personas esperadas las
+    // mantiene el administrador y el seed no las pisa.
+    await prisma.grupo.upsert({
+      where: { codigo: grupo.codigo },
+      update: {},
+      create: grupo,
     });
   }
-  console.log(`  Proveedores: ${PROVEEDORES.length}`);
+  console.log(`  Grupos: ${GRUPOS.length}`);
+}
+
+async function sembrarLineas(): Promise<void> {
+  for (const linea of LINEAS_PRODUCCION) {
+    await prisma.lineaProduccion.upsert({
+      where: { codigo: linea.codigo },
+      update: { nombre: linea.nombre, tipo: linea.tipo, capacidadKgHora: linea.capacidadKgHora, orden: linea.orden },
+      create: linea,
+    });
+  }
+  console.log(`  Líneas de producción: ${LINEAS_PRODUCCION.length}`);
 }
 
 /**
@@ -401,7 +207,8 @@ async function main(): Promise<void> {
   await sembrarRoles();
   await sembrarTurnos();
   await sembrarLugares();
-  await sembrarProveedores();
+  await sembrarGrupos();
+  await sembrarLineas();
   await sembrarAdministradorInicial();
 
   console.log('\nListo. El catálogo de productos se carga aparte.');

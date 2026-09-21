@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import type { Producto } from '../../domain/producto/producto.repository.js';
+import { Remision, type EstadoRemision } from '../../domain/remision/remision.entity.js';
+import {
+  DatosRemisionInvalidosError,
+  ProductoNoProgramadoError,
+  RemisionExcedeProgramacionError,
+  SinProgramacionDelDiaError,
+} from '../../domain/remision/remision.errors.js';
 import type {
-  Producto,
-  ProductoRepository,
-} from '../../domain/producto/producto.repository.js';
-import { Remision } from '../../domain/remision/remision.entity.js';
-import { DatosRemisionInvalidosError } from '../../domain/remision/remision.errors.js';
-import type {
+  CajasAgrupadas,
   FiltroRemisiones,
   RemisionRepository,
   ResultadoPaginado,
 } from '../../domain/remision/remision.repository.js';
 import {
   AuditoriaRepositorioFalso,
+  ProductoRepositorioFalso,
   UnidadDeTrabajoFalsa,
   UsuarioRepositorioFalso,
 } from '../pruebas/dobles-en-memoria.js';
+import { BloqueRepositorioFalso, EstandarRepositorioFalso, programarTarget } from '../pruebas/dobles-mfr.js';
 import {
   CrearRemisionUseCase,
   type CrearRemisionComando,
@@ -27,30 +32,13 @@ import {
 // ============================================================
 
 /**
- * Implementaciones en memoria de las interfaces del dominio.
+ * Implementación en memoria del repositorio de remisiones. Los dobles
+ * transversales (productos, usuarios, auditoría, unidad de trabajo)
+ * viven en `application/pruebas/dobles-en-memoria.ts`.
  *
  * Esto es lo que compra la arquitectura: el caso de uso se prueba
  * completo, sin PostgreSQL, sin Prisma y sin levantar NestJS.
  */
-
-class ProductoRepositorioFalso implements ProductoRepository {
-  private readonly items = new Map<string, Producto>();
-
-  agregar(producto: Producto): void {
-    this.items.set(producto.id, producto);
-  }
-
-  buscarPorId(id: string): Promise<Producto | null> {
-    return Promise.resolve(this.items.get(id) ?? null);
-  }
-
-  buscarPorCodigo(codigo: string): Promise<Producto | null> {
-    const encontrado = [...this.items.values()].find(
-      (p) => p.codigo === codigo,
-    );
-    return Promise.resolve(encontrado ?? null);
-  }
-}
 
 class RemisionRepositorioFalso implements RemisionRepository {
   readonly guardadas: Remision[] = [];
@@ -93,6 +81,28 @@ class RemisionRepositorioFalso implements RemisionRepository {
       porPagina: filtro.porPagina ?? 20,
     });
   }
+
+  listarTodas(): Promise<Remision[]> {
+    return Promise.resolve([...this.guardadas]);
+  }
+
+  buscarPorIds(): Promise<Remision[]> {
+    return Promise.resolve([]);
+  }
+
+  /** Igual que la base: suma cajas por turno, producto y extraoficial, solo de los estados pedidos. */
+  totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]> {
+    const grupos = new Map<string, CajasAgrupadas>();
+    for (const r of this.guardadas) {
+      const d = r.aObjeto();
+      if (d.fechaOperativa.getTime() !== fechaOperativa.getTime() || !estados.includes(d.estado)) continue;
+      const clave = `${d.turnoId}|${d.productoId}|${d.extraoficial}`;
+      const g = grupos.get(clave) ?? { turnoId: d.turnoId, productoId: d.productoId, extraoficial: d.extraoficial, cajas: 0 };
+      g.cajas += d.cantidadCajas;
+      grupos.set(clave, g);
+    }
+    return Promise.resolve([...grupos.values()]);
+  }
 }
 
 class RelojFijo implements Reloj {
@@ -115,9 +125,14 @@ const PRODUCTO: Producto = {
   id: 'prod-1',
   codigo: '300058141',
   descripcion: 'SURTIDO MEGA LONCHERA 586GX3X1 BX22',
+  proceso: 'MANUAL',
   activo: true,
   unidadesPorCaja: 4,
   cajasPorEstiba: 36,
+  personasIdeal: null,
+  subdescripcion: null,
+  cajasPorHora: null,
+  pesoNetoKg: null,
 };
 
 function comando(
@@ -125,7 +140,7 @@ function comando(
 ): CrearRemisionComando {
   return {
     turnoId: 'turno-t1',
-    proveedorId: 'prov-logicmard',
+    grupoId: 'prov-logicmard',
     lugarId: 'lugar-mq',
     productoId: 'prod-1',
     fechaVencimiento: new Date('2027-03-01T00:00:00.000Z'),
@@ -143,11 +158,12 @@ function comando(
 describe('CrearRemisionUseCase', () => {
   let productos: ProductoRepositorioFalso;
   let remisiones: RemisionRepositorioFalso;
+  let bloques: BloqueRepositorioFalso;
   let auditoria: AuditoriaRepositorioFalso;
   let reloj: RelojFijo;
   let useCase: CrearRemisionUseCase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     productos = new ProductoRepositorioFalso();
     productos.agregar(PRODUCTO);
 
@@ -155,11 +171,23 @@ describe('CrearRemisionUseCase', () => {
     auditoria = new AuditoriaRepositorioFalso();
     reloj = new RelojFijo(new Date('2026-09-14T09:30:00-05:00'));
 
+    // "Ni una caja más de lo programado": cada día operativo de las
+    // pruebas tiene un DPP con 1.000 cajas del producto.
+    bloques = new BloqueRepositorioFalso();
+    const estandares = new EstandarRepositorioFalso();
+    estandares.agregar({ productoId: 'prod-1', codigo: PRODUCTO.codigo, descripcion: PRODUCTO.descripcion, subdescripcion: null, unidadesPorCaja: 4, cajasPorHora: null, pesoNetoKg: null });
+    for (const dia of ['2026-09-14', '2026-12-31', '2027-06-15']) {
+      await programarTarget(bloques, new Date(`${dia}T00:00:00.000Z`), 'prod-1', 1000);
+    }
+
     useCase = new CrearRemisionUseCase(
       new UnidadDeTrabajoFalsa({
         remisiones,
         auditoria,
         usuarios: new UsuarioRepositorioFalso(),
+        productos,
+        bloques,
+        estandares,
       }),
       productos,
       reloj,
@@ -282,6 +310,51 @@ describe('CrearRemisionUseCase', () => {
       ).rejects.toThrow();
 
       expect(remisiones.guardadas).toHaveLength(0);
+    });
+  });
+
+  describe('tope de lo programado (DPP)', () => {
+    /** Deja una remisión APROBADA del día con las cajas dadas. */
+    const aprobada = (cajas: number, extraoficial = false) =>
+      remisiones.guardadas.push(
+        Remision.desdePersistencia({
+          ...comando(), id: `r-${cajas}`, anio: 2026, numero: 99, version: 1, estado: 'APROBADA',
+          fechaOperativa: new Date('2026-09-14T00:00:00.000Z'), fechaHoraRegistro: new Date(),
+          codigoSnapshot: PRODUCTO.codigo, descripcionSnapshot: PRODUCTO.descripcion,
+          cantidadCajas: cajas, extraoficial, motivoExtraoficial: extraoficial ? 'Emergencia OPA' : null,
+        }),
+      );
+
+    it('permite remisionar hasta completar lo programado, ni una caja más', async () => {
+      aprobada(900);
+      await expect(useCase.ejecutar(comando({ cantidadCajas: 100 }))).resolves.toBeDefined();
+      await expect(useCase.ejecutar(comando({ cantidadCajas: 101 }))).rejects.toThrow(RemisionExcedeProgramacionError);
+      // La que acaba de crearse es BORRADOR: todavía no cuenta (solo aprobadas y validadas).
+      await expect(useCase.ejecutar(comando({ cantidadCajas: 100 }))).resolves.toBeDefined();
+      // El número no se consume cuando el tope rechaza la remisión.
+      expect(remisiones.guardadas.filter((r) => r.estado === 'BORRADOR').map((r) => r.consecutivo)).toEqual(['2026-0001', '2026-0002']);
+    });
+
+    it('las extraoficiales no cuentan para el tope y pasan aunque lo superen (con motivo)', async () => {
+      aprobada(1000);
+      aprobada(500, true);
+      await expect(useCase.ejecutar(comando({ cantidadCajas: 1 }))).rejects.toThrow(RemisionExcedeProgramacionError);
+
+      const emergencia = await useCase.ejecutar(comando({ cantidadCajas: 200, extraoficial: true, motivoExtraoficial: 'Pedido de emergencia del OPA' }));
+      expect(emergencia.esExtraoficial).toBe(true);
+      expect(emergencia.aObjeto().motivoExtraoficial).toBe('Pedido de emergencia del OPA');
+
+      await expect(useCase.ejecutar(comando({ cantidadCajas: 200, extraoficial: true }))).rejects.toThrow(DatosRemisionInvalidosError);
+    });
+
+    it('sin DPP del día se bloquea; un producto fuera del DPP también', async () => {
+      reloj.mover(new Date('2026-09-20T09:00:00-05:00')); // día sin programación
+      await expect(useCase.ejecutar(comando())).rejects.toThrow(SinProgramacionDelDiaError);
+      await expect(useCase.ejecutar(comando({ extraoficial: true, motivoExtraoficial: 'Emergencia' }))).resolves.toBeDefined();
+
+      reloj.mover(new Date('2026-09-14T09:00:00-05:00'));
+      productos.agregar({ ...PRODUCTO, id: 'prod-2', codigo: '300000002' });
+      await expect(useCase.ejecutar(comando({ productoId: 'prod-2' }))).rejects.toThrow(ProductoNoProgramadoError);
     });
   });
 });

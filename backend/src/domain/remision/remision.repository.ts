@@ -26,7 +26,7 @@ export interface FiltroRemisiones {
   fechaOperativaDesde?: Date;
   fechaOperativaHasta?: Date;
   turnoId?: string;
-  proveedorId?: string;
+  grupoId?: string;
   productoId?: string;
   estado?: EstadoRemision;
   pagina?: number;
@@ -78,6 +78,31 @@ export interface RemisionRepository {
   buscarPorConsecutivo(anio: number, numero: number): Promise<Remision | null>;
 
   listar(filtro: FiltroRemisiones): Promise<ResultadoPaginado<Remision>>;
+
+  /**
+   * Todas las remisiones que cumplen el filtro, sin paginar, en orden
+   * cronológico (fecha operativa y número ascendentes). Para exportar e
+   * imprimir por lote. La implementación pone un tope de seguridad.
+   */
+  listarTodas(filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina'>): Promise<Remision[]>;
+
+  /** Varias remisiones por id, en el orden pedido; omite las que no existan. */
+  buscarPorIds(ids: string[]): Promise<Remision[]>;
+
+  /**
+   * Cajas remisionadas en un día operativo, agrupadas por turno, producto
+   * y si son extraoficiales, contando solo los estados indicados.
+   * Alimenta el MFR (que excluye las extraoficiales) y el tope de lo
+   * programado.
+   */
+  totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]>;
+}
+
+export interface CajasAgrupadas {
+  turnoId: string;
+  productoId: string;
+  extraoficial: boolean;
+  cajas: number;
 }
 
 /** Token de inyección de dependencias. */

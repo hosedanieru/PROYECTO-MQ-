@@ -8,6 +8,7 @@ import {
 import {
   AuditoriaRepositorioFalso,
   HashFalso,
+  ProductoRepositorioFalso,
   REMISIONES_SIN_USO,
   UnidadDeTrabajoFalsa,
   UsuarioRepositorioFalso,
@@ -48,6 +49,7 @@ describe('CrearUsuarioUseCase', () => {
       new UnidadDeTrabajoFalsa({
         remisiones: REMISIONES_SIN_USO,
         usuarios,
+        productos: new ProductoRepositorioFalso(),
         auditoria,
       }),
       new HashFalso(),

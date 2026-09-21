@@ -22,6 +22,7 @@ import { Remision } from '../../domain/remision/remision.entity.js';
 import { DatosRemisionInvalidosError } from '../../domain/remision/remision.errors.js';
 import { registroActual } from '../../domain/shared/fecha-operativa.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import { verificarContraProgramacion } from './control-programacion.js';
 
 /**
  * Fuente de la hora actual.
@@ -38,7 +39,7 @@ export const RELOJ = Symbol('Reloj');
 
 export interface CrearRemisionComando {
   turnoId: string;
-  proveedorId: string;
+  grupoId: string;
   lugarId: string;
   productoId: string;
   fechaVencimiento: Date;
@@ -48,6 +49,9 @@ export interface CrearRemisionComando {
   cajasSueltas: number;
   numerosEstiba: number[];
   observaciones?: string | null;
+  /** Pedido de emergencia fuera del DPP: no cuenta para el MFR ni para el tope; exige motivo. */
+  extraoficial?: boolean;
+  motivoExtraoficial?: string | null;
   creadaPorId: string;
 }
 
@@ -84,7 +88,23 @@ export class CrearRemisionUseCase {
      */
     const anio = fechaOperativa.getUTCFullYear();
 
-    return this.uow.ejecutar(async ({ remisiones, auditoria }) => {
+    return this.uow.ejecutar(async ({ remisiones, auditoria, bloques, estandares }) => {
+      /**
+       * "Ni una caja más de lo programado" (área, 2026-09-18). Se verifica
+       * DENTRO de la transacción, antes de reservar el consecutivo: si la
+       * remisión no cabe en el DPP del día, el número no se consume.
+       */
+      await verificarContraProgramacion(
+        { bloques, estandares, remisiones },
+        {
+          fechaOperativa,
+          productoId: producto.id,
+          codigoProducto: producto.codigo,
+          cantidadCajas: comando.cantidadCajas,
+          extraoficial: comando.extraoficial ?? false,
+        },
+      );
+
       const remision = await remisiones.crearConConsecutivo(
         (anioAsignado, numeroAsignado) =>
           Remision.crear({
@@ -93,7 +113,7 @@ export class CrearRemisionUseCase {
             fechaOperativa,
             fechaHoraRegistro,
             turnoId: comando.turnoId,
-            proveedorId: comando.proveedorId,
+            grupoId: comando.grupoId,
             lugarId: comando.lugarId,
             productoId: producto.id,
             // Copia congelada: la remisión es un documento firmado y debe
@@ -108,6 +128,8 @@ export class CrearRemisionUseCase {
             cajasSueltas: comando.cajasSueltas,
             numerosEstiba: comando.numerosEstiba,
             observaciones: comando.observaciones ?? null,
+            extraoficial: comando.extraoficial ?? false,
+            motivoExtraoficial: comando.motivoExtraoficial ?? null,
             creadaPorId: comando.creadaPorId,
           }),
         anio,

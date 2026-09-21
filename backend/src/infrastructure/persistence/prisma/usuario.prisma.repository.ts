@@ -50,6 +50,32 @@ export class UsuarioPrismaRepository implements UsuarioRepository {
     return registro ? this.aDominio(registro) : null;
   }
 
+  async listar(): Promise<Usuario[]> {
+    const registros = await this.cliente.usuario.findMany({
+      include: INCLUIR_ROL_Y_PERMISOS,
+      orderBy: { nombre: 'asc' },
+    });
+    return registros.map((r) => this.aDominio(r));
+  }
+
+  async actualizar(usuario: Usuario): Promise<Usuario> {
+    const datos = usuario.aObjeto();
+
+    const registro = await this.cliente.usuario.update({
+      where: { id: datos.id },
+      data: {
+        nombre: datos.nombre,
+        email: datos.email ?? null,
+        passwordHash: datos.passwordHash,
+        activo: datos.activo,
+        rolId: datos.rolId,
+      },
+      include: INCLUIR_ROL_Y_PERMISOS,
+    });
+
+    return this.aDominio(registro);
+  }
+
   async crear(usuario: Usuario): Promise<Usuario> {
     const datos = usuario.aObjeto();
 

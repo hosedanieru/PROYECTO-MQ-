@@ -50,6 +50,19 @@ enum AccionAuditoria {
   ELIMINAR
 }
 
+/// Tipo de máquina de la línea, como lo nombra el DPP de PepsiCo.
+enum TipoLinea {
+  MULTIPACK
+  MANUAL
+}
+
+/// De dónde salió un bloque: digitado, importado del PDF del DPP o copiado de otro día.
+enum OrigenBloque {
+  MANUAL
+  DPP
+  COPIA
+}
+
 // ============================================================
 // USUARIOS Y PERMISOS
 // ============================================================
@@ -74,6 +87,12 @@ model Usuario {
   remisionesValidadas  Remision[] @relation("RemisionValidadaPor")
   rectificaciones      RemisionVersion[]
   auditorias           Auditoria[]
+
+  // MFR
+  bloquesCreados  BloqueProgramacion[] @relation("BloqueCreadoPor")
+  bloquesCerrados BloqueProgramacion[] @relation("BloqueCerradoPor")
+  asistencias     AsistenciaTurno[]    @relation("AsistenciaRegistradaPor")
+  asignaciones    AsignacionLinea[]    @relation("AsignacionRegistradaPor")
 
   @@map("usuario")
 }
@@ -129,17 +148,23 @@ model Lugar {
   @@map("lugar")
 }
 
-/// Empresas que operan los turnos.
-/// Valores actuales: LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX
-model Proveedor {
-  id     String  @id @default(uuid())
-  codigo String  @unique
+/// Grupo (antes "proveedor", área 2026-09-21): quien pone el personal
+/// del turno. Valores actuales: LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX.
+/// `descripcion` es texto libre donde se escribe el proveedor real;
+/// `personas_esperadas` se compara con la asistencia del turno.
+model Grupo {
+  id                String  @id @default(uuid())
+  codigo            String  @unique
+  descripcion       String?
+  personasEsperadas Int?    @map("personas_esperadas")
   nombre String
   activo Boolean @default(true)
 
-  remisiones Remision[]
+  remisiones   Remision[]
+  asistencias  AsistenciaTurno[]
+  asignaciones AsignacionLinea[]
 
-  @@map("proveedor")
+  @@map("grupo")
 }
 
 /// Catálogo de productos. Administrable desde el panel.
@@ -154,10 +179,16 @@ model Producto {
 
   unidadesPorCaja  Int? @map("unidades_por_caja")
   cajasPorEstiba   Int? @map("cajas_por_estiba")
+  /// LINEA IDEAL de la hoja TIEMPOS: personas necesarias en la línea para ese SKU.
+  personasIdeal    Int? @map("personas_ideal")
+  /// SUBDESCRIPCION: familia (SURTIDO, OFERTA, REEMPAQUE, MULTIPACK…). Agrupa el "Flavor Breakdown".
+  subdescripcion   String?
 
-  // Estándar de producción (base del cálculo de capacidad en Fase 2)
-  unidadesPorHora Decimal? @map("unidades_por_hora") @db.Decimal(12, 2)
-  cajasPorHora    Decimal? @map("cajas_por_hora") @db.Decimal(12, 2)
+  // Estándar de producción, con los nombres del DPP de PepsiCo:
+  //   cajasPorHora ritmo al 100 % (hoja TIEMPOS); por defecto para bloques a mano
+  //   pesoNetoKg kilos netos de una caja (para Target/Instant Kilograms)
+  cajasPorHora Decimal? @map("cajas_por_hora") @db.Decimal(8, 2)
+  pesoNetoKg Decimal? @map("peso_neto_kg") @db.Decimal(8, 3)
 
   activo Boolean @default(true)
 
@@ -165,6 +196,7 @@ model Producto {
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
   remisiones Remision[]
+  bloques    BloqueProgramacion[]
 
   @@index([activo])
   @@map("producto")
@@ -176,19 +208,18 @@ model Turno {
   nombre String
   activo Boolean @default(true)
 
-  horarios   TurnoHorario[]
-  remisiones Remision[]
+  horarios    TurnoHorario[]
+  remisiones  Remision[]
+  bloques      BloqueProgramacion[]
+  asistencias  AsistenciaTurno[]
+  asignaciones AsignacionLinea[]
 
   @@map("turno")
 }
 
-/// Los horarios varían por día de la semana, por eso son configuración
-/// y no valores fijos en código.
-///
-///        LUNES        MAR-VIE      SÁBADO
-///   T1   08:00-14:00  06:00-14:00  06:00-10:00
-///   T2   14:00-20:00  14:00-22:00  10:00-14:00
-///   T3   20:00-06:00  22:00-06:00  N/A
+/// Los horarios son configuración y no valores fijos en código.
+/// Decisión del 2026-09-18: se usan los del DPP de PepsiCo todos los días:
+///   T1 06:00-13:30 · T2 14:00-21:30 · T3 22:00-05:30
 model TurnoHorario {
   id      String    @id @default(uuid())
   turnoId String    @map("turno_id")
@@ -236,8 +267,8 @@ model Remision {
   turno   Turno  @relation(fields: [turnoId], references: [id])
 
   // --- Contexto ---
-  proveedorId String    @map("proveedor_id")
-  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  grupoId String @map("grupo_id")
+  grupo   Grupo  @relation(fields: [grupoId], references: [id])
 
   lugarId String @map("lugar_id")
   lugar   Lugar  @relation(fields: [lugarId], references: [id])
@@ -263,6 +294,11 @@ model Remision {
 
   /// Notas humanas reales. Los números de estiba van en RemisionEstiba.
   observaciones String?
+
+  /// Pedido de emergencia fuera del DPP de PepsiCo (área, 2026-09-18):
+  /// no cuenta para el MFR ni para el tope de lo programado. Exige motivo.
+  extraoficial       Boolean @default(false)
+  motivoExtraoficial String? @map("motivo_extraoficial")
 
   // --- Flujo ---
   estado EstadoRemision @default(BORRADOR)
@@ -301,7 +337,7 @@ model Remision {
   @@index([fechaOperativa, turnoId])
   @@index([estado])
   @@index([productoId, fechaOperativa])
-  @@index([proveedorId, fechaOperativa])
+  @@index([grupoId, fechaOperativa])
   @@map("remision")
 }
 
@@ -389,4 +425,111 @@ model Consecutivo {
 
   @@unique([tipo, anio])
   @@map("consecutivo")
+}
+
+// ============================================================
+// MFR — Manufacturing Fill Rate
+// ============================================================
+
+/// Línea de producción: activo físico con identidad estable (confirmado
+/// por el DPP de PepsiCo, 2026-09-18). Tipo de máquina y capacidad
+/// nominal en kg/h según el schedule; `orden` es el de las páginas del DPP.
+model LineaProduccion {
+  id              String    @id @default(uuid())
+  codigo          String    @unique // L1, MANUAL-1, REEMPAQUES...
+  nombre          String // como lo escribe PepsiCo: "MANUAL 1"
+  tipo            TipoLinea @default(MANUAL)
+  capacidadKgHora Decimal?  @map("capacidad_kg_hora") @db.Decimal(8, 2)
+  orden           Int       @default(0)
+  activo          Boolean   @default(true)
+
+  bloques      BloqueProgramacion[]
+  asignaciones AsignacionLinea[]
+
+  @@map("linea_produccion")
+}
+
+/// Bloque del DPP de PepsiCo: en una línea, de una hora a otra, se corre
+/// un producto a un ritmo de cajas/hora y una eficiencia esperada. Es a la vez la meta
+/// (T = Mx × E) y la configuración de la línea. Se congela al cerrar el
+/// turno (cerrado_en). El turno se deriva de la hora de inicio.
+model BloqueProgramacion {
+  id String @id @default(uuid())
+
+  fechaOperativa DateTime        @map("fecha_operativa") @db.Date
+  lineaId        String          @map("linea_id")
+  linea          LineaProduccion @relation(fields: [lineaId], references: [id])
+  turnoId        String          @map("turno_id")
+  turno          Turno           @relation(fields: [turnoId], references: [id])
+  productoId     String          @map("producto_id")
+  producto       Producto        @relation(fields: [productoId], references: [id])
+
+  horaInicio String @map("hora_inicio") // "HH:mm"
+  horaFin    String @map("hora_fin")
+
+  cajasPorHora         Decimal      @map("cajas_por_hora") @db.Decimal(8, 2)
+  eficienciaPorcentaje Decimal      @map("eficiencia_porcentaje") @db.Decimal(5, 2)
+  loop                 String?
+  personasAsignadas    Int?         @map("personas_asignadas")
+  origen               OrigenBloque @default(MANUAL)
+
+  creadoPorId   String   @map("creado_por_id")
+  creadoPor     Usuario  @relation("BloqueCreadoPor", fields: [creadoPorId], references: [id])
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+
+  cerradoEn    DateTime? @map("cerrado_en") @db.Timestamptz(3)
+  cerradoPorId String?   @map("cerrado_por_id")
+  cerradoPor   Usuario?  @relation("BloqueCerradoPor", fields: [cerradoPorId], references: [id])
+
+  @@index([fechaOperativa])
+  @@index([fechaOperativa, lineaId])
+  @@map("bloque_programacion")
+}
+
+/// Personas que llegaron de un grupo a un turno (área, 2026-09-21).
+/// Se compara con `grupo.personas_esperadas` para saber si la
+/// productividad del turno queda "a fin" o afectada.
+model AsistenciaTurno {
+  id String @id @default(uuid())
+
+  fechaOperativa DateTime @map("fecha_operativa") @db.Date
+  turnoId        String   @map("turno_id")
+  turno          Turno    @relation(fields: [turnoId], references: [id])
+  grupoId        String   @map("grupo_id")
+  grupo          Grupo    @relation(fields: [grupoId], references: [id])
+
+  personasLlegaron Int     @map("personas_llegaron")
+  observacion      String?
+
+  registradaPorId String   @map("registrada_por_id")
+  registradaPor   Usuario  @relation("AsistenciaRegistradaPor", fields: [registradaPorId], references: [id])
+  fechaRegistro   DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(3)
+
+  @@unique([fechaOperativa, turnoId, grupoId])
+  @@index([fechaOperativa])
+  @@map("asistencia_turno")
+}
+
+/// Qué grupo trabaja en qué línea, con cuántas personas, por día y turno.
+/// Un grupo puede repartirse entre líneas; una línea puede tener varios grupos.
+model AsignacionLinea {
+  id String @id @default(uuid())
+
+  fechaOperativa DateTime        @map("fecha_operativa") @db.Date
+  turnoId        String          @map("turno_id")
+  turno          Turno           @relation(fields: [turnoId], references: [id])
+  lineaId        String          @map("linea_id")
+  linea          LineaProduccion @relation(fields: [lineaId], references: [id])
+  grupoId        String          @map("grupo_id")
+  grupo          Grupo           @relation(fields: [grupoId], references: [id])
+
+  personas Int
+
+  registradaPorId String   @map("registrada_por_id")
+  registradaPor   Usuario  @relation("AsignacionRegistradaPor", fields: [registradaPorId], references: [id])
+  fechaRegistro   DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(3)
+
+  @@unique([fechaOperativa, turnoId, lineaId, grupoId])
+  @@index([fechaOperativa])
+  @@map("asignacion_linea")
 }

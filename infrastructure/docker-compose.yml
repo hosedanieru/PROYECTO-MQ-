@@ -1,0 +1,83 @@
+# =============================================================
+# APLICATIVO MQ — despliegue con Docker Compose
+# =============================================================
+#
+#   docker compose --env-file .env up -d --build
+#
+# Servicios:
+#   db        PostgreSQL 18 con volumen persistente
+#   backend   API NestJS (aplica migraciones y seed al arrancar)
+#   frontend  nginx con la SPA; reenvía /api al backend
+#
+# Solo el frontend expone puerto al exterior. La base y la API se hablan
+# por la red interna de Compose.
+#
+# Variables: copiar `.env.example` a `.env` en esta carpeta y completar.
+
+name: mq
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mq}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      TZ: America/Bogota
+    volumes:
+      - mq_postgres:/var/lib/postgresql/data
+      # Crea el usuario de aplicación con permisos limitados al inicializar.
+      - ../database/crear-usuario-app.sql:/docker-entrypoint-initdb.d/10-usuario-app.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mq}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TZ: America/Bogota
+      # "postgres" (usa el servicio db) o "firestore" (usa Firebase; el
+      # servicio db sobra y puede detenerse con `docker compose stop db`).
+      PERSISTENCIA: ${PERSISTENCIA:-postgres}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Migraciones y seed corren con el superusuario (crean tablas);
+      # la API podría usar el usuario limitado `mq_app` (ver database/).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mq}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env (mínimo 32 caracteres)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      ADMIN_INICIAL_DOCUMENTO: ${ADMIN_INICIAL_DOCUMENTO:-}
+      ADMIN_INICIAL_NOMBRE: ${ADMIN_INICIAL_NOMBRE:-Administrador}
+      ADMIN_INICIAL_PASSWORD: ${ADMIN_INICIAL_PASSWORD:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      MQ_SEED_AL_ARRANCAR: ${MQ_SEED_AL_ARRANCAR:-true}
+    # Chromium necesita más memoria compartida que la que Docker da por defecto.
+    shm_size: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  frontend:
+    build: ../frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${PUERTO_WEB:-80}:80"
+
+volumes:
+  mq_postgres:

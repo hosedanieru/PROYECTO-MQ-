@@ -8,14 +8,17 @@
  */
 
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+
+import { EsId } from '../../../infrastructure/http/validadores.js';
 
 import { LONGITUD_MINIMA_CONTRASENA } from '../../../domain/usuario/contrasena.js';
 
@@ -52,6 +55,35 @@ export class CrearUsuarioDto {
   @MaxLength(72) // límite de bcrypt: ignora todo lo que pase de 72 bytes
   contrasena!: string;
 
-  @IsUUID()
+  @EsId()
   rolId!: string;
+}
+
+export class ActualizarUsuarioDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(120)
+  nombre?: string;
+
+  /** `null` explícito borra el correo. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsEmail()
+  @MaxLength(120)
+  email?: string | null;
+
+  @IsOptional()
+  @EsId()
+  rolId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+
+  /** Restablecer contraseña. Solo el administrador; el usuario no la elige aquí. */
+  @IsOptional()
+  @IsString()
+  @MinLength(LONGITUD_MINIMA_CONTRASENA)
+  @MaxLength(72)
+  contrasena?: string;
 }

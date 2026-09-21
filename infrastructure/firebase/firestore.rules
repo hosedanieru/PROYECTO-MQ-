@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Nadie accede a Firestore desde el navegador: toda lectura y escritura
+// pasa por el backend (SDK de administrador, que no está sujeto a estas
+// reglas). Así la auditoría, los permisos y el consecutivo siguen
+// garantizados por el servidor.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

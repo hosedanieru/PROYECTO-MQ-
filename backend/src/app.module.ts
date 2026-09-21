@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { PrismaModule } from './infrastructure/database/prisma/prisma.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CatalogoModule } from './modules/catalogo/catalogo.module.js';
+import { MfrModule } from './modules/mfr/mfr.module.js';
 import { RemisionModule } from './modules/remision/remision.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -30,7 +31,15 @@ const modulosOpcionales = observeHabilitado
   : [];
 
 @Module({
-  imports: [PrismaModule, AuthModule, RemisionModule, ...modulosOpcionales],
+  // La base de datos (PostgreSQL o Firestore) la decide PersistenciaModule,
+  // que importan los módulos de negocio; aquí no se conecta nada.
+  imports: [
+    AuthModule,
+    CatalogoModule,
+    RemisionModule,
+    MfrModule,
+    ...modulosOpcionales,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

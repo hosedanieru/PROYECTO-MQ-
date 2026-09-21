@@ -22,9 +22,17 @@ Para no repetir trabajo.
 | Repositorios Prisma: remisión, producto, auditoría | LISTO |
 | API HTTP de Remisiones: 9 endpoints | LISTO |
 | Autenticación JWT, permisos por endpoint, admin inicial por seed (B1) | LISTO |
-| 92 pruebas unitarias sin base de datos | LISTO |
+| Catálogos, productos (carga manual) y usuarios: API + pantallas de administración | LISTO |
+| Frontend de Remisiones: listado, detalle, crear, editar, flujo completo, historial (B5) | LISTO |
+| Edición de remisiones en BORRADOR / EN_RECTIFICACION | LISTO |
+| PDF dos por hoja con Puppeteer (B4) | LISTO |
+| Exportación a Excel (B7) | LISTO |
+| Pruebas de integración contra PostgreSQL (B2) | LISTO |
+| Docker Compose, Dockerfiles, usuario de BD limitado, CI (E3) | LISTO (compose sin ejecutar aún) |
+| Documentación en `docs/` (E4) | LISTO |
+| 129 pruebas unitarias + 8 de integración | LISTO |
 
-**Lo que NO está:** frontend, PDF, catálogo de productos cargado, histórico migrado, y todos los módulos fuera de Remisiones.
+**Lo que NO está:** vistas por rol × área (esperando al área), histórico migrado (decisión pendiente), y todos los módulos fuera de Remisiones (MFR bloqueado por 3 preguntas; los demás sin levantamiento).
 
 ---
 
@@ -57,9 +65,9 @@ Piezas: `domain/usuario/`, `application/auth/`, `infrastructure/auth/`, `modules
 - Revocación de tokens antes de expirar (requeriría refresh token o lista de revocación).
 - Auditoría de inicios de sesión (PENDIENTE DE DEFINIR con el área).
 
-### Pregunta pendiente al área
+### Pregunta respondida (2026-09-16)
 
-**¿Quién registra la respuesta del OPA: el coordinador, el patinador, o ambos?** Hoy ambos roles tienen el permiso `remision.registrar_aprobacion`. Si es solo uno, hay que quitarlo del otro en el seed.
+**La respuesta del OPA la registra solo el coordinador.** Se quitó `remision.registrar_aprobacion` del rol `PATINADOR` en el seed.
 
 ---
 
@@ -93,9 +101,13 @@ Hoy se simula. La atomicidad real solo se comprueba contra PostgreSQL.
 
 ---
 
-## B3 · Importación del catálogo de productos
+## B3 · Catálogo de productos
 
-**Estado:** BLOQUEADO PARCIALMENTE · **Prioridad:** ALTA · **Bloquea:** uso real del sistema
+**Estado:** REDEFINIDO (2026-09-16) · **Prioridad:** ALTA · **Bloquea:** uso real del sistema
+
+> **Decisión del usuario:** no se importa el Excel por ahora. El administrador crea los productos **uno a uno desde el panel administrativo**. Eso desbloquea B3 sin esperar las respuestas del área sobre duplicados y contradicciones. Tareas nuevas: endpoints `GET/POST/PATCH /api/productos` (con `catalogo.consultar` / `catalogo.editar`) y pantalla de administración. La importación queda como opción futura; lo que sigue abajo se conserva como referencia para ese momento.
+
+### Situación original (referencia para la importación futura)
 
 ### Situación
 
@@ -177,11 +189,19 @@ El PDF generado es equivalente al formato actual y el área lo acepta como reemp
 
 ## B5 · Frontend de Remisiones
 
-**Estado:** PENDIENTE · **Prioridad:** ALTA · **Depende de:** B1 (autenticación) — LISTO
+**Estado:** EN CURSO (2026-09-16) · **Prioridad:** ALTA · **Depende de:** B1 — LISTO
 
-### Situación
+### Avance
 
-`frontend/src/` tiene solo el scaffold de Vite: `App.tsx`, `main.tsx`, `index.css`. No hay routing, ni cliente HTTP, ni estructura de módulos.
+Hecho: base (Vite + proxy + Tailwind v4 + axios + TanStack Query), login y sesión, panel de inicio por permisos, listado con filtros en URL y paginación, detalle con trazabilidad, creación con cálculo asistido de estibas y fecha operativa visible, las 5 acciones de flujo con diálogos, administración de usuarios y productos. Decisiones: axios, Tailwind, token en `localStorage`.
+
+Pendiente: vistas por rol × área (esperando respuestas del área, ver Parte F), historial de versiones y auditoría en el detalle, exportar, limpieza del scaffold de Vite (`App.tsx`, `App.css`, `assets/`, `public/icons.svg`), "Recordar sesión" (localStorage vs sessionStorage como en recepción).
+
+**Hueco resuelto (2026-09-16):** ya se pueden editar los datos de una remisión en BORRADOR o EN_RECTIFICACION (`Remision.editar`, `PATCH /api/remisiones/:id`, pantalla `/remisiones/:id/editar`). También se corrigió el mapeador, que no persistía cambios de turno/proveedor/lugar/producto.
+
+### Situación original
+
+`frontend/src/` tenía solo el scaffold de Vite: `App.tsx`, `main.tsx`, `index.css`. No hay routing, ni cliente HTTP, ni estructura de módulos.
 
 ### Tareas
 
@@ -314,7 +334,11 @@ El permiso `remision.exportar` ya existe en el seed.
 
 # PARTE C — Módulo MFR
 
-**Estado:** BLOQUEADO · **Depende de:** tres respuestas del área
+**Estado:** IMPLEMENTADO (2026-09-17) · **Pendiente:** confirmar si la línea es activo físico; importador del correo; cierre automático por hora.
+
+> Respuestas del área (2026-09-17): programación en **cajas**; una remisión cuenta **al aprobarla el OPA**; meta **95 %**.
+>
+> **Rediseño del 2026-09-18 — el MFR se rige por el DPP de PepsiCo** (schedule "WM OMEGA"): la programación es por **línea y bloque horario** (producto, cajas/hora, eficiencia E), con `Mx = cajasPorHora × horas` y `T = Mx × E` (2026-09-19: por hora, no en BPM; al importar el PDF, cajas/h = Mx ÷ horas). Las líneas son **activos físicos** (L1–L4 MULTIPACK, MANUAL 1–2, REEMPAQU 2, REEMPAQUES). Turnos del DPP: 06:00–13:30 / 14:00–21:30 / 22:00–05:30. Se importa el PDF del DPP, se copia de otro día o se edita a mano; kilos derivados del peso neto por caja. `Programacion` y `ConfigTurno` fueron reemplazados por `BloqueProgramacion`. Detalle en `docs/modules/mfr.md`. Lo que sigue abajo se conserva como el análisis original.
 
 MFR = **Manufacturing Fill Rate**, cumplimiento de lo programado.
 
@@ -660,10 +684,10 @@ Y actualizar `CLAUDE.md` cada vez que el área responda una de las preguntas pen
 
 | # | Pregunta | Desbloquea |
 |---|---|---|
-| 1 | ¿Quién registra la respuesta del OPA: coordinador, patinador o ambos? | B1 (permisos) |
-| 2 | ¿`LINEA` y `AUTOMATICA` son el mismo proceso? | B3 (catálogo) |
-| 3 | Cuando PRODUCTOS y TIEMPOS se contradicen, ¿cuál manda? | B3 |
-| 4 | Códigos duplicados: ¿filas repetidas o variantes distintas? | B3 |
+| 1 | ~~¿Quién registra la respuesta del OPA?~~ **Respondido: solo el coordinador** | — |
+| 2 | ~~¿`LINEA` y `AUTOMATICA` son el mismo proceso?~~ Diferido: el catálogo se cargará a mano desde el panel (decisión 2026-09-16); la importación del Excel queda descartada por ahora | — |
+| 3 | ~~Cuando PRODUCTOS y TIEMPOS se contradicen, ¿cuál manda?~~ Diferido, mismo motivo | — |
+| 4 | ~~Códigos duplicados?~~ Diferido, mismo motivo | — |
 | 5 | ¿Desde qué dispositivos se usará el sistema? | B5 (frontend) |
 | 6 | ¿Hay zonas sin conexión? ¿Se necesita offline? | B5 |
 
@@ -706,25 +730,25 @@ Y actualizar `CLAUDE.md` cada vez que el área responda una de las preguntas pen
 
 ```text
 1. B1  Autenticación y autorización          LISTO
-2. B3  Importación del catálogo (con lo que el área responda)
-3. B5  Frontend de Remisiones
-4. B2  Pruebas de integración
+2. B3  Catálogo (carga manual desde el panel) LISTO
+3. B5  Frontend de Remisiones                LISTO (falta rol × área)
+4. B2  Pruebas de integración                LISTO
 ```
 
-Al terminar: el área puede operar un turno completo sin el Excel.
+Al terminar: el área puede operar un turno completo sin el Excel. **Alcanzado el 2026-09-16.**
 
 ## Bloque 2 — Reemplazar el Excel por completo
 
 ```text
-5. B4  PDF de la remisión
-6. B7  Exportación a Excel
-7. B6  Migración del histórico (si se decide migrar)
+5. B4  PDF de la remisión                    LISTO
+6. B7  Exportación a Excel                   LISTO
+7. B6  Migración del histórico (si se decide migrar)   PENDIENTE DE DECISIÓN
 ```
 
 ## Bloque 3 — Segundo módulo
 
 ```text
-8. MFR, cuando estén respondidas las preguntas 7, 8 y 9
+8. MFR                                        IMPLEMENTADO según el DPP de PepsiCo (2026-09-18)
 ```
 
 En paralelo: levantamiento de Averías, que es el siguiente en importancia según el área.

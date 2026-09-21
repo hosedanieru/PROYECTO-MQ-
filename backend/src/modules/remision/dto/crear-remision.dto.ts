@@ -11,27 +11,29 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsDate,
   IsInt,
   IsOptional,
   IsPositive,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
 
+import { EsId } from '../../../infrastructure/http/validadores.js';
+
 export class CrearRemisionDto {
-  @IsUUID()
+  @EsId()
   turnoId!: string;
 
-  @IsUUID()
-  proveedorId!: string;
+  @EsId()
+  grupoId!: string;
 
-  @IsUUID()
+  @EsId()
   lugarId!: string;
 
-  @IsUUID()
+  @EsId()
   productoId!: string;
 
   @Type(() => Date)
@@ -64,4 +66,14 @@ export class CrearRemisionDto {
   @IsString()
   @MaxLength(500)
   observaciones?: string;
+
+  /** Pedido de emergencia fuera del DPP: no cuenta para el MFR; exige motivo. */
+  @IsOptional()
+  @IsBoolean()
+  extraoficial?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivoExtraoficial?: string;
 }

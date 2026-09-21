@@ -25,9 +25,36 @@ import {
 import type { Response } from 'express';
 
 import {
+  AsignacionNoEncontradaError,
+  BloqueNoEncontradoError,
+  BloquesSolapadosError,
+  CodigoLineaDuplicadoError,
+  DatosMfrInvalidosError,
+  DiaConProgramacionError,
+  DppNoReconocidoError,
+  FaltanteSinMotivoError,
+  LineaNoEncontradaError,
+  MotivoObligatorioError,
+  TurnoCerradoError,
+} from '../../../domain/mfr/mfr.errors.js';
+import {
+  CodigoGrupoDuplicadoError,
+  DatosGrupoInvalidosError,
+  GrupoNoEncontradoError,
+} from '../../../domain/grupo/grupo.errors.js';
+import {
+  CodigoProductoDuplicadoError,
+  DatosProductoInvalidosError,
+  ProductoNoEncontradoError,
+} from '../../../domain/producto/producto.errors.js';
+import {
   DatosRemisionInvalidosError,
   InformacionIncompletaError,
+  ProductoNoProgramadoError,
+  RemisionExcedeProgramacionError,
+  RemisionNoEditableError,
   RemisionNoEncontradaError,
+  SinProgramacionDelDiaError,
   TransicionEstadoInvalidaError,
 } from '../../../domain/remision/remision.errors.js';
 import { ErrorDominio } from '../../../domain/shared/errores.js';
@@ -55,6 +82,11 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   // Transición inválida → los datos están bien, pero el estado actual
   // del recurso no permite la operación. Conflicto, no validación.
   [TransicionEstadoInvalidaError, HttpStatus.CONFLICT],
+  [RemisionNoEditableError, HttpStatus.CONFLICT],
+  // Tope del DPP: los datos están bien, pero el día no admite esa remisión.
+  [SinProgramacionDelDiaError, HttpStatus.CONFLICT],
+  [ProductoNoProgramadoError, HttpStatus.CONFLICT],
+  [RemisionExcedeProgramacionError, HttpStatus.CONFLICT],
   [RemisionNoEncontradaError, HttpStatus.NOT_FOUND],
 
   // --- Usuarios / autenticación ---
@@ -65,6 +97,29 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   [DatosUsuarioInvalidosError, HttpStatus.BAD_REQUEST],
   [DocumentoDuplicadoError, HttpStatus.CONFLICT],
   [UsuarioNoEncontradoError, HttpStatus.NOT_FOUND],
+
+  // --- Catálogo de productos ---
+  [DatosProductoInvalidosError, HttpStatus.BAD_REQUEST],
+  [CodigoProductoDuplicadoError, HttpStatus.CONFLICT],
+  [ProductoNoEncontradoError, HttpStatus.NOT_FOUND],
+
+  // --- Grupos ---
+  [DatosGrupoInvalidosError, HttpStatus.BAD_REQUEST],
+  [CodigoGrupoDuplicadoError, HttpStatus.CONFLICT],
+  [GrupoNoEncontradoError, HttpStatus.NOT_FOUND],
+
+  // --- MFR ---
+  [DatosMfrInvalidosError, HttpStatus.BAD_REQUEST],
+  [MotivoObligatorioError, HttpStatus.BAD_REQUEST],
+  [DppNoReconocidoError, HttpStatus.BAD_REQUEST],
+  [FaltanteSinMotivoError, HttpStatus.BAD_REQUEST],
+  [TurnoCerradoError, HttpStatus.CONFLICT],
+  [BloquesSolapadosError, HttpStatus.CONFLICT],
+  [DiaConProgramacionError, HttpStatus.CONFLICT],
+  [CodigoLineaDuplicadoError, HttpStatus.CONFLICT],
+  [BloqueNoEncontradoError, HttpStatus.NOT_FOUND],
+  [AsignacionNoEncontradaError, HttpStatus.NOT_FOUND],
+  [LineaNoEncontradaError, HttpStatus.NOT_FOUND],
 ];
 
 @Catch(ErrorDominio)
@@ -80,6 +135,9 @@ export class ErrorDominioFilter implements ExceptionFilter {
     respuesta.status(estado).json({
       codigo: error.codigo,
       mensaje: error.message,
+      // Algunos errores traen datos para que el cliente actúe (p. ej. los
+      // faltantes al cerrar un turno). Se exponen solo si el error los define.
+      ...('faltantes' in error ? { faltantes: (error as { faltantes: unknown }).faltantes } : {}),
     });
   }
 

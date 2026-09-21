@@ -19,16 +19,25 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
+  Res,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 
 import { CrearRemisionUseCase } from '../../application/remision/crear-remision.use-case.js';
+import { EditarRemisionUseCase } from '../../application/remision/editar-remision.use-case.js';
+import { ExportarRemisionesUseCase } from '../../application/remision/exportar-remisiones.use-case.js';
+import { ImprimirRemisionesUseCase } from '../../application/remision/imprimir-remisiones.use-case.js';
 import {
   AprobarRemisionUseCase,
   EntregarRemisionUseCase,
@@ -42,15 +51,21 @@ import {
   type Remision,
 } from '../../domain/remision/remision.entity.js';
 import {
+  HISTORIAL_REMISION_REPOSITORY,
+  type HistorialRemisionRepository,
+} from '../../domain/remision/historial.repository.js';
+import {
   REMISION_REPOSITORY,
   type RemisionRepository,
 } from '../../domain/remision/remision.repository.js';
+import { ErrorDominio } from '../../domain/shared/errores.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import {
   RequierePermisos,
   UsuarioActual,
 } from '../../infrastructure/auth/decoradores.js';
 import { CrearRemisionDto } from './dto/crear-remision.dto.js';
+import { EditarRemisionDto } from './dto/editar-remision.dto.js';
 import {
   AprobarRemisionDto,
   RechazarRemisionDto,
@@ -71,7 +86,8 @@ function presentar(remision: Remision) {
     fechaOperativa: datos.fechaOperativa.toISOString().slice(0, 10),
     fechaHoraRegistro: datos.fechaHoraRegistro.toISOString(),
     turnoId: datos.turnoId,
-    proveedorId: datos.proveedorId,
+    grupoId: datos.grupoId,
+    lugarId: datos.lugarId,
     producto: {
       id: datos.productoId,
       codigo: datos.codigoSnapshot,
@@ -87,6 +103,8 @@ function presentar(remision: Remision) {
     descripcionEstibas: remision.descripcionEstibas,
     numerosEstiba: datos.numerosEstiba,
     observaciones: datos.observaciones,
+    extraoficial: datos.extraoficial,
+    motivoExtraoficial: datos.motivoExtraoficial,
     entrega: {
       entregadaPorId: datos.entregadaPorId ?? null,
       fecha: datos.fechaEntrega?.toISOString() ?? null,
@@ -109,8 +127,13 @@ function presentar(remision: Remision) {
 
 @Controller('remisiones')
 export class RemisionController {
+  private readonly logger = new Logger(RemisionController.name);
+
   constructor(
     private readonly crearRemision: CrearRemisionUseCase,
+    private readonly editarRemision: EditarRemisionUseCase,
+    private readonly imprimirRemisiones: ImprimirRemisionesUseCase,
+    private readonly exportarRemisiones: ExportarRemisionesUseCase,
     private readonly entregarRemision: EntregarRemisionUseCase,
     private readonly aprobarRemision: AprobarRemisionUseCase,
     private readonly rechazarRemision: RechazarRemisionUseCase,
@@ -118,6 +141,8 @@ export class RemisionController {
     private readonly validarRemision: ValidarRemisionUseCase,
     @Inject(REMISION_REPOSITORY)
     private readonly remisiones: RemisionRepository,
+    @Inject(HISTORIAL_REMISION_REPOSITORY)
+    private readonly historial: HistorialRemisionRepository,
   ) { }
 
   // ==========================================================
@@ -130,7 +155,7 @@ export class RemisionController {
   async crear(@Body() dto: CrearRemisionDto, @UsuarioActual() actual: Usuario) {
     const remision = await this.crearRemision.ejecutar({
       turnoId: dto.turnoId,
-      proveedorId: dto.proveedorId,
+      grupoId: dto.grupoId,
       lugarId: dto.lugarId,
       productoId: dto.productoId,
       fechaVencimiento: dto.fechaVencimiento,
@@ -140,7 +165,29 @@ export class RemisionController {
       cajasSueltas: dto.cajasSueltas,
       numerosEstiba: dto.numerosEstiba,
       observaciones: dto.observaciones ?? null,
+      extraoficial: dto.extraoficial ?? false,
+      motivoExtraoficial: dto.motivoExtraoficial ?? null,
       creadaPorId: actual.id,
+    });
+
+    return presentar(remision);
+  }
+
+  // ==========================================================
+  // EDICIÓN (solo BORRADOR o EN_RECTIFICACION; lo decide la entidad)
+  // ==========================================================
+
+  @Patch(':id')
+  @RequierePermisos('remision.editar')
+  async editar(
+    @Param('id') id: string,
+    @Body() dto: EditarRemisionDto,
+    @UsuarioActual() actual: Usuario,
+  ) {
+    const remision = await this.editarRemision.ejecutar({
+      remisionId: id,
+      cambios: dto,
+      editadaPorId: actual.id,
     });
 
     return presentar(remision);
@@ -240,7 +287,7 @@ export class RemisionController {
   async listar(
     @Query('anio') anio?: string,
     @Query('turnoId') turnoId?: string,
-    @Query('proveedorId') proveedorId?: string,
+    @Query('grupoId') grupoId?: string,
     @Query('productoId') productoId?: string,
     @Query('estado') estado?: string,
     @Query('desde') desde?: string,
@@ -251,7 +298,7 @@ export class RemisionController {
     const resultado = await this.remisiones.listar({
       anio: anio ? Number(anio) : undefined,
       turnoId,
-      proveedorId,
+      grupoId,
       productoId,
       estado: this.validarEstado(estado),
       // Los rangos se interpretan como fechas operativas, no
@@ -270,6 +317,92 @@ export class RemisionController {
     };
   }
 
+  // ==========================================================
+  // DOCUMENTOS — van antes de `:id` para que no se confundan con un id
+  // ==========================================================
+
+  /**
+   * PDF por lote: `?ids=a,b,c`. Dos remisiones por hoja, en el orden
+   * pedido. Para imprimir una sola, `GET /:id/pdf` (abajo).
+   */
+  @Get('pdf')
+  @RequierePermisos('remision.consultar')
+  async pdfLote(@Query('ids') ids: string | undefined, @Res() res: Response) {
+    const lista = (ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const pdf = await this.generarPdf(() => this.imprimirRemisiones.ejecutar(lista));
+    this.responderArchivo(res, pdf, 'application/pdf', 'remisiones.pdf');
+  }
+
+  /**
+   * Un fallo del generador (Chromium caído, sin memoria, ruta de Chrome
+   * mal configurada) no es culpa del cliente ni un error de negocio: se
+   * responde 503 con el motivo, y el detalle completo queda en el log.
+   */
+  private async generarPdf(generar: () => Promise<Buffer>): Promise<Buffer> {
+    try {
+      return await generar();
+    } catch (error) {
+      if (error instanceof ErrorDominio || error instanceof HttpException) {
+        throw error;
+      }
+      const detalle = error instanceof Error ? error.message.split('\n')[0] : String(error);
+      this.logger.error(`No se pudo generar el PDF: ${detalle}`, error instanceof Error ? error.stack : undefined);
+      throw new ServiceUnavailableException(
+        `No se pudo generar el PDF (${detalle}). Verifique que Chrome esté disponible (PUPPETEER_EXECUTABLE_PATH) e intente de nuevo.`,
+      );
+    }
+  }
+
+  /** Excel con los mismos filtros del listado, sin paginación. */
+  @Get('exportar')
+  @RequierePermisos('remision.exportar')
+  async exportar(
+    @Res() res: Response,
+    @Query('anio') anio?: string,
+    @Query('turnoId') turnoId?: string,
+    @Query('grupoId') grupoId?: string,
+    @Query('productoId') productoId?: string,
+    @Query('estado') estado?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    const excel = await this.exportarRemisiones.ejecutar({
+      anio: anio ? Number(anio) : undefined,
+      turnoId,
+      grupoId,
+      productoId,
+      estado: this.validarEstado(estado),
+      fechaOperativaDesde: desde ? new Date(`${desde}T00:00:00.000Z`) : undefined,
+      fechaOperativaHasta: hasta ? new Date(`${hasta}T00:00:00.000Z`) : undefined,
+    });
+    const nombre = `remisiones${desde ? `_${desde}` : ''}${hasta ? `_${hasta}` : ''}.xlsx`;
+    this.responderArchivo(
+      res,
+      excel,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      nombre,
+    );
+  }
+
+  @Get(':id/pdf')
+  @RequierePermisos('remision.consultar')
+  async pdf(@Param('id') id: string, @Res() res: Response) {
+    const remision = await this.remisiones.buscarPorId(id);
+    if (!remision) {
+      throw new NotFoundException(`No existe la remisión "${id}".`);
+    }
+    const pdf = await this.generarPdf(() => this.imprimirRemisiones.ejecutar([id]));
+    this.responderArchivo(res, pdf, 'application/pdf', `remision_${remision.consecutivo}.pdf`);
+  }
+
+  private responderArchivo(res: Response, contenido: Buffer, tipo: string, nombre: string): void {
+    res.setHeader('Content-Type', tipo);
+    // `inline` para que el navegador lo muestre (PDF) y el nombre sirva al guardar.
+    res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
+    res.setHeader('Content-Length', String(contenido.length));
+    res.end(contenido);
+  }
+
   @Get('consecutivo/:anio/:numero')
   @RequierePermisos('remision.consultar')
   async porConsecutivo(
@@ -285,6 +418,20 @@ export class RemisionController {
     }
 
     return presentar(remision);
+  }
+
+  /** Versiones anteriores del documento (una por rectificación). */
+  @Get(':id/versiones')
+  @RequierePermisos('remision.consultar')
+  versiones(@Param('id') id: string) {
+    return this.historial.versiones(id);
+  }
+
+  /** Rastro de auditoría de la remisión: quién hizo qué y cuándo. */
+  @Get(':id/auditoria')
+  @RequierePermisos('remision.consultar', 'admin.auditoria')
+  auditoria(@Param('id') id: string) {
+    return this.historial.auditoria(id);
   }
 
   /**
