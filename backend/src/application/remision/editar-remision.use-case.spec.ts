@@ -8,11 +8,13 @@ import {
   RemisionNoEditableError,
   RemisionNoEncontradaError,
 } from '../../domain/remision/remision.errors.js';
-import type {
-  CajasAgrupadas,
-  FiltroRemisiones,
-  RemisionRepository,
-  ResultadoPaginado,
+import {
+  conteoEnCero,
+  type CajasAgrupadas,
+  type ConteoPorEstado,
+  type FiltroRemisiones,
+  type RemisionRepository,
+  type ResultadoPaginado,
 } from '../../domain/remision/remision.repository.js';
 import {
   AuditoriaRepositorioFalso,
@@ -69,6 +71,12 @@ class RemisionRepositorioFalso implements RemisionRepository {
 
   buscarPorIds(ids: string[]): Promise<Remision[]> {
     return Promise.resolve(ids.map((id) => this.porId.get(id)).filter((r): r is Remision => !!r));
+  }
+
+  contarPorEstado(): Promise<ConteoPorEstado> {
+    const conteo = conteoEnCero();
+    for (const r of this.porId.values()) conteo[r.aObjeto().estado] += 1;
+    return Promise.resolve(conteo);
   }
 
   totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]> {

@@ -13,20 +13,20 @@ export function Select({ etiqueta, error, id, className = '', children, ...resto
 
   return (
     <div className="space-y-1">
-      <label htmlFor={idCampo} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={idCampo} className="block text-sm font-medium text-tinta-suave">
         {etiqueta}
       </label>
       <select
         id={idCampo}
         aria-invalid={error ? true : undefined}
-        className={`block w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-marca ${
-          error ? 'border-red-500' : 'border-slate-300'
+        className={`block w-full rounded-lg border bg-base px-3 py-2 text-sm text-tinta shadow-sm transition outline-none focus:border-marca focus:ring-2 focus:ring-marca/30 ${
+          error ? 'border-critico' : 'border-borde'
         } ${className}`}
         {...resto}
       >
         {children}
       </select>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-critico">{error}</p>}
     </div>
   )
 }

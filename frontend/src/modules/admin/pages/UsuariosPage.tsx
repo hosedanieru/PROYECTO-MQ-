@@ -90,16 +90,16 @@ export function UsuariosPage() {
   return (
     <section className="space-y-4">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Usuarios</h1>
+        <h1 className="text-2xl font-semibold text-tinta">Usuarios</h1>
         <Boton onClick={() => setEditando('nuevo')}>Nuevo usuario</Boton>
       </header>
 
       {usuarios.isError && <Alerta tipo="error">{comoErrorApi(usuarios.error).mensaje}</Alerta>}
       {cambiarActivo.isError && <Alerta tipo="error">{comoErrorApi(cambiarActivo.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
               <th className="px-4 py-2">Documento</th>
               <th className="px-4 py-2">Nombre</th>
@@ -109,10 +109,10 @@ export function UsuariosPage() {
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-borde">
             {usuarios.data?.map((u) => (
-              <tr key={u.id} className={u.activo ? '' : 'text-slate-400'}>
-                <td className="px-4 py-2 font-mono">{u.documento}</td>
+              <tr key={u.id} className={u.activo ? '' : 'text-tinta-suave'}>
+                <td className="px-4 py-2 cifra">{u.documento}</td>
                 <td className="px-4 py-2">{u.nombre}</td>
                 <td className="px-4 py-2">{u.email ?? '—'}</td>
                 <td className="px-4 py-2">{u.rolCodigo}</td>
@@ -123,7 +123,7 @@ export function UsuariosPage() {
                   </button>
                   {u.id !== actual?.id && (
                     <button
-                      className="ml-3 text-slate-600 hover:underline"
+                      className="ml-3 text-tinta-suave hover:underline"
                       onClick={() => cambiarActivo.mutate(u)}
                     >
                       {u.activo ? 'Desactivar' : 'Activar'}

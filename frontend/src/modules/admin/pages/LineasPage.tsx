@@ -76,7 +76,7 @@ export function LineasPage() {
 
   return (
     <section className="mx-auto max-w-4xl space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Líneas de producción</h1>
+      <h1 className="text-2xl font-semibold text-tinta">Líneas de producción</h1>
       <Alerta tipo="info">
         El <strong>nombre</strong> debe ser el mismo que usa PepsiCo en el DPP (“MANUAL 1”, “REEMPAQU 2”): así el importador del
         PDF reconoce la línea. La capacidad en kg/h es la fila “Capacity” del schedule y da el “Pct Overpull”.
@@ -84,22 +84,22 @@ export function LineasPage() {
 
       {error && <Alerta tipo="error">{comoErrorApi(error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
               <th className="px-2 py-2 w-32">Código</th><th className="px-2 py-2">Nombre (PepsiCo)</th><th className="px-2 py-2 w-32">Tipo</th>
               <th className="px-2 py-2 w-28">kg/h</th><th className="px-2 py-2 w-20">Orden</th><th className="px-2 py-2 w-24">Estado</th><th></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-borde">
             {lineas.data?.map((l) => {
               const e = edicion[l.id]
               return (
-                <tr key={l.id} className={l.activo ? '' : 'text-slate-400'}>
+                <tr key={l.id} className={l.activo ? '' : 'text-tinta-suave'}>
                   {e ? editor(e, (c) => setEdicion({ ...edicion, [l.id]: { ...e, ...c } })) : (
                     <>
-                      <td className="px-2 py-2 font-mono">{l.codigo}</td>
+                      <td className="px-2 py-2 cifra">{l.codigo}</td>
                       <td className="px-2 py-2">{l.nombre}</td>
                       <td className="px-2 py-2">{l.tipo}</td>
                       <td className="px-2 py-2">{l.capacidadKgHora ?? '—'}</td>
@@ -111,22 +111,22 @@ export function LineasPage() {
                     {e ? (
                       <>
                         <button className="text-marca hover:underline" onClick={() => actualizar.mutate(l)}>Guardar</button>
-                        <button className="ml-3 text-slate-600 hover:underline" onClick={() => setEdicion((x) => { const { [l.id]: _q, ...r } = x; return r })}>Cancelar</button>
+                        <button className="ml-3 text-tinta-suave hover:underline" onClick={() => setEdicion((x) => { const { [l.id]: _q, ...r } = x; return r })}>Cancelar</button>
                       </>
                     ) : (
                       <>
                         <button className="text-marca hover:underline" onClick={() => setEdicion({ ...edicion, [l.id]: { codigo: l.codigo, nombre: l.nombre, tipo: l.tipo, capacidadKgHora: l.capacidadKgHora?.toString() ?? '', orden: String(l.orden) } })}>Editar</button>
-                        <button className="ml-3 text-slate-600 hover:underline" onClick={() => cambiarActivo.mutate(l)}>{l.activo ? 'Desactivar' : 'Activar'}</button>
+                        <button className="ml-3 text-tinta-suave hover:underline" onClick={() => cambiarActivo.mutate(l)}>{l.activo ? 'Desactivar' : 'Activar'}</button>
                       </>
                     )}
                   </td>
                 </tr>
               )
             })}
-            {lineas.data?.length === 0 && <tr><td colSpan={7} className="px-4 py-4 text-center text-slate-500">Sin líneas.</td></tr>}
-            <tr className="bg-slate-50">
+            {lineas.data?.length === 0 && <tr><td colSpan={7} className="px-4 py-4 text-center text-tinta-suave">Sin líneas.</td></tr>}
+            <tr className="bg-velo">
               {editor(nueva, (c) => setNueva({ ...nueva, ...c }))}
-              <td className="px-2 py-1 text-xs text-slate-500">nueva</td>
+              <td className="px-2 py-1 text-xs text-tinta-suave">nueva</td>
               <td className="px-2 py-1 text-right">
                 <Boton cargando={crear.isPending} disabled={!nueva.codigo || !nueva.nombre} onClick={() => crear.mutate()}>Crear</Boton>
               </td>

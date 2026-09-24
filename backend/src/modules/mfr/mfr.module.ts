@@ -5,12 +5,14 @@ import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from '../../applica
 import { RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
 import {
   CargarDiaUseCase,
+  CargarPeriodoUseCase,
   CerrarTurnoUseCase,
   CopiarDiaUseCase,
   EliminarBloqueUseCase,
   GuardarBloqueUseCase,
 } from '../../application/mfr/bloques.use-cases.js';
 import {
+  ActualizarEstandaresEnLoteUseCase,
   ActualizarEstandarUseCase,
   ActualizarLineaUseCase,
   CrearLineaUseCase,
@@ -79,6 +81,11 @@ import { MfrController } from './mfr.controller.js';
         new CargarDiaUseCase(uow, p, h, reloj),
     },
     {
+      provide: CargarPeriodoUseCase,
+      inject: [CargarDiaUseCase],
+      useFactory: (cargar: CargarDiaUseCase) => new CargarPeriodoUseCase(cargar),
+    },
+    {
       provide: CopiarDiaUseCase,
       inject: [CargarDiaUseCase, BLOQUE_REPOSITORY],
       useFactory: (cargar: CargarDiaUseCase, bloques: BloqueRepository) => new CopiarDiaUseCase(cargar, bloques),
@@ -92,6 +99,11 @@ import { MfrController } from './mfr.controller.js';
     { provide: CrearLineaUseCase, inject: [UNIDAD_DE_TRABAJO], useFactory: (uow: UnidadDeTrabajo) => new CrearLineaUseCase(uow) },
     { provide: ActualizarLineaUseCase, inject: [UNIDAD_DE_TRABAJO], useFactory: (uow: UnidadDeTrabajo) => new ActualizarLineaUseCase(uow) },
     { provide: ActualizarEstandarUseCase, inject: [UNIDAD_DE_TRABAJO], useFactory: (uow: UnidadDeTrabajo) => new ActualizarEstandarUseCase(uow) },
+    {
+      provide: ActualizarEstandaresEnLoteUseCase,
+      inject: [UNIDAD_DE_TRABAJO],
+      useFactory: (uow: UnidadDeTrabajo) => new ActualizarEstandaresEnLoteUseCase(uow),
+    },
   ],
 })
 export class MfrModule {}

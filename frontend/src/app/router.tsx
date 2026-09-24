@@ -10,6 +10,7 @@
  *   /remisiones/:id/editar   corregir datos (BORRADOR / EN_RECTIFICACION)
  *   /admin/usuarios          administración
  *   /admin/productos         administración
+ *   /admin/pesos             pesos por caja en lote (estándar del MFR)
  *
  * `RutaProtegida` envuelve al layout: si no hay sesión, ninguna ruta
  * hija se renderiza. La autorización fina (permisos) la hace el
@@ -20,6 +21,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { GruposPage } from '../modules/admin/pages/GruposPage'
 import { LineasPage } from '../modules/admin/pages/LineasPage'
+import { PesosPage } from '../modules/admin/pages/PesosPage'
 import { ProductosPage } from '../modules/admin/pages/ProductosPage'
 import { ProgramacionPage } from '../modules/mfr/pages/ProgramacionPage'
 import { TableroMfrPage } from '../modules/mfr/pages/TableroMfrPage'
@@ -54,6 +56,7 @@ export const router = createBrowserRouter([
           { path: 'admin/productos', element: <ProductosPage /> },
           { path: 'admin/lineas', element: <LineasPage /> },
           { path: 'admin/grupos', element: <GruposPage /> },
+          { path: 'admin/pesos', element: <PesosPage /> },
         ],
       },
     ],

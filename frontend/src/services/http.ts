@@ -71,7 +71,24 @@ function aErrorApi(error: unknown): ErrorApi {
     return { estado: 0, codigo: 'DESCONOCIDO', mensaje: 'Error inesperado.' }
   }
 
-  const { response } = error as AxiosError<Record<string, unknown>>
+  const axiosError = error as AxiosError<Record<string, unknown>>
+  const { response } = axiosError
+
+  // Se agotó el tiempo de espera. Axios tampoco trae respuesta aquí, pero
+  // decir "no se pudo conectar" engaña: el servidor sí respondió al
+  // contacto y puede seguir trabajando. Importa porque una operación larga
+  // (cargar un DPP de varios días) puede completarse aunque el navegador
+  // ya se haya rendido.
+  if (!response && (axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT')) {
+    return {
+      estado: 0,
+      codigo: 'TIEMPO_AGOTADO',
+      mensaje:
+        'La operación tardó más de lo esperado y el navegador dejó de esperar. ' +
+        'Puede que el servidor la haya terminado: recargue y verifique antes de repetirla.',
+    }
+  }
+
   if (!response) {
     return {
       estado: 0,

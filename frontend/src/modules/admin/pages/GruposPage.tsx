@@ -63,37 +63,37 @@ export function GruposPage() {
     <section className="mx-auto max-w-4xl space-y-4">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Grupos</h1>
-          <p className="text-sm text-slate-600">Quien pone el personal del turno. El proveedor se escribe en la descripción.</p>
+          <h1 className="text-2xl font-semibold text-tinta">Grupos</h1>
+          <p className="text-sm text-tinta-suave">Quien pone el personal del turno. El proveedor se escribe en la descripción.</p>
         </div>
         <Boton onClick={() => abrir('nuevo')}>Nuevo grupo</Boton>
       </header>
 
       {cambiarActivo.isError && <Alerta tipo="error">{comoErrorApi(cambiarActivo.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
               <th className="px-4 py-2">Código</th><th className="px-4 py-2">Nombre</th><th className="px-4 py-2">Descripción (proveedor)</th>
               <th className="px-4 py-2 text-right" title="Personas que debería enviar por turno">Pers. esperadas</th><th className="px-4 py-2">Estado</th><th></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-borde">
             {grupos.data?.map((g) => (
-              <tr key={g.id} className={g.activo ? '' : 'text-slate-400'}>
-                <td className="px-4 py-2 font-mono">{g.codigo}</td>
+              <tr key={g.id} className={g.activo ? '' : 'text-tinta-suave'}>
+                <td className="px-4 py-2 cifra">{g.codigo}</td>
                 <td className="px-4 py-2 font-medium">{g.nombre}</td>
-                <td className="px-4 py-2 max-w-md truncate" title={g.descripcion ?? ''}>{g.descripcion ?? <span className="text-amber-700">sin proveedor</span>}</td>
-                <td className="px-4 py-2 text-right">{g.personasEsperadas ?? <span className="text-amber-700">—</span>}</td>
+                <td className="px-4 py-2 max-w-md truncate" title={g.descripcion ?? ''}>{g.descripcion ?? <span className="text-alerta">sin proveedor</span>}</td>
+                <td className="px-4 py-2 text-right">{g.personasEsperadas ?? <span className="text-alerta">—</span>}</td>
                 <td className="px-4 py-2">{g.activo ? 'Activo' : 'Inactivo'}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
                   <button className="text-marca hover:underline" onClick={() => abrir(g)}>Editar</button>
-                  <button className="ml-3 text-slate-600 hover:underline" onClick={() => cambiarActivo.mutate(g)}>{g.activo ? 'Desactivar' : 'Activar'}</button>
+                  <button className="ml-3 text-tinta-suave hover:underline" onClick={() => cambiarActivo.mutate(g)}>{g.activo ? 'Desactivar' : 'Activar'}</button>
                 </td>
               </tr>
             ))}
-            {grupos.data?.length === 0 && <tr><td colSpan={6} className="px-4 py-4 text-center text-slate-500">Sin grupos.</td></tr>}
+            {grupos.data?.length === 0 && <tr><td colSpan={6} className="px-4 py-4 text-center text-tinta-suave">Sin grupos.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -106,7 +106,7 @@ export function GruposPage() {
           </div>
           <AreaTexto etiqueta="Descripción (proveedor, contacto…)" rows={3} placeholder="Ej.: Proveedor Logicmard S.A.S. — contacto Juan Pérez" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           <Campo etiqueta="Personas esperadas por turno" type="number" min={1} value={form.personasEsperadas} onChange={(e) => setForm({ ...form, personasEsperadas: e.target.value })} />
-          <p className="text-xs text-slate-500">Se compara con las personas que realmente llegaron al turno: si llegan menos, la productividad del turno se marca como afectada.</p>
+          <p className="text-xs text-tinta-suave">Se compara con las personas que realmente llegaron al turno: si llegan menos, la productividad del turno se marca como afectada.</p>
           {guardar.isError && <Alerta tipo="error">{comoErrorApi(guardar.error).mensaje}</Alerta>}
           <div className="flex justify-end gap-2">
             <Boton type="button" variante="secundario" onClick={() => setEditando(null)}>Cancelar</Boton>

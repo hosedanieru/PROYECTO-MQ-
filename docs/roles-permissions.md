@@ -7,7 +7,7 @@ Fuente de verdad: `backend/prisma/seed.ts`. El seed reemplaza los permisos de ca
 | Rol | Quién | Resumen |
 |---|---|---|
 | `ADMINISTRADOR` | Administración de Inlotrans | **Superusuario.** Puede ejecutar cualquier acción y ver cualquier apartado del sistema, sin excepción. Está garantizado en dos niveles: el seed le asigna todos los permisos, y además `Usuario.tienePermiso()` devuelve `true` para este rol aunque el permiso no exista todavía en la base (un módulo nuevo nunca lo deja por fuera). El frontend aplica la misma regla. No está atado a ningún área. |
-| `COORDINADOR_MQ` | Coordinador de Maquila en turno | Crea, edita, registra la respuesta del OPA, rectifica, valida (concilia), exporta, consulta catálogo. |
+| `COORDINADOR_MQ` | Coordinador de Maquila en turno | Crea, edita, registra la respuesta del OPA, rectifica, valida (concilia), exporta. Edita catálogos (incluidos los grupos) y opera el MFR: carga la programación del DPP, registra asistencia y asignaciones, cierra el turno. |
 | `PATINADOR` | Auxiliar logístico | Consulta y entrega al OPA. **No registra la respuesta del OPA** (decisión del área, 2026-09-16). |
 | `CONSULTA` | Solo lectura | Consulta y exporta. |
 
@@ -26,10 +26,15 @@ Los actores de PepsiCo (OPA, contacto de conciliación) **no son usuarios**: se 
 | `remision.validar` | ✓ | ✓ | | |
 | `remision.exportar` | ✓ | ✓ | | ✓ |
 | `catalogo.consultar` | ✓ | ✓ | ✓ | ✓ |
-| `catalogo.editar` | ✓ | | | |
+| `catalogo.editar` | ✓ | ✓ | | |
 | `catalogo.editar_estandares` | ✓ | | | |
 | `admin.usuarios` | ✓ | | | |
 | `admin.auditoria` | ✓ | | | |
+| `mfr.consultar` | ✓ | ✓ | | ✓ |
+| `mfr.cargar_programacion` | ✓ | ✓ | | |
+| `mfr.configurar_turno` | ✓ | ✓ | | |
+
+`catalogo.editar` se le dio al coordinador el 2026-09-21 (decisión del usuario): necesitaba gestionar **grupos**, y se prefirió el permiso completo de catálogo antes que crear uno específico. Solo el administrador conserva `catalogo.editar_estandares` (cajas/hora y peso por caja).
 
 ## Cómo se aplica
 

@@ -27,6 +27,23 @@ export interface EstandarProducto {
   pesoSugeridoKg: number | null
 }
 
+/**
+ * Un producto dentro de la carga en lote. Omitir un campo significa
+ * "no lo toques"; `null` significa "bórralo". Por eso son opcionales y
+ * no se envían siempre los dos.
+ */
+export interface CambioEstandarLote {
+  productoId: string
+  cajasPorHora?: number | null
+  pesoNetoKg?: number | null
+}
+
+export interface ResultadoLoteEstandares {
+  actualizados: EstandarProducto[]
+  /** Códigos que ya tenían ese mismo valor: no se tocaron ni se auditaron. */
+  sinCambios: string[]
+}
+
 /** Lo que se envía al crear o corregir un bloque. */
 export interface DatosBloque {
   lineaId: string
@@ -229,7 +246,10 @@ export interface IndicadoresDia {
 export interface BloquePropuesto {
   linea: string
   tipoLinea: TipoLinea
+  /** Fecha de calendario en que arranca, tal como la trae el PDF. */
   fechaInicio: string
+  /** Día operativo al que pertenece (corte 06:00). Es el día en que se carga. */
+  fechaOperativa: string
   horaInicio: string
   horaFin: string
   codigoPepsico: string
@@ -253,10 +273,34 @@ export interface BloquePropuesto {
   advertencias: string[]
 }
 
+/** Un día dentro del DPP. Un archivo puede traer uno, una semana o un mes. */
+export interface DiaPropuesto {
+  fechaOperativa: string
+  bloques: number
+  listos: number
+}
+
 export interface PropuestaDpp {
   archivo: string
+  /** Primer día del archivo; el detalle está en `dias`. */
   fechaOperativa: string | null
+  dias: DiaPropuesto[]
   bloques: BloquePropuesto[]
   listos: number
   advertencias: string[]
+}
+
+/** Qué pasó con cada día de una carga por período. */
+export interface ResultadoDiaCarga {
+  fechaOperativa: string
+  estado: 'CARGADO' | 'OMITIDO' | 'ERROR'
+  bloquesCreados: number
+  codigo?: string
+  mensaje?: string
+}
+
+export interface ResultadoPeriodo {
+  dias: ResultadoDiaCarga[]
+  totalBloquesCreados: number
+  diasCargados: number
 }

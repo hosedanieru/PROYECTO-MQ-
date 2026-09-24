@@ -117,7 +117,7 @@ export function RemisionesListaPage() {
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">Remisiones</h1>
+        <h1 className="text-2xl font-semibold text-tinta">Remisiones</h1>
         <div className="flex flex-wrap gap-2">
           <Boton
             variante="secundario"
@@ -142,7 +142,7 @@ export function RemisionesListaPage() {
 
       {errorArchivo && <Alerta tipo="error">{errorArchivo}</Alerta>}
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg bg-white p-4 shadow-sm md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 rounded-lg bg-base p-4 shadow-sm md:grid-cols-5">
         <Campo
           etiqueta="Desde (fecha operativa)"
           type="date"
@@ -197,9 +197,9 @@ export function RemisionesListaPage() {
         <Alerta tipo="error">{comoErrorApi(remisiones.error).mensaje}</Alerta>
       )}
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
               <th className="px-3 py-2">
                 <input
@@ -229,17 +229,17 @@ export function RemisionesListaPage() {
               <th className="px-4 py-2">Estado</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-borde">
             {remisiones.isLoading && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-6 text-center text-tinta-suave">
                   Cargando…
                 </td>
               </tr>
             )}
             {remisiones.data?.items.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-6 text-center text-tinta-suave">
                   No hay remisiones con esos filtros.
                 </td>
               </tr>
@@ -247,7 +247,7 @@ export function RemisionesListaPage() {
             {remisiones.data?.items.map((r) => (
               <tr
                 key={r.id}
-                className={r.estaPendienteDeConciliar ? 'bg-amber-50/60' : 'hover:bg-slate-50'}
+                className={r.estaPendienteDeConciliar ? 'bg-alerta-claro/60' : 'hover:bg-velo'}
               >
                 <td className="px-3 py-2">
                   <input
@@ -262,10 +262,10 @@ export function RemisionesListaPage() {
                     {r.consecutivo}
                   </Link>
                   {r.version > 1 && (
-                    <span className="ml-1 text-xs text-slate-400">v{r.version}</span>
+                    <span className="ml-1 text-xs text-tinta-suave">v{r.version}</span>
                   )}
                   {r.extraoficial && (
-                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-semibold uppercase text-amber-800" title={r.motivoExtraoficial ?? ''}>
+                    <span className="ml-1 rounded bg-alerta-claro px-1 text-[10px] font-semibold uppercase text-alerta" title={r.motivoExtraoficial ?? ''}>
                       extraoficial
                     </span>
                   )}
@@ -276,7 +276,7 @@ export function RemisionesListaPage() {
                   {grupos.data?.find((p) => p.id === r.grupoId)?.nombre ?? '—'}
                 </td>
                 <td className="px-4 py-2">
-                  <div className="font-mono text-xs text-slate-500">{r.producto.codigo}</div>
+                  <div className="cifra text-xs text-tinta-suave">{r.producto.codigo}</div>
                   <div className="max-w-xs truncate">{r.producto.descripcion}</div>
                 </td>
                 <td className="px-4 py-2 text-right">{r.cantidadCajas}</td>
@@ -291,7 +291,7 @@ export function RemisionesListaPage() {
         </table>
       </div>
 
-      <footer className="flex items-center justify-between text-sm text-slate-600">
+      <footer className="flex items-center justify-between text-sm text-tinta-suave">
         <span>{total} remisiones</span>
         <div className="flex items-center gap-2">
           <Boton

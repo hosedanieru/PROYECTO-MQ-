@@ -18,7 +18,7 @@
  * reglas del negocio.
  */
 
-import type { EstadoRemision, Remision } from './remision.entity.js';
+import { ESTADOS_REMISION, type EstadoRemision, type Remision } from './remision.entity.js';
 
 /** Criterios de búsqueda de remisiones. */
 export interface FiltroRemisiones {
@@ -90,12 +90,37 @@ export interface RemisionRepository {
   buscarPorIds(ids: string[]): Promise<Remision[]>;
 
   /**
+   * Cuántas remisiones hay de cada estado, sin traer los documentos.
+   *
+   * Existe porque el tablero necesita los seis conteos: pedirlos como
+   * seis listados era seis veces el trabajo (en Firestore, seis lecturas
+   * completas del día) para devolver seis números.
+   */
+  contarPorEstado(
+    filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>,
+  ): Promise<ConteoPorEstado>;
+
+  /**
    * Cajas remisionadas en un día operativo, agrupadas por turno, producto
    * y si son extraoficiales, contando solo los estados indicados.
    * Alimenta el MFR (que excluye las extraoficiales) y el tope de lo
    * programado.
    */
   totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]>;
+}
+
+/** Un número por estado; los estados sin remisiones van en cero. */
+export type ConteoPorEstado = Record<EstadoRemision, number>;
+
+/**
+ * Conteo con todos los estados en cero.
+ *
+ * Las dos implementaciones parten de aquí: así un estado sin remisiones
+ * sale como 0 y no como `undefined`, y quien consume no tiene que
+ * preguntarse si el estado faltaba o valía cero.
+ */
+export function conteoEnCero(): ConteoPorEstado {
+  return Object.fromEntries(ESTADOS_REMISION.map((estado) => [estado, 0])) as ConteoPorEstado;
 }
 
 export interface CajasAgrupadas {

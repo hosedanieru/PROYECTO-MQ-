@@ -19,9 +19,9 @@ import type { EstadoLinea, PersonalGrupo, PersonalLinea } from '../../../shared/
 import { useAsignarGrupoLinea, useQuitarAsignacion } from '../hooks/useMfr'
 
 const ESTILO: Record<EstadoLinea, { texto: string; clase: string }> = {
-  CUBIERTA: { texto: 'Cubierta', clase: 'bg-green-100 text-green-800' },
-  INCOMPLETA: { texto: 'Incompleta', clase: 'bg-red-100 text-red-800' },
-  SIN_DATO: { texto: 'Sin dato', clase: 'bg-slate-100 text-slate-500' },
+  CUBIERTA: { texto: 'Cubierta', clase: 'bg-exito-claro text-exito' },
+  INCOMPLETA: { texto: 'Incompleta', clase: 'bg-critico-claro text-critico' },
+  SIN_DATO: { texto: 'Sin dato', clase: 'bg-velo text-tinta-suave' },
 }
 
 interface Props {
@@ -72,12 +72,12 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
   const error = asignar.error ?? quitar.error
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3">
-      <h4 className="text-xs font-semibold uppercase text-slate-500">Líneas del turno</h4>
+    <div className="mt-3 border-t border-borde pt-3">
+      <h4 className="text-xs font-semibold uppercase text-tinta-suave">Líneas del turno</h4>
 
       {lineas.length > 0 ? (
         <table className="mt-1 w-full text-left">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-tinta-suave">
             <tr>
               <th className="py-1">Línea</th>
               <th className="py-1">Grupos asignados</th>
@@ -88,19 +88,19 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
           </thead>
           <tbody>
             {lineas.map((l) => (
-              <tr key={l.lineaId} className="border-t border-slate-100 align-top">
+              <tr key={l.lineaId} className="border-t border-borde align-top">
                 <td className="py-1 font-medium">{l.nombre}</td>
                 <td className="py-1">
-                  {l.grupos.length === 0 && <span className="text-slate-400">—</span>}
+                  {l.grupos.length === 0 && <span className="text-tinta-suave">—</span>}
                   {l.grupos.map((g) => (
-                    <span key={g.asignacionId} className="mr-2 inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                    <span key={g.asignacionId} className="mr-2 inline-flex items-center gap-1 rounded bg-velo px-1.5 py-0.5 text-xs">
                       <button type="button" className="hover:underline" onClick={() => escoger(l.lineaId, g.grupoId)} title="Corregir">
                         {g.nombre} · {g.personas}
                       </button>
                       {puedeRegistrar && (
                         <button
                           type="button"
-                          className="text-red-600 hover:text-red-800"
+                          className="text-critico hover:text-critico"
                           title="Quitar"
                           disabled={quitar.isPending}
                           onClick={() => void quitarAsignacion(g.asignacionId, `${g.nombre} (${g.personas})`)}
@@ -123,11 +123,11 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
           </tbody>
         </table>
       ) : (
-        <p className="mt-1 text-slate-500">Este turno no tiene bloques ni grupos asignados a líneas.</p>
+        <p className="mt-1 text-tinta-suave">Este turno no tiene bloques ni grupos asignados a líneas.</p>
       )}
 
       {puedeRegistrar && gruposConAsistencia.length === 0 && (
-        <p className="mt-2 text-xs text-amber-700">Registre primero la asistencia de los grupos: solo se pueden asignar personas que llegaron.</p>
+        <p className="mt-2 text-xs text-alerta">Registre primero la asistencia de los grupos: solo se pueden asignar personas que llegaron.</p>
       )}
       {puedeRegistrar && gruposConAsistencia.length > 0 && (
         <form onSubmit={(e) => void enviar(e)} className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_7rem_auto] md:items-end">

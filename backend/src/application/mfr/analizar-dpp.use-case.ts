@@ -19,8 +19,15 @@ import { coincideConSku, leerDpp, type BloqueDpp } from '../../domain/mfr/dpp-pe
 import { pesoNetoSugeridoKg, type EstandarRepository } from '../../domain/mfr/estandar-produccion.js';
 import { claveLinea, type LineaRepository } from '../../domain/mfr/linea-produccion.js';
 import { DppNoReconocidoError } from '../../domain/mfr/mfr.errors.js';
+import { fechaOperativaDeHoraLocal } from '../../domain/shared/fecha-operativa.js';
 
 export interface BloquePropuesto extends BloqueDpp {
+  /**
+   * Día operativo al que pertenece el bloque, derivado de SU propia
+   * fecha y hora de inicio (corte 06:00), no de la fecha que el usuario
+   * tenga en pantalla. Es lo que permite importar un DPP de varios días.
+   */
+  fechaOperativa: string;
   lineaId: string | null;
   productoId: string | null;
   productoCodigo: string | null;
@@ -31,8 +38,22 @@ export interface BloquePropuesto extends BloqueDpp {
   advertencias: string[];
 }
 
+/** Resumen de un día dentro del DPP, para que la pantalla ofrezca cargarlos por separado. */
+export interface DiaPropuesto {
+  fechaOperativa: string;
+  bloques: number;
+  /** Cuántos de esos bloques tienen línea y producto resueltos. */
+  listos: number;
+}
+
 export interface PropuestaDpp {
+  /**
+   * Primer día operativo del archivo. Se conserva por compatibilidad y
+   * como valor por defecto; el detalle real está en `dias`.
+   */
   fechaOperativa: string | null;
+  /** Un DPP puede traer un día, una semana o un mes: aquí van todos. */
+  dias: DiaPropuesto[];
   bloques: BloquePropuesto[];
   /** Cuántos bloques están listos para cargar (línea y producto resueltos). */
   listos: number;
@@ -89,6 +110,7 @@ export class AnalizarDppUseCase {
 
       return {
         ...b,
+        fechaOperativa: fechaOperativaDeHoraLocal(b.fechaInicio, b.horaInicio),
         lineaId: linea?.id ?? null,
         productoId: estandar?.productoId ?? null,
         productoCodigo: estandar?.codigo ?? null,
@@ -99,8 +121,24 @@ export class AnalizarDppUseCase {
       };
     });
 
+    const porDia = new Map<string, DiaPropuesto>();
+    for (const b of bloques) {
+      const dia = porDia.get(b.fechaOperativa) ?? { fechaOperativa: b.fechaOperativa, bloques: 0, listos: 0 };
+      dia.bloques += 1;
+      if (b.lineaId && b.productoId) dia.listos += 1;
+      porDia.set(b.fechaOperativa, dia);
+    }
+    const dias = [...porDia.values()].sort((a, b) => a.fechaOperativa.localeCompare(b.fechaOperativa));
+
+    if (dias.length > 1) {
+      globales.add(`El archivo trae ${dias.length} días (${dias[0].fechaOperativa} a ${dias[dias.length - 1].fechaOperativa}). Se cargan por separado, un día a la vez.`);
+    }
+
     return {
-      fechaOperativa: dpp.fechaOperativa,
+      // El encabezado "Date:" solo sirve si el archivo es de un día; en
+      // uno de varios, el primer día operativo es más fiable.
+      fechaOperativa: dias[0]?.fechaOperativa ?? dpp.fechaOperativa,
+      dias,
       bloques,
       listos: bloques.filter((b) => b.lineaId && b.productoId).length,
       advertencias: [...globales],

@@ -1,16 +1,235 @@
 @import 'tailwindcss';
 
 /*
- * Tema mínimo. Tailwind v4 lee estas variables como tokens de diseño
- * (`bg-marca`, `text-marca`, etc.). Cuando el área defina identidad
- * visual o el dispositivo objetivo, se ajusta aquí, no en cada pantalla.
+ * SISTEMA DE DISEÑO — Inlotrans MQ
+ * ===============================
+ *
+ * Único lugar donde viven los colores, radios y sombras. Hay DOS temas
+ * (claro y oscuro) y la aplicación entera cambia con un atributo:
+ *
+ *   <html data-tema="claro">   o   <html data-tema="oscuro">
+ *
+ * CÓMO FUNCIONA
+ * -------------
+ * Las variables de abajo (`--fondo`, `--marca`…) cambian de valor según
+ * el tema. `@theme inline` le dice a Tailwind que sus utilidades
+ * (`bg-fondo`, `text-marca`) apunten a esas variables en vez de copiar
+ * el color: así el cambio de tema es inmediato, sin recompilar y sin
+ * duplicar una sola clase en las pantallas.
+ *
+ * REGLA: ninguna pantalla escribe un color en crudo (`bg-[#1d4ed8]`) ni
+ * usa la paleta de Tailwind (`bg-blue-600`, `text-slate-500`). Si falta
+ * un color, se agrega aquí. Un color escrito a mano queda ilegible en
+ * el otro tema, que es justo lo que estos tokens evitan.
+ *
+ * EL TEMA OSCURO NO ES EL CLARO INVERTIDO. Los tonos de marca, acento y
+ * crítico son un paso más claros, porque sobre fondo oscuro los
+ * originales no alcanzan el contraste mínimo de 3:1 (comprobado, no
+ * estimado). Los nombres son los mismos; solo cambia el valor.
  */
-@theme {
-  --color-marca: #1d4ed8;
-  --color-marca-oscuro: #1e40af;
-  --color-marca-claro: #dbeafe;
+
+:root,
+:root[data-tema='claro'] {
+  /* --- Superficies ---------------------------------------------------
+   * marina  = barra lateral (oscura en los dos temas, como el diseño)
+   * fondo   = lienzo de la página
+   * base    = tarjetas y formularios
+   * velo    = zonas hundidas dentro de una tarjeta
+   */
+  --marina: #0b1b3f;
+  --fondo: #f4f7fc;
+  --base: #ffffff;
+  --velo: #f8fafc;
+  --borde: #e2e8f0;
+
+  /* --- Texto --------------------------------------------------------- */
+  --tinta: #0f172a;
+  --tinta-suave: #475569;
+
+  /* --- Azul institucional: acciones, enlaces, estado activo ---------- */
+  --marca: #1d4ed8;
+  /* Fondo del botón primario al pasar el cursor. */
+  --marca-hover: #1e3a8a;
+  /* Pastilla suave (fondo) y su texto. */
+  --marca-claro: #dbeafe;
+  --marca-texto: #1e3a8a;
+
+  /* --- Semánticos: significado, no decoración ------------------------ */
+  --exito: #15a34a;
+  --exito-claro: #dcfce7;
+  --alerta: #d97706;
+  --alerta-claro: #fef3c7;
+  --critico: #dc2626;
+  --critico-claro: #fee2e2;
+  --acento: #7c3aed;
+  --acento-claro: #ede9fe;
+
+  /*
+   * Gris de dato: estados "todavía no empezó" (BORRADOR). Más oscuro
+   * que un gris de interfaz porque en una gráfica debe separarse del
+   * fondo (3:1 mínimo).
+   */
+  --neutro: #64748b;
+
+  --sombra-tarjeta: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.18);
+  --sombra-elevada: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 36px -16px rgb(15 23 42 / 0.28);
+}
+
+:root[data-tema='oscuro'] {
+  --marina: #081326;
+  --fondo: #0b1830;
+  --base: #122344;
+  --velo: #18294b;
+  --borde: #22375e;
+
+  --tinta: #e6edf8;
+  --tinta-suave: #9aabc4;
+
+  --marca: #3b82f6;
+  /* En oscuro el "hover" aclara en vez de oscurecer: al revés que en claro. */
+  --marca-hover: #60a5fa;
+  --marca-claro: #1c3566;
+  --marca-texto: #bfdbfe;
+
+  --exito: #16a34a;
+  --exito-claro: #0f2e1f;
+  --alerta: #d97706;
+  --alerta-claro: #33240c;
+  --critico: #ef4444;
+  --critico-claro: #3a1717;
+  --acento: #8b5cf6;
+  --acento-claro: #261c47;
+
+  --neutro: #64748b;
+
+  /*
+   * En oscuro la sombra no separa (negro sobre negro no se ve): la
+   * separación la hace el borde. Se deja una sombra mínima solo para
+   * los elementos flotantes.
+   */
+  --sombra-tarjeta: 0 1px 2px rgb(0 0 0 / 0.3);
+  --sombra-elevada: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+}
+
+/*
+ * `inline` hace que las utilidades apunten a la variable, no a su valor
+ * actual. Sin esa palabra, Tailwind congelaría los colores del tema
+ * claro y el oscuro no tendría efecto.
+ */
+@theme inline {
+  --color-marina: var(--marina);
+  --color-fondo: var(--fondo);
+  --color-base: var(--base);
+  --color-velo: var(--velo);
+  --color-borde: var(--borde);
+
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+
+  --color-marca: var(--marca);
+  --color-marca-hover: var(--marca-hover);
+  --color-marca-claro: var(--marca-claro);
+  --color-marca-texto: var(--marca-texto);
+
+  --color-exito: var(--exito);
+  --color-exito-claro: var(--exito-claro);
+  --color-alerta: var(--alerta);
+  --color-alerta-claro: var(--alerta-claro);
+  --color-critico: var(--critico);
+  --color-critico-claro: var(--critico-claro);
+  --color-acento: var(--acento);
+  --color-acento-claro: var(--acento-claro);
+  --color-neutro: var(--neutro);
+
+  --shadow-tarjeta: var(--sombra-tarjeta);
+  --shadow-elevada: var(--sombra-elevada);
+
+  --radius-tarjeta: 1rem;
+
+  /*
+   * Inter, empaquetada con la aplicación (ver `main.tsx`). No se carga
+   * de internet: la planta puede quedarse sin conexión. Detrás va la
+   * fuente del sistema por si el archivo fallara.
+   *
+   * Se eligió por dos cosas que este aplicativo necesita: dígitos de
+   * ancho fijo (las columnas de cantidades no bailan) y un cero con
+   * barra, que evita confundirlo con la letra O en un código de producto.
+   */
+  --font-sans: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-numerica: 'Inter Variable', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+html {
+  /* Pinta los controles nativos (barras de scroll, selects) según el tema. */
+  color-scheme: light;
+}
+
+html[data-tema='oscuro'] {
+  color-scheme: dark;
 }
 
 body {
-  @apply bg-slate-100 text-slate-800 antialiased;
+  @apply bg-fondo text-tinta antialiased;
+  font-family: var(--font-sans);
+}
+
+/*
+ * Cifras tabulares: en una tabla de cantidades, los dígitos de ancho
+ * variable hacen que las columnas bailen. `tabular-nums` las alinea.
+ * `cv01`/`ss01` activan en Inter el cero con barra y la ele recta, para
+ * que un código de producto no se lea mal.
+ */
+.cifra {
+  font-family: var(--font-numerica);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'cv01', 'ss01';
+  letter-spacing: -0.01em;
+}
+
+/*
+ * Código de producto o de línea: es un identificador, no un texto. Se
+ * separan las letras para poder leerlo dígito a dígito al cotejarlo
+ * contra el documento de PepsiCo.
+ */
+.codigo {
+  font-family: var(--font-numerica);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'cv01', 'ss01';
+  letter-spacing: 0.04em;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--color-marca);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/*
+ * Animación de entrada en CSS. anime.js cubre lo que necesita
+ * secuencia, cálculo o interacción (ver `shared/animacion/`); esto
+ * cubre el caso simple de "que la pantalla aparezca" sin JavaScript.
+ */
+@keyframes aparecer-arriba {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animar-entrada {
+  animation: aparecer-arriba 420ms ease-out both;
+}
+
+/*
+ * Accesibilidad: quien pidió menos movimiento en su sistema operativo no
+ * ve ninguna animación. anime.js respeta lo mismo por código, en
+ * `prefiereMenosMovimiento()`.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

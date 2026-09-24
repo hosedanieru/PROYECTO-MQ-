@@ -211,4 +211,18 @@ export class EstandarFirestoreRepository implements EstandarRepository {
     await this.cliente.actualizar(ref, { ...datos, actualizadoEn: ahoraServidor() });
     return { ...estandarADominio(actual), ...datos };
   }
+
+  /**
+   * Escritura pura, sin una sola lectura: por eso el lote cabe en una
+   * transacción. `actualizar` (arriba) relee para poder devolver el
+   * estándar completo, y eso solo es válido como PRIMERA operación.
+   */
+  async actualizarVarios(cambios: Array<{ productoId: string; datos: DatosEstandar }>): Promise<void> {
+    for (const { productoId, datos } of cambios) {
+      await this.cliente.actualizar(this.cliente.coleccion(COLECCION.productos).doc(productoId), {
+        ...datos,
+        actualizadoEn: ahoraServidor(),
+      });
+    }
+  }
 }

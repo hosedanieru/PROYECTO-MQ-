@@ -26,8 +26,8 @@ import { useRemision } from '../hooks/useRemisiones'
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs uppercase text-slate-500">{etiqueta}</dt>
-      <dd className="text-sm text-slate-900">{children ?? '—'}</dd>
+      <dt className="text-xs uppercase text-tinta-suave">{etiqueta}</dt>
+      <dd className="text-sm text-tinta">{children ?? '—'}</dd>
     </div>
   )
 }
@@ -54,19 +54,19 @@ export function RemisionDetallePage() {
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link to="/remisiones" className="text-sm text-slate-500 hover:underline">
+          <Link to="/remisiones" className="text-sm text-tinta-suave hover:underline">
             ← Remisiones
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+          <h1 className="mt-1 text-2xl font-semibold text-tinta">
             Remisión {r.consecutivo}
             {r.version > 1 && (
-              <span className="ml-2 text-base font-normal text-slate-500">versión {r.version}</span>
+              <span className="ml-2 text-base font-normal text-tinta-suave">versión {r.version}</span>
             )}
           </h1>
           <div className="mt-1 flex items-center gap-2">
             <EstadoBadge estado={r.estado} />
             {r.estaPendienteDeConciliar && (
-              <span className="text-xs text-amber-700">Aprobada por PepsiCo, pendiente de conciliar</span>
+              <span className="text-xs text-alerta">Aprobada por PepsiCo, pendiente de conciliar</span>
             )}
           </div>
         </div>
@@ -92,7 +92,7 @@ export function RemisionDetallePage() {
             {r.esEditable && tienePermiso('remision.editar') && (
               <Link
                 to={`/remisiones/${r.id}/editar`}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-borde bg-base px-4 py-2 text-sm font-medium text-tinta hover:bg-velo"
               >
                 Editar datos
               </Link>
@@ -111,14 +111,14 @@ export function RemisionDetallePage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
-        <dl className="grid grid-cols-2 gap-4 rounded-lg bg-white p-5 shadow-sm">
+        <dl className="grid grid-cols-2 gap-4 rounded-lg bg-base p-5 shadow-sm">
           <Dato etiqueta="Fecha operativa">{fechaCorta(r.fechaOperativa)}</Dato>
           <Dato etiqueta="Registrada">{fechaHora(r.fechaHoraRegistro)}</Dato>
           <Dato etiqueta="Turno">{turno ? `${turno.codigo} · ${turno.nombre}` : '—'}</Dato>
           <Dato etiqueta="Grupo">{grupo?.nombre}</Dato>
           <div className="col-span-2">
             <Dato etiqueta="Producto (como se firmó)">
-              <span className="font-mono text-xs text-slate-500">{r.producto.codigo}</span>
+              <span className="cifra text-xs text-tinta-suave">{r.producto.codigo}</span>
               <br />
               {r.producto.descripcion}
             </Dato>
@@ -135,14 +135,14 @@ export function RemisionDetallePage() {
             <Dato etiqueta="Observaciones">{r.observaciones}</Dato>
           </div>
           {r.extraoficial && (
-            <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="col-span-2 rounded-md border border-amber-200 bg-alerta-claro p-3">
               <Dato etiqueta="Pedido de emergencia (extraoficial, fuera del MFR)">{r.motivoExtraoficial}</Dato>
             </div>
           )}
         </dl>
 
-        <dl className="space-y-4 rounded-lg bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-700">Trazabilidad</h2>
+        <dl className="space-y-4 rounded-lg bg-base p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-tinta">Trazabilidad</h2>
           <Dato etiqueta="Entrega al OPA">
             {r.entrega.fecha ? fechaHora(r.entrega.fecha) : 'Pendiente'}
           </Dato>

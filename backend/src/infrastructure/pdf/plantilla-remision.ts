@@ -2,7 +2,7 @@
  * PLANTILLA HTML DE LA REMISIÓN — formato aprobado por Inlotrans
  * ==============================================================
  *
- * Reproduce el formato oficial (hoja apaisada, dos remisiones por hoja):
+ * Reproduce el formato oficial (hoja vertical, dos remisiones por hoja):
  *
  *   [logo]        REMISIÓN                     [ ]
  *   FECHA: dd/mm/aaaa          LUGAR: MAQUILA PEPSICO SANTO DOMINGO
@@ -171,7 +171,7 @@ function bloqueRemision({ remision, turno, lugar }: RemisionParaImprimir): strin
   </section>`;
 }
 
-/** Documento completo: hojas carta apaisadas con dos remisiones cada una. */
+/** Documento completo: hojas carta verticales con dos remisiones cada una. */
 export function plantillaRemisiones(remisiones: RemisionParaImprimir[]): string {
   const hojas: string[] = [];
   for (let i = 0; i < remisiones.length; i += 2) {
@@ -185,10 +185,10 @@ export function plantillaRemisiones(remisiones: RemisionParaImprimir[]): string 
 <meta charset="utf-8">
 <title>Remisiones</title>
 <style>
-  @page { size: letter landscape; margin: 8mm 10mm; }
+  @page { size: letter portrait; margin: 8mm 10mm; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #fff; font-family: "Century Gothic", "Trebuchet MS", Arial, sans-serif; color: #000; font-size: 9pt; }
-  .hoja { page-break-after: always; display: flex; flex-direction: column; height: 199mm; overflow: hidden; }
+  .hoja { page-break-after: always; display: flex; flex-direction: column; height: 263mm; overflow: hidden; }
   .hoja:last-child { page-break-after: auto; }
   .corte { border-top: 1px dashed #999; margin: 2mm 0; }
   .remision { position: relative; flex: 1; padding: 1mm 0; display: flex; flex-direction: column; }

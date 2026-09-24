@@ -22,8 +22,8 @@ export function CrearRemisionPage() {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Nueva remisión</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-semibold text-tinta">Nueva remisión</h1>
+        <p className="text-sm text-tinta-suave">
           Quedará registrada en el día operativo <strong>{fechaCorta(fechaOperativa)}</strong>{' '}
           (corte 06:00 a 06:00).
         </p>

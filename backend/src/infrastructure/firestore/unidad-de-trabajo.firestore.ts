@@ -20,6 +20,7 @@ import type {
   UnidadDeTrabajo,
 } from '../../domain/shared/unidad-de-trabajo.js';
 import { ClienteFirestore } from './cliente-firestore.js';
+import { traducirErrorFirestore } from './errores-firestore.js';
 import { FirestoreService } from './firestore.service.js';
 import { AsignacionFirestoreRepository } from './repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from './repositorios/asistencia.firestore.repository.js';
@@ -38,7 +39,19 @@ import { UsuarioFirestoreRepository } from './repositorios/usuario.firestore.rep
 export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
   constructor(private readonly firestore: FirestoreService) {}
 
-  ejecutar<T>(trabajo: (contexto: ContextoTransaccional) => Promise<T>): Promise<T> {
+  async ejecutar<T>(trabajo: (contexto: ContextoTransaccional) => Promise<T>): Promise<T> {
+    try {
+      return await this.correr(trabajo);
+    } catch (error) {
+      // Las escrituras de una transacción se aplican al confirmar, fuera
+      // del `ClienteFirestore`: si el servicio falla ahí, el error llega
+      // en crudo. Se traduce aquí para que tampoco ese caso salga como
+      // un 500 sin explicación.
+      throw traducirErrorFirestore(error);
+    }
+  }
+
+  private correr<T>(trabajo: (contexto: ContextoTransaccional) => Promise<T>): Promise<T> {
     return this.firestore.db.runTransaction((tx) => {
       const cliente = new ClienteFirestore(this.firestore.db, tx);
       return trabajo({

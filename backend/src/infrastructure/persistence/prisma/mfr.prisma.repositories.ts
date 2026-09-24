@@ -246,4 +246,14 @@ export class EstandarPrismaRepository implements EstandarRepository {
     });
     return estandarADominio(fila);
   }
+
+  /** Escritura pura: en PostgreSQL basta con encadenar los UPDATE de la transacción. */
+  async actualizarVarios(cambios: Array<{ productoId: string; datos: DatosEstandar }>): Promise<void> {
+    for (const { productoId, datos } of cambios) {
+      await this.cliente.producto.update({
+        where: { id: productoId },
+        data: { cajasPorHora: datos.cajasPorHora, pesoNetoKg: datos.pesoNetoKg },
+      });
+    }
+  }
 }

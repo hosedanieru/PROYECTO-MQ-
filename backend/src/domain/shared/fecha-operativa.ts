@@ -45,6 +45,39 @@ export function fechaOperativaADate(fechaOperativa: string): Date {
 }
 
 /**
+ * Día operativo de una fecha y hora escritas en hora local, sin pasar
+ * por un instante UTC.
+ *
+ * Es la misma regla del corte de las 06:00, pero aplicada a un dato que
+ * ya viene en hora de Colombia: las filas del DPP de PepsiCo, que traen
+ * su propia fecha y hora ("09/17/2026 12:30 AM"). Convertir eso a `Date`
+ * para restarle 6 horas obligaría a construir el instante en la zona
+ * correcta, con el riesgo de correrse un día; comparar la hora de pared
+ * no tiene ese riesgo.
+ *
+ *   hora >= 06:00  →  el mismo día
+ *   hora <  06:00  →  el día anterior
+ *
+ * Importa cuando PepsiCo parte un bloque nocturno en la medianoche: la
+ * fila del 17 a las 00:30 pertenece al día operativo del 16. Sin esto,
+ * la producción de la noche se iría al día equivocado.
+ */
+export function fechaOperativaDeHoraLocal(fecha: string, hora: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    throw new Error(`fechaOperativaDeHoraLocal: fecha inválida "${fecha}", se esperaba YYYY-MM-DD`);
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+    throw new Error(`fechaOperativaDeHoraLocal: hora inválida "${hora}", se esperaba HH:mm`);
+  }
+
+  if (hora >= '06:00') return fecha;
+
+  // Medianoche UTC: restar un día aquí no cruza husos ni horario de verano.
+  const anterior = new Date(fechaOperativaADate(fecha).getTime() - 24 * MILISEGUNDOS_POR_HORA);
+  return anterior.toISOString().slice(0, 10);
+}
+
+/**
  * Instante real de un registro junto con el día operativo al que
  * pertenece. Es lo que necesita cualquier documento que se fecha: la
  * hora exacta para la trazabilidad y el día operativo para los reportes.

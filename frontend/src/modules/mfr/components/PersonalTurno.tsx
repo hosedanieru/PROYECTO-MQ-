@@ -23,16 +23,43 @@ import type { EstadoPersonal, PersonalTurno as Personal } from '../../../shared/
 import { useRegistrarAsistencia } from '../hooks/useMfr'
 import { LineasTurno } from './LineasTurno'
 
-const ESTILO: Record<EstadoPersonal, { texto: string; clase: string }> = {
-  A_FIN: { texto: 'Personal a fin', clase: 'bg-green-100 text-green-800' },
-  AFECTADA: { texto: 'Productividad afectada', clase: 'bg-red-100 text-red-800' },
-  SIN_DATO: { texto: 'Sin asistencia', clase: 'bg-slate-100 text-slate-500' },
+/**
+ * "Productividad afectada" no decía por qué ni cuánto. Ahora el texto
+ * cuenta el hecho ("faltaron 8 personas") y el estado va en el color y
+ * en el punto, no solo en una etiqueta que hay que interpretar.
+ */
+const ESTILO: Record<EstadoPersonal, { clase: string; punto: string }> = {
+  A_FIN: { clase: 'bg-exito-claro text-exito', punto: 'bg-exito' },
+  AFECTADA: { clase: 'bg-critico-claro text-critico', punto: 'bg-critico' },
+  SIN_DATO: { clase: 'bg-velo text-tinta-suave', punto: 'bg-neutro' },
+}
+
+/** Estado de un grupo suelto: cabe en una celda, así que va corto. */
+const ETIQUETA_ESTADO_GRUPO: Record<EstadoPersonal, string> = {
+  A_FIN: 'Completo',
+  AFECTADA: 'Incompleto',
+  SIN_DATO: 'Sin registrar',
+}
+
+function textoPersonal(personal: Personal): string {
+  if (personal.estado === 'SIN_DATO') return 'Falta registrar la asistencia'
+  if (personal.faltante > 0) {
+    return `Faltaron ${personal.faltante} de ${personal.esperadas} personas`
+  }
+  return `Llegaron las ${personal.esperadas} personas esperadas`
 }
 
 export function PersonalBadge({ personal }: { personal: Personal }) {
-  const { texto, clase } = ESTILO[personal.estado]
-  const detalle = personal.estado === 'SIN_DATO' ? '' : ` · ${personal.llegaron}/${personal.esperadas}`
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${clase}`}>{texto}{detalle}</span>
+  const { clase, punto } = ESTILO[personal.estado]
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${clase}`}
+      title="Se compara contra las personas que cada grupo debe enviar por turno, no contra la línea ideal del DPP."
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${punto}`} aria-hidden="true" />
+      {textoPersonal(personal)}
+    </span>
+  )
 }
 
 interface Props {
@@ -79,19 +106,19 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+    <div className="rounded-lg border border-borde bg-base p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold text-slate-800">
+        <h3 className="font-semibold text-tinta">
           Personal {codigoTurno} <PersonalBadge personal={personal} />
         </h3>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-tinta-suave">
           Referencia DPP (línea ideal): {personal.requeridasDpp} persona(s)
         </span>
       </div>
 
       {personal.grupos.length > 0 ? (
         <table className="mt-2 w-full text-left">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-tinta-suave">
             <tr>
               <th className="py-1">Grupo</th>
               <th className="py-1 text-right">Esperadas</th>
@@ -104,26 +131,31 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
           </thead>
           <tbody>
             {personal.grupos.map((g) => (
-              <tr key={g.grupoId} className="border-t border-slate-100">
+              <tr key={g.grupoId} className="border-t border-borde">
                 <td className="py-1">{g.nombre}</td>
                 <td className="py-1 text-right">{g.esperadas ?? '—'}</td>
                 <td className="py-1 text-right">{g.llegaron}</td>
-                <td className={`py-1 text-right ${g.faltante > 0 ? 'font-semibold text-red-700' : ''}`}>{g.faltante}</td>
+                <td className={`py-1 text-right ${g.faltante > 0 ? 'font-semibold text-critico' : ''}`}>{g.faltante}</td>
                 <td className="py-1 text-right" title="Personas del grupo repartidas en líneas / las que llegaron">
                   {g.asignadas ?? 0}/{g.llegaron}
                 </td>
-                <td className="py-1"><span className={`rounded-full px-2 py-0.5 text-xs ${ESTILO[g.estado].clase}`}>{ESTILO[g.estado].texto}</span></td>
-                <td className="py-1 text-slate-600">{g.observacion ?? ''}</td>
+                <td className="py-1">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${ESTILO[g.estado].clase}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${ESTILO[g.estado].punto}`} aria-hidden="true" />
+                    {ETIQUETA_ESTADO_GRUPO[g.estado]}
+                  </span>
+                </td>
+                <td className="py-1 text-tinta-suave">{g.observacion ?? ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
       ) : (
-        <p className="mt-2 text-slate-500">Ningún grupo registrado en este turno.</p>
+        <p className="mt-2 text-tinta-suave">Ningún grupo registrado en este turno.</p>
       )}
 
       {puedeRegistrar && (
-        <form onSubmit={(e) => void enviar(e)} className="mt-3 grid gap-2 border-t border-slate-100 pt-3 md:grid-cols-[1fr_8rem_1fr_auto] md:items-end">
+        <form onSubmit={(e) => void enviar(e)} className="mt-3 grid gap-2 border-t border-borde pt-3 md:grid-cols-[1fr_8rem_1fr_auto] md:items-end">
           <Select etiqueta="Grupo" value={grupoId} onChange={(e) => escogerGrupo(e.target.value)} required>
             <option value="">Seleccione…</option>
             {activos.map((g) => (
@@ -149,7 +181,7 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
         </form>
       )}
       {seleccionado && seleccionado.personasEsperadas === null && (
-        <p className="mt-1 text-xs text-amber-700">
+        <p className="mt-1 text-xs text-alerta">
           Este grupo no tiene personas esperadas definidas; se registra pero no se puede comparar.
         </p>
       )}

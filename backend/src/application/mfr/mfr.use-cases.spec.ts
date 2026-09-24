@@ -38,17 +38,20 @@ import {
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
 import { evaluarLineasTurno } from '../../domain/mfr/asignacion-linea.js';
 import { evaluarPersonalTurno } from '../../domain/mfr/asistencia-turno.js';
+import { MAXIMO_DIAS_POR_CARGA } from '../../domain/mfr/bloque-programacion.js';
+import { MAXIMO_ESTANDARES_POR_LOTE } from '../../domain/mfr/estandar-produccion.js';
 import { AnalizarDppUseCase } from './analizar-dpp.use-case.js';
 import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from './asignacion.use-cases.js';
 import { RegistrarAsistenciaUseCase } from './asistencia.use-case.js';
 import {
   CargarDiaUseCase,
+  CargarPeriodoUseCase,
   CerrarTurnoUseCase,
   CopiarDiaUseCase,
   EliminarBloqueUseCase,
   GuardarBloqueUseCase,
 } from './bloques.use-cases.js';
-import { ActualizarEstandarUseCase } from './catalogos-mfr.use-cases.js';
+import { ActualizarEstandaresEnLoteUseCase, ActualizarEstandarUseCase } from './catalogos-mfr.use-cases.js';
 import { IndicadoresDiaUseCase } from './indicadores-dia.use-case.js';
 
 const FECHA = new Date('2026-09-16T00:00:00.000Z'); // miércoles
@@ -266,6 +269,201 @@ describe('MFR — casos de uso', () => {
       const actualizado = await useCase.ejecutar({ productoId: 'SPR', cajasPorHora: 77.14, pesoNetoKg: 1.897, motivo: 'Peso tomado del DPP del 16/09', usuarioId: 'admin' });
       expect(actualizado.pesoNetoKg).toBe(1.897);
       expect(auditoria.entradas[0]).toMatchObject({ entidad: 'producto', motivo: 'Peso tomado del DPP del 16/09', valorAnterior: { cajasPorHora: 77.14, pesoNetoKg: null } });
+    });
+  });
+
+  describe('CargarPeriodoUseCase (DPP de varios días)', () => {
+    const bloqueDe = (fechaOperativa: Date, extra: Record<string, unknown> = {}) => ({
+      fechaOperativa, lineaId: 'L1', productoId: 'LNC', horaInicio: '06:00', horaFin: '13:30',
+      cajasPorHora: 150, eficienciaPorcentaje: 87, loop: null, personasAsignadas: null, ...extra,
+    });
+    const nuevoUseCase = () => new CargarPeriodoUseCase(new CargarDiaUseCase(uow, productos, horarios, RELOJ));
+
+    it('agrupa por día y carga cada uno por separado', async () => {
+      const resultado = await nuevoUseCase().ejecutar({
+        bloques: [
+          bloqueDe(FECHA),
+          bloqueDe(FECHA, { lineaId: 'L2' }),
+          bloqueDe(MANANA),
+        ],
+        origen: 'DPP',
+        reemplazar: false,
+        usuarioId: 'coord',
+      });
+
+      expect(resultado.diasCargados).toBe(2);
+      expect(resultado.totalBloquesCreados).toBe(3);
+      expect(resultado.dias.map((d) => d.bloquesCreados)).toEqual([2, 1]);
+      expect(resultado.dias.every((d) => d.estado === 'CARGADO')).toBe(true);
+      // Cada bloque quedó en su día, no todos en el primero.
+      expect(await bloques.listarPorFecha(FECHA)).toHaveLength(2);
+      expect(await bloques.listarPorFecha(MANANA)).toHaveLength(1);
+    });
+
+    it('devuelve los días en orden cronológico aunque lleguen desordenados', async () => {
+      const resultado = await nuevoUseCase().ejecutar({
+        bloques: [bloqueDe(MANANA), bloqueDe(FECHA)],
+        origen: 'DPP',
+        reemplazar: false,
+        usuarioId: 'coord',
+      });
+
+      expect(resultado.dias.map((d) => d.fechaOperativa.toISOString().slice(0, 10))).toEqual(['2026-09-16', '2026-09-17']);
+    });
+
+    it('un día que ya tiene programación se OMITE y los demás sí entran', async () => {
+      const useCase = nuevoUseCase();
+      await useCase.ejecutar({ bloques: [bloqueDe(FECHA)], origen: 'DPP', reemplazar: false, usuarioId: 'coord' });
+
+      const resultado = await useCase.ejecutar({
+        bloques: [bloqueDe(FECHA), bloqueDe(MANANA)],
+        origen: 'DPP',
+        reemplazar: false,
+        usuarioId: 'coord',
+      });
+
+      expect(resultado.dias[0]).toMatchObject({ estado: 'OMITIDO', codigo: 'MFR_DIA_CON_PROGRAMACION', bloquesCreados: 0 });
+      expect(resultado.dias[1]).toMatchObject({ estado: 'CARGADO', bloquesCreados: 1 });
+      expect(resultado.diasCargados).toBe(1);
+      // El día omitido conserva su bloque original: no se tocó.
+      expect(await bloques.listarPorFecha(FECHA)).toHaveLength(1);
+    });
+
+    it('un día con turno cerrado queda en ERROR sin frenar al resto', async () => {
+      const useCase = nuevoUseCase();
+      await useCase.ejecutar({ bloques: [bloqueDe(FECHA)], origen: 'DPP', reemplazar: false, usuarioId: 'coord' });
+      // Sin remisiones aprobadas el turno cierra con faltante, y eso exige motivo (regla "ni menos").
+      await new CerrarTurnoUseCase(uow, RELOJ).ejecutar({
+        fechaOperativa: FECHA,
+        turnoId: 'T1',
+        motivoFaltante: 'Prueba: turno cerrado sin producción registrada',
+        usuarioId: 'coord',
+      });
+
+      const resultado = await useCase.ejecutar({
+        bloques: [bloqueDe(FECHA), bloqueDe(MANANA)],
+        origen: 'DPP',
+        reemplazar: true,
+        motivo: 'Semanal corregido por PepsiCo',
+        usuarioId: 'coord',
+      });
+
+      expect(resultado.dias[0]).toMatchObject({ estado: 'ERROR', codigo: 'MFR_TURNO_CERRADO' });
+      expect(resultado.dias[1].estado).toBe('CARGADO');
+      expect(resultado.diasCargados).toBe(1);
+    });
+
+    it('rechaza una carga vacía o con más días de los permitidos', async () => {
+      const useCase = nuevoUseCase();
+
+      await expect(useCase.ejecutar({ bloques: [], origen: 'DPP', reemplazar: false, usuarioId: 'coord' })).rejects.toThrow(
+        DatosMfrInvalidosError,
+      );
+
+      const demasiados = Array.from({ length: MAXIMO_DIAS_POR_CARGA + 1 }, (_, i) =>
+        bloqueDe(new Date(Date.UTC(2026, 0, i + 1))),
+      );
+      await expect(useCase.ejecutar({ bloques: demasiados, origen: 'DPP', reemplazar: false, usuarioId: 'coord' })).rejects.toThrow(
+        /máximo 62 días/,
+      );
+    });
+  });
+
+  describe('ActualizarEstandaresEnLoteUseCase', () => {
+    const MOTIVO = 'Pesos confirmados contra el DPP del 16/09';
+
+    it('aplica el lote en una sola escritura y audita cada producto con el mismo motivo', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+
+      const resultado = await useCase.ejecutar({
+        cambios: [
+          { productoId: 'SPR', pesoNetoKg: 1.897 },
+          { productoId: 'LNC', pesoNetoKg: 2.4 },
+        ],
+        motivo: MOTIVO,
+        usuarioId: 'admin',
+      });
+
+      expect(resultado.actualizados.map((e) => e.pesoNetoKg)).toEqual([1.897, 2.4]);
+      // Una sola llamada de escritura: es lo que permite que quepa en una transacción.
+      expect(estandares.llamadasAActualizarVarios).toBe(1);
+      expect(auditoria.entradas).toHaveLength(2);
+      expect(auditoria.entradas.every((e) => e.motivo === MOTIVO && e.entidad === 'producto')).toBe(true);
+      expect(auditoria.entradas[0]).toMatchObject({ valorAnterior: { pesoNetoKg: null }, valorNuevo: { pesoNetoKg: 1.897 } });
+    });
+
+    it('lo que no se envía no se toca: cargar pesos no borra las cajas por hora', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+
+      await useCase.ejecutar({ cambios: [{ productoId: 'SPR', pesoNetoKg: 1.897 }], motivo: MOTIVO, usuarioId: 'admin' });
+
+      const spr = await estandares.buscarPorProducto('SPR');
+      expect(spr).toMatchObject({ cajasPorHora: 77.14, pesoNetoKg: 1.897 });
+    });
+
+    it('distingue null (borrar) de omitido (conservar)', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+
+      await useCase.ejecutar({ cambios: [{ productoId: 'LNC', cajasPorHora: null }], motivo: MOTIVO, usuarioId: 'admin' });
+
+      expect(await estandares.buscarPorProducto('LNC')).toMatchObject({ cajasPorHora: null, pesoNetoKg: 2.344 });
+    });
+
+    it('informa los productos que ya tenían ese valor y no los audita', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+
+      const resultado = await useCase.ejecutar({
+        cambios: [
+          { productoId: 'LNC', pesoNetoKg: 2.344 }, // el que ya tiene
+          { productoId: 'SPR', pesoNetoKg: 1.897 },
+        ],
+        motivo: MOTIVO,
+        usuarioId: 'admin',
+      });
+
+      expect(resultado.sinCambios).toEqual(['300066770']);
+      expect(resultado.actualizados).toHaveLength(1);
+      expect(auditoria.entradas).toHaveLength(1);
+    });
+
+    it('no escribe nada cuando ningún producto cambia', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+
+      const resultado = await useCase.ejecutar({ cambios: [{ productoId: 'LNC', pesoNetoKg: 2.344 }], motivo: MOTIVO, usuarioId: 'admin' });
+
+      expect(resultado.actualizados).toEqual([]);
+      expect(estandares.llamadasAActualizarVarios).toBe(0);
+      expect(auditoria.entradas).toHaveLength(0);
+    });
+
+    it('rechaza lote sin motivo, vacío, con producto repetido, desconocido, inactivo o con valor inválido', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+      const lote = (cambios: Array<{ productoId: string; pesoNetoKg?: number | null }>, motivo = MOTIVO) =>
+        useCase.ejecutar({ cambios, motivo, usuarioId: 'admin' });
+
+      await expect(lote([{ productoId: 'SPR', pesoNetoKg: 1.9 }], '  ')).rejects.toThrow(MotivoObligatorioError);
+      await expect(lote([])).rejects.toThrow(DatosMfrInvalidosError);
+      await expect(lote([{ productoId: 'SPR', pesoNetoKg: 1.9 }, { productoId: 'SPR', pesoNetoKg: 2 }])).rejects.toThrow(DatosMfrInvalidosError);
+      await expect(lote([{ productoId: 'NO_EXISTE', pesoNetoKg: 1.9 }])).rejects.toThrow(DatosMfrInvalidosError);
+      // 'X' está inactivo: `listar()` no lo devuelve, así que el lote lo rechaza.
+      await expect(lote([{ productoId: 'X', pesoNetoKg: 1.9 }])).rejects.toThrow(DatosMfrInvalidosError);
+      await expect(lote([{ productoId: 'SPR', pesoNetoKg: -3 }])).rejects.toThrow(DatosMfrInvalidosError);
+
+      // Ninguno de los rechazos dejó rastro: la transacción no llegó a escribir.
+      expect(auditoria.entradas).toHaveLength(0);
+      expect(await estandares.buscarPorProducto('SPR')).toMatchObject({ pesoNetoKg: null });
+    });
+
+    it('rechaza un lote por encima del tope de Firestore', async () => {
+      const useCase = new ActualizarEstandaresEnLoteUseCase(uow);
+      const demasiados = Array.from({ length: MAXIMO_ESTANDARES_POR_LOTE + 1 }, (_, i) => ({
+        productoId: `p-${i}`,
+        pesoNetoKg: 1,
+      }));
+
+      await expect(useCase.ejecutar({ cambios: demasiados, motivo: MOTIVO, usuarioId: 'admin' })).rejects.toThrow(
+        /máximo 100 productos/,
+      );
     });
   });
 

@@ -68,6 +68,12 @@ export interface ResultadoPaginado<T> {
   porPagina: number
 }
 
+/** Lo que devuelve GET /remisiones/resumen: seis números, sin documentos. */
+export interface ResumenRemisiones {
+  porEstado: Record<EstadoRemision, number>
+  total: number
+}
+
 export interface FiltroRemisiones {
   anio?: number
   turnoId?: string

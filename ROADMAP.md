@@ -13,8 +13,8 @@ Para no repetir trabajo.
 | Componente | Estado |
 |---|---|
 | Base de datos PostgreSQL 18 local + Prisma 7 configurado | LISTO |
-| `schema.prisma` con 14 tablas y migraciones aplicadas | LISTO |
-| Seed idempotente: 13 permisos, 4 roles, 3 turnos, 14 horarios, 1 lugar, 4 proveedores | LISTO |
+| `schema.prisma` con 18 tablas y migraciones aplicadas | LISTO |
+| Seed idempotente: 16 permisos, 4 roles, 3 turnos con 21 horarios, 1 lugar, 4 grupos, 9 líneas | LISTO |
 | Regla `fecha_operativa` (corte 6:00 a 6:00) con pruebas de casos borde | LISTO |
 | Dominio de Remisión: entidad, reglas, flujo de estados, errores, interfaces | LISTO |
 | 6 casos de uso: crear + 5 transiciones | LISTO |
@@ -30,7 +30,9 @@ Para no repetir trabajo.
 | Pruebas de integración contra PostgreSQL (B2) | LISTO |
 | Docker Compose, Dockerfiles, usuario de BD limitado, CI (E3) | LISTO (compose sin ejecutar aún) |
 | Documentación en `docs/` (E4) | LISTO |
-| 129 pruebas unitarias + 8 de integración | LISTO |
+| MFR regido por el DPP de PepsiCo: bloques, importador del PDF, tablero, tope "ni más ni menos" | LISTO |
+| Grupos (antes proveedores), asistencia por turno y asignación de grupos a líneas | LISTO |
+| 189 pruebas unitarias + 8 de integración (PostgreSQL) + 5 contra Firestore | LISTO |
 
 **Lo que NO está:** vistas por rol × área (esperando al área), histórico migrado (decisión pendiente), y todos los módulos fuera de Remisiones (MFR bloqueado por 3 preguntas; los demás sin levantamiento).
 
@@ -73,11 +75,13 @@ Piezas: `domain/usuario/`, `application/auth/`, `infrastructure/auth/`, `modules
 
 ## B2 · Pruebas de integración contra PostgreSQL
 
-**Estado:** PENDIENTE · **Prioridad:** ALTA · **Depende de:** nada
+**Estado:** LISTO · **Prioridad:** ALTA · **Depende de:** nada
+
+Cerrado: 8 pruebas en `test/remisiones.e2e-spec.ts` y `test/app.e2e-spec.ts` contra la base `mq_test` (`npm run test:e2e`), más 5 contra Firestore (`npm run test:firestore`). Lo que sigue es el análisis original.
 
 ### Por qué importa
 
-Las 92 pruebas actuales no tocan la base de datos. Eso es correcto para el dominio, pero deja sin verificar justamente lo más delicado:
+Las pruebas unitarias no tocan la base de datos. Eso es correcto para el dominio, pero deja sin verificar justamente lo más delicado:
 
 - El bloqueo de fila del consecutivo bajo concurrencia real
 - Que la transacción efectivamente revierta cuando la auditoría falla
@@ -103,7 +107,7 @@ Hoy se simula. La atomicidad real solo se comprueba contra PostgreSQL.
 
 ## B3 · Catálogo de productos
 
-**Estado:** REDEFINIDO (2026-09-16) · **Prioridad:** ALTA · **Bloquea:** uso real del sistema
+**Estado:** LISTO por la vía manual (2026-09-16); la importación del Excel sigue pendiente · **Prioridad:** ALTA
 
 > **Decisión del usuario:** no se importa el Excel por ahora. El administrador crea los productos **uno a uno desde el panel administrativo**. Eso desbloquea B3 sin esperar las respuestas del área sobre duplicados y contradicciones. Tareas nuevas: endpoints `GET/POST/PATCH /api/productos` (con `catalogo.consultar` / `catalogo.editar`) y pantalla de administración. La importación queda como opción futura; lo que sigue abajo se conserva como referencia para ese momento.
 
@@ -150,7 +154,7 @@ El catálogo cargado con los productos válidos, y un reporte de excepciones ent
 
 ## B4 · PDF de la remisión
 
-**Estado:** PENDIENTE · **Prioridad:** MEDIA · **Depende de:** nada
+**Estado:** LISTO (Puppeteer, dos por hoja, marca de estado) · **Prioridad:** MEDIA · **Depende de:** nada
 
 ### Objetivo
 
@@ -189,7 +193,7 @@ El PDF generado es equivalente al formato actual y el área lo acepta como reemp
 
 ## B5 · Frontend de Remisiones
 
-**Estado:** EN CURSO (2026-09-16) · **Prioridad:** ALTA · **Depende de:** B1 — LISTO
+**Estado:** LISTO (2026-09-16); queda pendiente solo las vistas por rol × área, que esperan al área · **Prioridad:** ALTA · **Depende de:** B1 — LISTO
 
 ### Avance
 
@@ -197,7 +201,7 @@ Hecho: base (Vite + proxy + Tailwind v4 + axios + TanStack Query), login y sesi�
 
 Pendiente: vistas por rol × área (esperando respuestas del área, ver Parte F), historial de versiones y auditoría en el detalle, exportar, limpieza del scaffold de Vite (`App.tsx`, `App.css`, `assets/`, `public/icons.svg`), "Recordar sesión" (localStorage vs sessionStorage como en recepción).
 
-**Hueco resuelto (2026-09-16):** ya se pueden editar los datos de una remisión en BORRADOR o EN_RECTIFICACION (`Remision.editar`, `PATCH /api/remisiones/:id`, pantalla `/remisiones/:id/editar`). También se corrigió el mapeador, que no persistía cambios de turno/proveedor/lugar/producto.
+**Hueco resuelto (2026-09-16):** ya se pueden editar los datos de una remisión en BORRADOR o EN_RECTIFICACION (`Remision.editar`, `PATCH /api/remisiones/:id`, pantalla `/remisiones/:id/editar`). También se corrigió el mapeador, que no persistía cambios de turno/grupo/lugar/producto.
 
 ### Situación original
 
@@ -240,14 +244,14 @@ Pendiente: vistas por rol × área (esperando respuestas del área, ver Parte F)
    - Rutas protegidas y ocultamiento de acciones según permisos
 
 4. **Formulario de creación de remisión**
-   - Selectores de turno, proveedor, lugar y producto desde los catálogos
+   - Selectores de turno, grupo, lugar y producto desde los catálogos
    - Validación con Zod, espejo de las reglas del backend
    - Cálculo asistido de estibas: al ingresar cajas, sugerir estibas completas y cajas sueltas usando `cajasPorEstiba` del producto
    - Ingreso de números de estiba con validación de duplicados
    - Mostrar la fecha operativa calculada, para que el coordinador vea a qué día productivo va a quedar el registro
 
 5. **Listado de remisiones**
-   - Tabla con filtros: fecha operativa, turno, proveedor, producto, estado
+   - Tabla con filtros: fecha operativa, turno, grupo, producto, estado
    - Paginación
    - Indicador visual de estado
    - Destacar las remisiones aprobadas sin conciliar
@@ -264,7 +268,7 @@ Pendiente: vistas por rol × área (esperando respuestas del área, ver Parte F)
 8. **Administración de catálogos**
    - Productos: crear, editar, activar/desactivar
    - Turnos y horarios
-   - Proveedores
+   - Grupos
    - Usuarios y roles
 
 ### Consideraciones de diseño a validar con el área
@@ -319,7 +323,7 @@ Histórico migrado (o descartado por decisión explícita), con reporte de excep
 
 ## B7 · Exportación a Excel
 
-**Estado:** PENDIENTE · **Prioridad:** BAJA · **Depende de:** B5
+**Estado:** LISTO (exceljs, con los filtros del listado) · **Prioridad:** BAJA · **Depende de:** B5
 
 El permiso `remision.exportar` ya existe en el seed.
 
@@ -334,7 +338,7 @@ El permiso `remision.exportar` ya existe en el seed.
 
 # PARTE C — Módulo MFR
 
-**Estado:** IMPLEMENTADO (2026-09-17) · **Pendiente:** confirmar si la línea es activo físico; importador del correo; cierre automático por hora.
+**Estado:** IMPLEMENTADO (2026-09-18, rediseñado sobre el DPP de PepsiCo) · **Pendiente:** peso neto por caja de los productos del DPP; cierre automático del turno por hora; estadística histórica por línea. La línea quedó confirmada como **activo físico** (2026-09-18).
 
 > Respuestas del área (2026-09-17): programación en **cajas**; una remisión cuenta **al aprobarla el OPA**; meta **95 %**.
 >
@@ -470,12 +474,12 @@ La pregunta 13 es la más importante: todo cuelga de Remisiones.
 
 **Estado:** SIN LEVANTAR
 
-Lo único que se sabe: se quiere el **% de averías por día y por turno, segmentado por proveedor**.
+Lo único que se sabe: se quiere el **% de averías por día y por turno, segmentado por proveedor** (en el vocabulario actual del sistema, probablemente por **grupo**; hay que confirmarlo).
 
 Preguntas mínimas:
 - ¿Qué es una avería en este contexto? ¿Producto dañado, empaque defectuoso, material de entrada malo?
 - ¿Se registra **sobre** una remisión existente, o es independiente y se relaciona después?
-- ¿"Proveedor" aquí es el que suministra el material, o la empresa que opera el turno? (En remisiones es lo segundo, pero en averías podría ser lo primero — y eso cambia el modelo)
+- ¿"Proveedor" aquí es el que suministra el material, o quien pone el personal del turno (lo que hoy se llama **grupo**)? En remisiones es lo segundo, pero en averías podría ser lo primero — y eso cambia el modelo
 - ¿Cómo se registra hoy?
 - ¿Hay tipos o categorías de avería?
 - ¿Requiere evidencia fotográfica?
@@ -500,7 +504,40 @@ La última pregunta es clave: si calidad debe aprobar antes de que el patinador 
 
 ## D3 · Inventario
 
-**Estado:** SIN LEVANTAR · Decisión de alcance pendiente
+**Estado:** SIN LEVANTAR · Decisión de alcance pendiente · **Último bloque del orden** (usuario, 2026-09-22)
+
+### Alcance aclarado por el usuario (2026-09-22)
+
+El área quiere el inventario **de los insumos con los que se arma cada producto**, construido poco a poco, y lo ubica entre los últimos módulos.
+
+Eso resuelve buena parte de la duda de alcance que estaba abierta, porque **son dos inventarios distintos**:
+
+| Qué | Dónde vive hoy | Qué corresponde hacer |
+|---|---|---|
+| **PT (producto terminado)** | Ya está en el **WMS de bodega**: lo carga el patinador | **Conciliar**, no duplicar |
+| **Insumos / material de empaque** | Probablemente en ningún sistema | Aquí sí hace falta inventario propio: no duplica al WMS porque el WMS guarda PT, no insumos |
+
+La pieza que une ambos es la **receta / ficha de armado** (ver D9): qué insumos y en qué cantidad lleva una caja de cada SKU.
+
+```text
+Remisión (PT entregado, cajas por SKU)
+      × Receta del SKU (insumos por caja)
+      = Consumo TEÓRICO de insumos
+                 vs
+        Consumo REAL (entradas y salidas de insumos)
+      = Merma / desperdicio
+```
+
+Ese comparativo es exactamente lo que el área pidió: *"lo fabricado vs inventario, en cuanto a lo consumido y el ingreso del PT"*.
+
+### Sobre la secuencia: qué urge y qué no
+
+Que el módulo vaya de último **no es problema para casi todo**, porque el dato base ya se está guardando:
+
+- **Las remisiones ya se registran.** El consumo teórico se puede calcular **retroactivamente** el día que existan las recetas. No se pierde nada por esperar.
+- **El consumo real de insumos NO se está capturando**, y ese sí es irrecuperable: lo que no se registre hoy no se puede reconstruir después. Si el área quiere medir merma sobre un periodo concreto, hay que empezar a capturar movimientos de insumos **antes** de construir el módulo completo.
+
+**Decisión a plantear cuando se levante:** si se adelanta una captura mínima de movimientos de insumos (entradas y salidas, sin ubicaciones ni alertas) para no perder historia, o si se acepta empezar a medir desde cero el día que el módulo exista.
 
 ### El punto crítico
 
@@ -530,9 +567,15 @@ El usuario indicó que puede resolverse por **API** (si se consigue la clave) o 
 
 ### Otras preguntas
 
-- ¿El inventario de MQ es el mismo del WMS, o cubre algo distinto (insumos, material de empaque, producto en proceso)?
-- El área mencionó "comparativo de lo fabricado vs inventario, en cuanto a lo consumido y el ingreso del PT". ¿Se necesita controlar también el **consumo** de insumos?
-- ¿Se manejan ubicaciones, desperdicios, alertas de existencias?
+- ~~¿El inventario de MQ es el mismo del WMS, o cubre algo distinto?~~ **Respondido 2026-09-22: insumos con los que se arman los productos.** El PT sigue siendo del WMS
+- ~~¿Se necesita controlar el **consumo** de insumos?~~ **Sí**, es el propósito del módulo
+- ¿Qué es un insumo aquí? ¿Bolsa, caja, etiqueta, cinta, producto a granel que llega de PepsiCo? ¿Todos o solo algunos?
+- ¿De quién son los insumos: los pone PepsiCo o los compra Inlotrans? (cambia si hay costos, proveedores y órdenes de compra, o solo control de existencias)
+- ¿Cómo entran hoy los insumos a la planta y quién lo registra?
+- ¿Se cuentan físicamente cada cuánto? ¿Hay conteo cíclico o inventario general?
+- ¿Se manejan lotes o vencimiento de insumos?
+- ¿Se manejan ubicaciones, desperdicios, alertas de existencias mínimas?
+- ¿Qué se hace hoy cuando falta un insumo a mitad de turno? (¿afecta el MFR? ¿se registra como causa de incumplimiento?)
 
 ## D4 · Planes de trabajo
 
@@ -568,16 +611,16 @@ Preguntas mínimas:
 - ¿Requiere firma o aprobación?
 - ¿Bloquea el inicio del turno siguiente?
 
-## D7 · Personal y proveedores por turno
+## D7 · Personal y grupos por turno
 
-**Estado:** SIN LEVANTAR
+**Estado:** PARCIALMENTE RESUELTO (2026-09-21) — vive dentro del MFR
 
-El área mencionó "personal, líderes, proveedor por turno". Se relaciona con `CONFIG_TURNO` del MFR y con la afectación del número de personas sobre el cumplimiento.
+Lo implementado: los "proveedores" pasaron a llamarse **grupos**, con `personasEsperadas`; el coordinador registra por turno cuántas personas llegaron de cada grupo (`asistencia_turno`) y las asigna a líneas (`asignacion_linea`), sin poder asignar más de las que llegaron. Ver `docs/modules/mfr.md`.
 
-Preguntas:
-- ¿Se registra el personal nominalmente, o solo la cantidad?
+Preguntas abiertas:
+- ¿Se registra el personal **nominalmente**, o basta la cantidad? (hoy solo cantidad)
 - ¿Quién es el "líder" y qué rol cumple?
-- ¿El proveedor de personal es el mismo concepto que el `proveedor` de las remisiones?
+- `PENDIENTE DE DEFINIR`: cómo traducir el faltante de personas de una línea a tiempo o productividad (hoy solo se marca CUBIERTA / INCOMPLETA).
 
 ## D8 · Alertas por desviación
 
@@ -602,9 +645,23 @@ Preguntas:
 
 El área pidió "un apartado con la receta para consulta". La hoja `PRODUCTOS` del Excel contiene la configuración de empaque: unidades por caja, cajas por estiba, tipo de proceso. La hoja `TIEMPOS` menciona además una **ficha de armado en PDF**.
 
-**Pregunta: ¿la "receta" es la ficha de armado y empaque (cuántas unidades en una caja, cuántas cajas en una estiba, con qué proceso), o existe además una receta de ingredientes?**
+**Aclarado el 2026-09-22 (usuario):** la receta es **con qué insumos se arma cada producto**. No es solo la configuración de empaque que ya está en `producto` (unidades por caja, cajas por estiba, proceso): es la **lista de materiales** que consume una caja de cada SKU.
 
-Si es lo primero, buena parte ya está modelada en la tabla `producto` y solo falta la pantalla de consulta más el acceso a las fichas PDF.
+Eso convierte a D9 en la pieza central de D3 (Inventario): sin receta no hay consumo teórico de insumos, y sin consumo teórico no hay medición de merma.
+
+```text
+producto (SKU)  ──1:N──►  receta_insumo  ──N:1──►  insumo
+                           cantidad por caja        (bolsa, caja,
+                                                     etiqueta…)
+```
+
+**Sigue abierto:**
+
+- ¿La receta cambia en el tiempo? Si sí, **hay que versionarla**: una remisión de marzo debe calcularse con la receta vigente en marzo, no con la de hoy. Es el mismo problema del snapshot de producto en las remisiones, y hay que decidirlo **antes** de modelar, no después.
+- ¿La receta es por SKU, o puede variar por línea o por proceso (MANUAL vs AUTOMATICA)?
+- ¿Existe hoy en alguna parte? La hoja TIEMPOS menciona una **ficha de armado en PDF**: ¿es esa? ¿La tiene PepsiCo o Inlotrans?
+- ¿Cuántos insumos lleva un SKU típico? (dos o tres cambia el diseño respecto a veinte)
+- ¿Se pide solo para **consulta**, o el sistema debe **calcular** consumo con ella? (el área pidió "un apartado con la receta para consulta", pero D3 necesita lo segundo)
 
 ---
 
@@ -695,11 +752,11 @@ Y actualizar `CLAUDE.md` cada vez que el área responda una de las preguntas pen
 
 | # | Pregunta | Desbloquea |
 |---|---|---|
-| 7 | ¿La programación de PepsiCo viene en cajas o unidades? | MFR |
-| 8 | ¿El MFR cuenta remisiones aprobadas o creadas? | MFR |
-| 9 | ¿La línea de producción es física o un armado diario? | MFR |
-| 10 | ¿Qué es `LINEA IDEAL`? ¿Personas por línea? | MFR |
-| 11 | ¿Cuál es la meta de MFR (95%, 98%)? | MFR, alertas |
+| 7 | ~~¿La programación de PepsiCo viene en cajas o unidades?~~ **Cajas** (2026-09-17) | — |
+| 8 | ~~¿El MFR cuenta remisiones aprobadas o creadas?~~ **Al aprobarla el OPA** (2026-09-17) | — |
+| 9 | ~~¿La línea de producción es física o un armado diario?~~ **Activo físico**, 8 plataformas del DPP (2026-09-18) | — |
+| 10 | ~~¿Qué es `LINEA IDEAL`?~~ **Personas necesarias en la línea para ese SKU** → `producto.personasIdeal` (2026-09-19) | — |
+| 11 | ~~¿Cuál es la meta de MFR?~~ **95 %** (2026-09-17) | — |
 | 12 | ¿Qué es el cuaderno virtual? | D5 |
 | 13 | ¿El WMS registra el número de remisión de origen? | D3 (inventario) |
 | 14 | ¿El inventario de MQ concilia contra el WMS o cubre otro alcance? | D3 |
@@ -709,11 +766,11 @@ Y actualizar `CLAUDE.md` cada vez que el área responda una de las preguntas pen
 | # | Pregunta |
 |---|---|
 | 15 | ¿Qué significan PT y PI exactamente? |
-| 16 | ¿Qué es `PC` en la hoja TIEMPOS? |
-| 17 | ¿Se produce los domingos? ¿Y el lunes entre 06:00 y 08:00? |
+| 16 | ~~¿Qué es `PC` en la hoja TIEMPOS?~~ **Se ignora por ahora** (2026-09-19) |
+| 17 | Turnos: se adoptaron los del DPP (06:00/14:00/22:00) todos los días. ¿Algún día opera distinto? |
 | 18 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) |
 | 19 | ¿Se migra el histórico 2026 o se deja como archivo? |
-| 20 | ¿`SUBDESCRIPCION` (OFERTA, SURTIDO, REEMPAQUE) debe modelarse? |
+| 20 | ~~¿`SUBDESCRIPCION` debe modelarse?~~ **Sí: familia del producto**, agrupa el Flavor Breakdown (2026-09-19) |
 | 21 | ¿La "receta" es la ficha de armado, o hay además receta de ingredientes? |
 | 22 | ¿Existe acceso a SAP? ¿De quién es el SAP: Inlotrans o PepsiCo? |
 | 23 | ¿Planes de trabajo y configuración de turno son lo mismo? |
@@ -749,6 +806,8 @@ Al terminar: el área puede operar un turno completo sin el Excel. **Alcanzado e
 
 ```text
 8. MFR                                        IMPLEMENTADO según el DPP de PepsiCo (2026-09-18)
+   + tope "ni más ni menos" contra el DPP     (2026-09-18)
+   + grupos, asistencia y asignación a líneas (2026-09-21)
 ```
 
 En paralelo: levantamiento de Averías, que es el siguiente en importancia según el área.

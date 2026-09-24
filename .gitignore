@@ -1,5 +1,9 @@
 node_modules/
 dist/
+# Estado incremental de TypeScript: es un artefacto de compilación, no
+# código. Versionarlo hace que tras un pull TypeScript crea que ya
+# compiló y deje dist vacío.
+*.tsbuildinfo
 .env
 .env.*
 !.env.example

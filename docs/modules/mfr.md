@@ -73,6 +73,31 @@ Lo remisionado de un SKU en un día debe ser exactamente lo que el DPP programó
 
 Código: `domain/remision/tope-programacion.ts` (regla pura), `application/remision/control-programacion.ts` (arma la situación: bloques + estándares + remisiones aprobadas), usado por `crear-remision`, `editar-remision` y `AprobarRemisionUseCase` (`antes` de la transición). `faltantesDelTurno` en `calculo-mfr.ts`; `CerrarTurnoUseCase` lo aplica.
 
+## El DPP llega por día, por semana o por mes (área, 2026-09-22)
+
+PepsiCo también manda el schedule **semanal**, y podría mandarlo mensual. En vez de un camino por periodicidad, el sistema maneja **N días**: el DPP diario es el caso N = 1, y no hay código específico de "semanal".
+
+Tres reglas:
+
+1. **El día de cada bloque lo decide el bloque**, no la fecha que el coordinador tenga en pantalla. Sale de la fecha y hora de inicio de la fila del PDF aplicando el corte de las 06:00 (`fechaOperativaDeHoraLocal` en `domain/shared/fecha-operativa.ts`). Importa cuando PepsiCo parte un bloque nocturno en la medianoche: la fila del 17 a las 00:30 es del día operativo del 16. Agrupar por la fecha cruda del PDF mandaría la producción nocturna al día equivocado.
+2. **Una transacción por día.** Un mes (~600 bloques × 2 escrituras) no cabe en el límite de 500 por transacción de Firestore, y un día con el turno cerrado no debe impedir cargar el resto de la semana.
+3. **La carga informa, no falla entera.** Cada día vuelve como `CARGADO`, `OMITIDO` (ya tenía programación y no se pidió reemplazo) o `ERROR` (turno cerrado, línea inactiva…). Solo los errores de infraestructura interrumpen todo.
+
+En la pantalla, si el archivo trae varios días aparece la lista de días con casillas (con cuántos bloques listos tiene cada uno), una casilla de reemplazo con motivo, y al terminar el detalle de qué pasó con cada día. Si trae uno solo, se comporta como antes, con la fecha editable por si hay que redirigir la carga.
+
+`PENDIENTE DE DEFINIR` con el área: si durante la semana PepsiCo manda un diario corregido, ¿ese manda sobre el semanal ya cargado? Hoy hay que marcar "reemplazar" a mano y explicar el motivo.
+
+### Verificación con el DPP semanal real (2026-09-22)
+
+Se importó el semanal W4–W5 (75 páginas, 12 días: 21–26 sep y 28 sep–3 oct, sin domingos). Resultados:
+
+- El lector leyó **172 bloques**, incluidas las páginas de REEMPAQUE que traen **dos líneas por página** (REEMPAQU 2 y REEMPAQUES). No se pierde ninguna.
+- **Apareció LINEA 5**, que no estaba en el catálogo: sus bloques se omitían en silencio. Se agregó al seed (`datos-base.ts`). `PENDIENTE DE CONFIRMAR` su capacidad: el DPP la marca MANUAL con 306 kg/h, la de las MULTIPACK.
+- Los turnos no siempre calzan: los lunes arrancan a las 08:00 y hay bloques como 14:00–18:10 o 06:00–08:06. El sistema los acepta porque el turno sale de la hora de inicio.
+- **La carga se pasó a día por día** (`useCargarPeriodoPorDia`): con una sola petición, un semanal superaba el tiempo de espera del navegador (15 s por defecto en `http.ts`) y, al abortar, se perdía el detalle de qué día había entrado aunque el servidor siguiera escribiendo. Ahora cada día es una petición corta con barra de avance. `POST /mfr/bloques/periodo` sigue existiendo como vía para scripts.
+
+**Sin verificar todavía:** el PDF semanal no quedó como prueba de regresión (falta el archivo en `backend/recursos/`). El lector ya extrae la fecha de cada fila, así que si el semanal es el mismo reporte GDPP508P debería funcionar sin cambios; confirmarlo con un archivo real antes de darlo por cerrado.
+
 ## Importar la hoja TIEMPOS del Excel
 
 ```powershell
@@ -133,7 +158,7 @@ La pantalla refleja la regla: el selector de grupo solo muestra grupos con asist
 
 | Tabla / colección | Campos clave | Notas |
 |---|---|---|
-| `linea_produccion` / `lineasProduccion` | `codigo`, `nombre` (como PepsiCo), `tipo` MULTIPACK·MANUAL, `capacidad_kg_hora`, `orden`, `activo` | 8 líneas sembradas: L1–L4, MANUAL-1, MANUAL-2, REEMPAQU-2, REEMPAQUES |
+| `linea_produccion` / `lineasProduccion` | `codigo`, `nombre` (como PepsiCo), `tipo` MULTIPACK·MANUAL, `capacidad_kg_hora`, `orden`, `activo` | 9 líneas sembradas: L1–L4, **L5**, MANUAL-1, MANUAL-2, REEMPAQU-2, REEMPAQUES |
 | `bloque_programacion` / `bloquesProgramacion` | `fecha_operativa`, `linea_id`, `turno_id` (derivado), `producto_id`, `hora_inicio`, `hora_fin`, `cajas_por_hora`, `eficiencia_porcentaje` (1–100), `loop`, `personas_asignadas`, `origen` MANUAL·DPP·COPIA, `creado_por_id`, `cerrado_en`, `cerrado_por_id` | Id aleatorio; la regla de no solapamiento la aplica el caso de uso en la transacción |
 | `producto` | `cajas_por_hora` (Decimal 8,2), `peso_neto_kg` (Decimal 8,3), `personas_ideal` (Int), `subdescripcion` (texto ≤ 40, en mayúsculas) | Estándar y datos de la hoja TIEMPOS |
 | `grupo` / `grupos` | `codigo`, `nombre`, `descripcion`, `personas_esperadas`, `activo` | Antes `proveedor`; `remision.grupo_id` |
@@ -151,6 +176,7 @@ Migraciones Prisma: `20260918140000_mfr_bloques_dpp_pepsico` (elimina `programac
 | `PUT /mfr/bloques` | `mfr.cargar_programacion` | Crea (sin `id`) o corrige (`id` + `motivo`) |
 | `DELETE /mfr/bloques/:id` | `mfr.cargar_programacion` | `{ motivo }` |
 | `POST /mfr/bloques/dia` | `mfr.cargar_programacion` | Carga un día completo (`origen`, `reemplazar`, `motivo`) |
+| `POST /mfr/bloques/periodo` | `mfr.cargar_programacion` | Carga N días: cada bloque trae su `fechaOperativa`; una transacción por día |
 | `POST /mfr/bloques/copiar` | `mfr.cargar_programacion` | `{ desde, hacia, reemplazar, motivo }` |
 | `POST /mfr/dpp/analizar` (multipart `archivo`) | `mfr.cargar_programacion` | PDF → propuesta cruzada con el catálogo; no escribe |
 | `POST /mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante? }` (400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes` si hay SKU bajo target) |
@@ -161,6 +187,7 @@ Migraciones Prisma: `20260918140000_mfr_bloques_dpp_pepsico` (elimina `programac
 | `GET/POST/PATCH /api/grupos` | `catalogo.consultar` / `catalogo.editar` | Catálogo de grupos (`descripcion`, `personasEsperadas`) |
 | `GET/POST/PATCH /mfr/lineas` | `mfr.consultar` / `catalogo.editar` | Catálogo de líneas |
 | `GET /mfr/estandares` · `PUT /mfr/estandares/:productoId` | `mfr.consultar` / `catalogo.editar_estandares` | Incluye `pesoSugeridoKg`; `{ cajasPorHora, pesoNetoKg, motivo }` |
+| `PUT /mfr/estandares` | `catalogo.editar_estandares` | Carga en lote: `{ cambios[], motivo }`, máx. 100 productos, una sola transacción |
 
 ## Pantallas
 
@@ -171,10 +198,13 @@ Migraciones Prisma: `20260918140000_mfr_bloques_dpp_pepsico` (elimina `programac
 | `/admin/grupos` | Grupos: código, nombre, descripción (proveedor a mano), personas esperadas por turno, activo |
 | `/admin/lineas` | Líneas: código, nombre PepsiCo, tipo, kg/h, orden |
 | `/admin/productos` | Crear producto con cajas/hora y peso; editar (cambiar el estándar exige motivo); botón "Estándar" con sugerencia de peso desde la descripción |
+| `/admin/pesos` | **Pesos por caja en lote** (2026-09-22): lista los SKU sin peso con la sugerencia al lado, campos editables, un motivo común y "Aplicar N cambios". Los campos arrancan vacíos y "Proponer todos los sugeridos" solo los llena: el sistema sugiere, el administrador confirma |
 
 Flujo diario del coordinador: abrir `/mfr/programacion` → "Importar PDF del DPP" → revisar la propuesta (✓ = Mx y T coinciden con el PDF) → "Cargar N bloques" → durante el día, corregir con motivo si PepsiCo cambia algo → al terminar, "Cerrar" el turno.
 
 ## Código
+
+**Nota de implementación de la carga en lote:** `EstandarRepository.actualizarVarios` es escritura pura (no lee y no devuelve nada) porque una transacción de Firestore exige todas las lecturas antes que cualquier escritura. El caso de uso lee primero todo el catálogo (`listar()`), compone el resultado por su cuenta y después escribe. Si el repositorio releyera —como hace `actualizar` para un solo producto—, el segundo producto del lote reventaría la transacción.
 
 ```text
 domain/mfr/        bloque-programacion (entidad + solapamiento), linea-produccion, estandar-produccion
@@ -193,11 +223,11 @@ modules/mfr/       mfr.controller, mfr.module, dto/mfr.dto
 
 Pruebas: 19 del dominio (cálculo, entidad, horas, peso sugerido), 6 del lector del DPP real, 11 de casos de uso. Verificación por HTTP contra Firestore: análisis del PDF (20/20 bloques coinciden), carga, copia, corrección con motivo, solapamiento rechazado, cierre de turno.
 
-Archivos obsoletos que quedaron vacíos (borrar): `domain/mfr/programacion.ts`, `domain/mfr/config-turno.ts`, `application/mfr/programacion.use-cases.ts`, `application/mfr/config-turno.use-cases.ts`, `frontend/src/modules/mfr/pages/ConfigTurnoPage.tsx`.
+Los archivos del diseño anterior (`programacion.ts`, `config-turno.ts`, sus casos de uso y `ConfigTurnoPage.tsx`) se eliminaron el 2026-09-22.
 
 ## Pendiente
 
-- Registrar el **peso neto por caja** de los productos del DPP (el sistema lo sugiere; lo confirma el administrador). Sin él no hay kilos.
+- Registrar el **peso neto por caja** de los productos del DPP. La herramienta ya está (`/admin/pesos`, carga en lote); falta que el administrador confirme los valores. Sin peso no hay kilos.
 - "Instant Kilograms" real por hora: requeriría la hora de producción de cada remisión; hoy la producción real se muestra por turno.
 - Cierre automático del turno al terminar su hora (hoy es manual).
 - Estadística histórica por línea: los bloques quedan guardados; falta la vista.

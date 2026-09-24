@@ -14,7 +14,7 @@ DOMINIO          domain/*      entidades, reglas, puertos (interfaces). Solo Typ
 INFRAESTRUCTURA  infrastructure/*  Prisma, bcrypt, JWT, Puppeteer, exceljs
 ```
 
-Regla inviolable: **`src/domain/` no importa nada externo** (ni NestJS, ni Prisma, ni librerías). Por eso el dominio se prueba en milisegundos sin base de datos: 129 pruebas unitarias corren en ~3 s.
+Regla inviolable: **`src/domain/` no importa nada externo** (ni NestJS, ni Prisma, ni librerías). Por eso el dominio se prueba en milisegundos sin base de datos: 189 pruebas unitarias corren en segundos.
 
 ### Puertos e implementaciones
 

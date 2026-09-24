@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { RegistroPeticionesMiddleware } from './infrastructure/http/registro-peticiones.middleware.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CatalogoModule } from './modules/catalogo/catalogo.module.js';
 import { MfrModule } from './modules/mfr/mfr.module.js';
@@ -41,6 +41,13 @@ const modulosOpcionales = observeHabilitado
     ...modulosOpcionales,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * El registro va sobre TODAS las rutas: su valor está en ver el
+   * volumen total, no el de una ruta suelta.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RegistroPeticionesMiddleware).forRoutes('*');
+  }
+}

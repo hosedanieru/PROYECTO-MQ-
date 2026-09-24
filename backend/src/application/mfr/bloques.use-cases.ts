@@ -16,6 +16,7 @@
 import type { Reloj } from '../remision/crear-remision.use-case.js';
 import {
   BloqueProgramacion,
+  MAXIMO_DIAS_POR_CARGA,
   verificarSinSolapamiento,
   type CambiosBloque,
   type DatosBloque,
@@ -33,6 +34,7 @@ import {
   TurnoCerradoError,
 } from '../../domain/mfr/mfr.errors.js';
 import type { Producto, ProductoRepository } from '../../domain/producto/producto.repository.js';
+import { ErrorDominio } from '../../domain/shared/errores.js';
 import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
 
 // ------------------------------------------------------------
@@ -269,6 +271,123 @@ export class CargarDiaUseCase {
       }
       return creados;
     });
+  }
+}
+
+// ------------------------------------------------------------
+// Cargar un período: N días en una sola operación
+// ------------------------------------------------------------
+
+/**
+ * CARGA DE UN PERÍODO (DPP diario, semanal o mensual)
+ * ===================================================
+ *
+ * PepsiCo manda el schedule por día o por semana, y podría mandarlo
+ * mensual (área, 2026-09-22). En vez de un camino por periodicidad, el
+ * sistema maneja **N días**: el DPP diario es el caso N = 1.
+ *
+ * El día de cada bloque lo decide el propio bloque (su fecha y hora de
+ * inicio, con el corte de las 06:00), nunca la fecha que el usuario
+ * tenga en pantalla.
+ *
+ * **Una transacción POR DÍA, no una para todo.** Dos razones:
+ *
+ *   1. Firestore admite 500 escrituras por transacción y cada bloque
+ *      gasta dos (el bloque y su auditoría); un mes no cabría.
+ *   2. Un día con el turno ya cerrado no debe impedir cargar el resto
+ *      de la semana. Cada día entra completo o no entra.
+ *
+ * Por eso se atrapan los errores de NEGOCIO por día y se informan: el
+ * resultado dice qué pasó con cada uno. Los errores de infraestructura
+ * (la base caída) NO se atrapan: significan que algo está roto de
+ * verdad y deben interrumpir la operación.
+ */
+export type EstadoDia = 'CARGADO' | 'OMITIDO' | 'ERROR';
+
+export interface ResultadoDia {
+  fechaOperativa: Date;
+  estado: EstadoDia;
+  bloquesCreados: number;
+  /** Código del error de dominio cuando el día no se cargó. */
+  codigo?: string;
+  mensaje?: string;
+}
+
+export interface CargarPeriodoComando {
+  /** Cada bloque trae su propio día; el caso de uso los agrupa. */
+  bloques: DatosBloque[];
+  origen: OrigenBloque;
+  reemplazar: boolean;
+  motivo?: string | null;
+  usuarioId: string;
+}
+
+export interface ResultadoPeriodo {
+  dias: ResultadoDia[];
+  totalBloquesCreados: number;
+  diasCargados: number;
+}
+
+function sinFecha(bloque: DatosBloque): Omit<DatosBloque, 'fechaOperativa'> {
+  const { fechaOperativa, ...resto } = bloque;
+  void fechaOperativa;
+  return resto;
+}
+
+export class CargarPeriodoUseCase {
+  constructor(private readonly cargarDia: CargarDiaUseCase) {}
+
+  async ejecutar(comando: CargarPeriodoComando): Promise<ResultadoPeriodo> {
+    if (comando.bloques.length === 0) {
+      throw new DatosMfrInvalidosError('No hay bloques para cargar.');
+    }
+
+    // Agrupar por día operativo, conservando el orden cronológico.
+    const porDia = new Map<number, DatosBloque[]>();
+    for (const bloque of comando.bloques) {
+      const clave = bloque.fechaOperativa.getTime();
+      porDia.set(clave, [...(porDia.get(clave) ?? []), bloque]);
+    }
+    if (porDia.size > MAXIMO_DIAS_POR_CARGA) {
+      throw new DatosMfrInvalidosError(
+        `Una carga admite como máximo ${MAXIMO_DIAS_POR_CARGA} días y llegaron ${porDia.size}.`,
+      );
+    }
+
+    const dias: ResultadoDia[] = [];
+    for (const clave of [...porDia.keys()].sort((a, b) => a - b)) {
+      const fechaOperativa = new Date(clave);
+      const bloquesDelDia = porDia.get(clave)!;
+      try {
+        const creados = await this.cargarDia.ejecutar({
+          fechaOperativa,
+          // `CargarDiaUseCase` pone la fecha del día; el bloque solo aporta el resto.
+          bloques: bloquesDelDia.map((b) => sinFecha(b)),
+          origen: comando.origen,
+          reemplazar: comando.reemplazar,
+          motivo: comando.motivo,
+          usuarioId: comando.usuarioId,
+        });
+        dias.push({ fechaOperativa, estado: 'CARGADO', bloquesCreados: creados.length });
+      } catch (error) {
+        if (!(error instanceof ErrorDominio)) throw error;
+        dias.push({
+          fechaOperativa,
+          // Que el día ya tuviera programación no es una falla: es el
+          // caso normal al recargar una semana sin pedir reemplazo.
+          estado: error instanceof DiaConProgramacionError ? 'OMITIDO' : 'ERROR',
+          bloquesCreados: 0,
+          codigo: error.codigo,
+          mensaje: error.message,
+        });
+      }
+    }
+
+    return {
+      dias,
+      totalBloquesCreados: dias.reduce((s, d) => s + d.bloquesCreados, 0),
+      diasCargados: dias.filter((d) => d.estado === 'CARGADO').length,
+    };
   }
 }
 

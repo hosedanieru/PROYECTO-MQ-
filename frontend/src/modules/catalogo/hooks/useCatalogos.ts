@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 
+import { REFRESCO_LENTO } from '../../../shared/refresco'
 import { catalogoApi } from '../api/catalogo.api'
 
 const CINCO_MINUTOS = 5 * 60 * 1000
@@ -26,10 +27,21 @@ export function useRoles() {
   return useQuery({ queryKey: ['catalogo', 'roles'], queryFn: catalogoApi.roles, staleTime: CINCO_MINUTOS })
 }
 
-export function useProductos(params: { texto?: string; soloActivos?: boolean } = {}) {
+/**
+ * `habilitado` permite no consultar a quien no tiene `catalogo.consultar`.
+ *
+ * El catálogo cambia cuando un administrador lo edita, no durante el
+ * turno: se refresca lento aunque la pantalla que lo use vaya rápido.
+ */
+export function useProductos(
+  params: { texto?: string; soloActivos?: boolean } = {},
+  habilitado = true,
+) {
   return useQuery({
     queryKey: ['productos', params],
     queryFn: () => catalogoApi.productos(params),
+    enabled: habilitado,
+    refetchInterval: REFRESCO_LENTO,
     staleTime: 60 * 1000,
   })
 }

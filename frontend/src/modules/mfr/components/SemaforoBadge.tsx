@@ -1,14 +1,14 @@
 import type { Semaforo } from '../../../shared/types/mfr'
 
 const COLOR: Record<Semaforo, string> = {
-  VERDE: 'bg-green-100 text-green-800',
-  AMARILLO: 'bg-amber-100 text-amber-800',
-  ROJO: 'bg-red-100 text-red-800',
+  VERDE: 'bg-exito-claro text-exito',
+  AMARILLO: 'bg-alerta-claro text-alerta',
+  ROJO: 'bg-critico-claro text-critico',
 }
 
 export function SemaforoBadge({ valor, porcentaje }: { valor: Semaforo | null; porcentaje: number | null }) {
   if (valor === null || porcentaje === null) {
-    return <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500">sin dato</span>
+    return <span className="rounded-full bg-velo px-2.5 py-0.5 text-xs text-tinta-suave">sin dato</span>
   }
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-sm font-semibold ${COLOR[valor]}`}>

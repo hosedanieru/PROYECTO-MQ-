@@ -130,9 +130,20 @@ export const TURNOS: ReadonlyArray<{ codigo: string; nombre: string; horarios: H
 // ============================================================
 
 /**
- * Tomadas del DPP del 2026-09-16. `nombre` es exactamente como lo
- * escribe PepsiCo (así se cruza al importar el PDF); la capacidad es
- * la fila "Capacity" del schedule.
+ * Tomadas de los DPP de PepsiCo. `nombre` es exactamente como lo escribe
+ * PepsiCo en la columna "Line" de Bar Details (así se cruza al importar
+ * el PDF); la capacidad es la fila "Capacity" del schedule.
+ *
+ * L1–L4, MANUAL 1/2 y las dos de REEMPAQUE salieron del DPP diario del
+ * 2026-09-16. **L5 se agregó el 2026-09-22** al aparecer en el DPP
+ * semanal de la W4–W5 (páginas 49–58, "Platform: LINEA 5"): sin ella,
+ * sus bloques se omitían en cada importación.
+ *
+ * `PENDIENTE DE CONFIRMAR con el área`: el schedule marca L5 como MANUAL
+ * pero con capacidad **306 kg/h**, la de las MULTIPACK, no los 249 de
+ * las otras manuales. Se respeta lo que dice el DPP porque es la misma
+ * fuente de la que salieron las ocho anteriores, pero conviene
+ * verificarlo en planta.
  */
 export const LINEAS_PRODUCCION: ReadonlyArray<{
   codigo: string;
@@ -145,10 +156,11 @@ export const LINEAS_PRODUCCION: ReadonlyArray<{
   { codigo: 'L2', nombre: 'L2', tipo: 'MULTIPACK', capacidadKgHora: 306, orden: 2 },
   { codigo: 'L3', nombre: 'L3', tipo: 'MULTIPACK', capacidadKgHora: 306, orden: 3 },
   { codigo: 'L4', nombre: 'L4', tipo: 'MULTIPACK', capacidadKgHora: 306, orden: 4 },
-  { codigo: 'MANUAL-1', nombre: 'MANUAL 1', tipo: 'MANUAL', capacidadKgHora: 249, orden: 5 },
-  { codigo: 'MANUAL-2', nombre: 'MANUAL 2', tipo: 'MANUAL', capacidadKgHora: 249, orden: 6 },
-  { codigo: 'REEMPAQU-2', nombre: 'REEMPAQU 2', tipo: 'MANUAL', capacidadKgHora: 203, orden: 7 },
-  { codigo: 'REEMPAQUES', nombre: 'REEMPAQUES', tipo: 'MANUAL', capacidadKgHora: 203, orden: 8 },
+  { codigo: 'L5', nombre: 'L5', tipo: 'MANUAL', capacidadKgHora: 306, orden: 5 },
+  { codigo: 'MANUAL-1', nombre: 'MANUAL 1', tipo: 'MANUAL', capacidadKgHora: 249, orden: 6 },
+  { codigo: 'MANUAL-2', nombre: 'MANUAL 2', tipo: 'MANUAL', capacidadKgHora: 249, orden: 7 },
+  { codigo: 'REEMPAQU-2', nombre: 'REEMPAQU 2', tipo: 'MANUAL', capacidadKgHora: 203, orden: 8 },
+  { codigo: 'REEMPAQUES', nombre: 'REEMPAQUES', tipo: 'MANUAL', capacidadKgHora: 203, orden: 9 },
 ];
 
 /** Un turno cruza la medianoche cuando su hora de fin es menor que la de inicio. */

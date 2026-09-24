@@ -131,7 +131,7 @@ export function AccionesRemision({ remision }: { remision: Remision }) {
           >
             {abierta.tipo === 'aprobar' && (
               <>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-tinta-suave">
                   El OPA no es usuario del sistema: se registra su nombre y cargo como dato.
                 </p>
                 <Campo

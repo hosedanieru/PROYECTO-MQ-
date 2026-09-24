@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     calcularFechaOperativa,
     fechaOperativaADate,
+    fechaOperativaDeHoraLocal,
     registroActual
 } from './fecha-operativa.js';
 
@@ -108,6 +109,41 @@ describe('fechaOperativaADate', () => {
         expect(() => fechaOperativaADate('14/09/2026')).toThrow();
         expect(() => fechaOperativaADate('2026-9-14')).toThrow();
         expect(() => fechaOperativaADate('')).toThrow();
+    });
+});
+
+describe('fechaOperativaDeHoraLocal', () => {
+    it('a partir de las 06:00 el día operativo es el mismo del calendario', () => {
+        expect(fechaOperativaDeHoraLocal('2026-09-16', '06:00')).toBe('2026-09-16');
+        expect(fechaOperativaDeHoraLocal('2026-09-16', '14:00')).toBe('2026-09-16');
+        expect(fechaOperativaDeHoraLocal('2026-09-16', '22:00')).toBe('2026-09-16');
+        expect(fechaOperativaDeHoraLocal('2026-09-16', '23:59')).toBe('2026-09-16');
+    });
+
+    it('antes de las 06:00 pertenece al día operativo anterior', () => {
+        // El caso que importa: PepsiCo parte un bloque nocturno en la medianoche.
+        expect(fechaOperativaDeHoraLocal('2026-09-17', '00:00')).toBe('2026-09-16');
+        expect(fechaOperativaDeHoraLocal('2026-09-17', '00:30')).toBe('2026-09-16');
+        expect(fechaOperativaDeHoraLocal('2026-09-17', '05:59')).toBe('2026-09-16');
+    });
+
+    it('cruza bien el mes y el año', () => {
+        expect(fechaOperativaDeHoraLocal('2026-10-01', '02:00')).toBe('2026-09-30');
+        expect(fechaOperativaDeHoraLocal('2027-01-01', '02:00')).toBe('2026-12-31');
+        expect(fechaOperativaDeHoraLocal('2028-03-01', '02:00')).toBe('2028-02-29'); // bisiesto
+    });
+
+    it('coincide con la regla general aplicada al instante equivalente', () => {
+        // Misma respuesta que calcularFechaOperativa, sin construir el instante.
+        expect(fechaOperativaDeHoraLocal('2026-09-15', '02:14')).toBe(
+            calcularFechaOperativa(new Date('2026-09-15T02:14:00-05:00')),
+        );
+    });
+
+    it('rechaza fechas y horas mal formadas', () => {
+        expect(() => fechaOperativaDeHoraLocal('16/09/2026', '06:00')).toThrow();
+        expect(() => fechaOperativaDeHoraLocal('2026-09-16', '6:00')).toThrow();
+        expect(() => fechaOperativaDeHoraLocal('2026-09-16', '24:00')).toThrow();
     });
 });
 

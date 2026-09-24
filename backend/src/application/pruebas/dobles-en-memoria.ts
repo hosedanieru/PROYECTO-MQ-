@@ -22,10 +22,12 @@ import type {
   ProductoRepository,
 } from '../../domain/producto/producto.repository.js';
 import { Remision, type EstadoRemision } from '../../domain/remision/remision.entity.js';
-import type {
-  CajasAgrupadas,
-  RemisionRepository,
-  ResultadoPaginado,
+import {
+  conteoEnCero,
+  type CajasAgrupadas,
+  type ConteoPorEstado,
+  type RemisionRepository,
+  type ResultadoPaginado,
 } from '../../domain/remision/remision.repository.js';
 import type {
   ContextoTransaccional,
@@ -236,6 +238,7 @@ export const REMISIONES_SIN_USO: RemisionRepository = {
   listar: () => Promise.reject(new Error('No aplica')),
   listarTodas: () => Promise.resolve([]),
   buscarPorIds: () => Promise.resolve([]),
+  contarPorEstado: () => Promise.resolve(conteoEnCero()),
   totalizarCajas: () => Promise.resolve([]),
 };
 
@@ -284,6 +287,14 @@ export class RemisionRepositorioEnMemoria implements RemisionRepository {
 
   listarTodas(): Promise<Remision[]> {
     return Promise.resolve([...this.porId.values()]);
+  }
+
+  contarPorEstado(): Promise<ConteoPorEstado> {
+    const conteo = conteoEnCero();
+    for (const remision of this.porId.values()) {
+      conteo[remision.aObjeto().estado] += 1;
+    }
+    return Promise.resolve(conteo);
   }
 
   buscarPorIds(ids: string[]): Promise<Remision[]> {

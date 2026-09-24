@@ -8,11 +8,13 @@ import {
   RemisionExcedeProgramacionError,
   SinProgramacionDelDiaError,
 } from '../../domain/remision/remision.errors.js';
-import type {
-  CajasAgrupadas,
-  FiltroRemisiones,
-  RemisionRepository,
-  ResultadoPaginado,
+import {
+  conteoEnCero,
+  type CajasAgrupadas,
+  type ConteoPorEstado,
+  type FiltroRemisiones,
+  type RemisionRepository,
+  type ResultadoPaginado,
 } from '../../domain/remision/remision.repository.js';
 import {
   AuditoriaRepositorioFalso,
@@ -88,6 +90,12 @@ class RemisionRepositorioFalso implements RemisionRepository {
 
   buscarPorIds(): Promise<Remision[]> {
     return Promise.resolve([]);
+  }
+
+  contarPorEstado(): Promise<ConteoPorEstado> {
+    const conteo = conteoEnCero();
+    for (const r of this.guardadas) conteo[r.aObjeto().estado] += 1;
+    return Promise.resolve(conteo);
   }
 
   /** Igual que la base: suma cajas por turno, producto y extraoficial, solo de los estados pedidos. */

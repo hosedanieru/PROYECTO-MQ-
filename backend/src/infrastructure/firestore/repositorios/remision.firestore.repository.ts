@@ -33,11 +33,13 @@ import {
   type EstadoPersistidoRemision,
   type EstadoRemision,
 } from '../../../domain/remision/remision.entity.js';
-import type {
-  CajasAgrupadas,
-  FiltroRemisiones,
-  RemisionRepository,
-  ResultadoPaginado,
+import {
+  conteoEnCero,
+  type CajasAgrupadas,
+  type ConteoPorEstado,
+  type FiltroRemisiones,
+  type RemisionRepository,
+  type ResultadoPaginado,
 } from '../../../domain/remision/remision.repository.js';
 import {
   aDate,
@@ -143,6 +145,36 @@ export class RemisionFirestoreRepository implements RemisionRepository {
     return snaps.filter((s) => s.exists).map(aDominio);
   }
 
+  /**
+   * Cuenta leyendo el rango UNA vez.
+   *
+   * Firestore no puede filtrar por estado sin un índice compuesto, así
+   * que el filtro es en memoria, igual que en `consultarFiltradas`. La
+   * diferencia está en que aquí NO se construyen entidades de dominio:
+   * solo se lee el campo `estado` de cada documento. Antes el tablero
+   * pedía seis listados y esto leía el día seis veces para devolver seis
+   * números.
+   */
+  async contarPorEstado(
+    filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>,
+  ): Promise<ConteoPorEstado> {
+    const snap = await this.cliente.consultar(this.consultaPorFecha(filtro).limit(TOPE_LECTURA));
+
+    const conteo = conteoEnCero();
+    for (const doc of snap.docs) {
+      if (filtro.anio !== undefined && doc.get('anio') !== filtro.anio) continue;
+      if (filtro.turnoId && doc.get('turnoId') !== filtro.turnoId) continue;
+      if (filtro.grupoId && doc.get('grupoId') !== filtro.grupoId) continue;
+      if (filtro.productoId && doc.get('productoId') !== filtro.productoId) continue;
+
+      const estado = doc.get('estado') as EstadoRemision;
+      // Un estado desconocido (dato viejo o corrupto) no debe romper el
+      // tablero ni inventar una clave nueva en el conteo: se salta.
+      if (estado in conteo) conteo[estado] += 1;
+    }
+    return conteo;
+  }
+
   async totalizarCajas(
     fechaOperativa: Date,
     estados: readonly EstadoRemision[],
@@ -162,15 +194,23 @@ export class RemisionFirestoreRepository implements RemisionRepository {
     return [...grupos.values()];
   }
 
-  /** Consulta por rango de fecha en Firestore; el resto de filtros en memoria. */
-  private async consultarFiltradas(filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina'>): Promise<Remision[]> {
+  /**
+   * La parte de la consulta que Firestore SÍ puede resolver: el rango de
+   * fecha operativa. Lo demás no tiene índice y se filtra en memoria.
+   */
+  private consultaPorFecha(filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>) {
     let q = this.cliente.coleccion(COLECCION.remisiones).orderBy('fechaOperativaTexto', 'desc');
     if (filtro.fechaOperativaDesde) q = q.where('fechaOperativaTexto', '>=', claveFecha(filtro.fechaOperativaDesde));
     if (filtro.fechaOperativaHasta) q = q.where('fechaOperativaTexto', '<=', claveFecha(filtro.fechaOperativaHasta));
     if (!filtro.fechaOperativaDesde && !filtro.fechaOperativaHasta && filtro.anio !== undefined) {
       q = q.where('fechaOperativaTexto', '>=', `${filtro.anio}-01-01`).where('fechaOperativaTexto', '<=', `${filtro.anio}-12-31`);
     }
-    const snap = await this.cliente.consultar(q.limit(TOPE_LECTURA));
+    return q;
+  }
+
+  /** Consulta por rango de fecha en Firestore; el resto de filtros en memoria. */
+  private async consultarFiltradas(filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina'>): Promise<Remision[]> {
+    const snap = await this.cliente.consultar(this.consultaPorFecha(filtro).limit(TOPE_LECTURA));
     return snap.docs.map(aDominio).filter((r) => {
       const d = r.aObjeto();
       return (

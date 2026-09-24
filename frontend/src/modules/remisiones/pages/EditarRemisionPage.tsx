@@ -42,14 +42,14 @@ export function EditarRemisionPage() {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
       <header>
-        <Link to={`/remisiones/${r.id}`} className="text-sm text-slate-500 hover:underline">
+        <Link to={`/remisiones/${r.id}`} className="text-sm text-tinta-suave hover:underline">
           ← Remisión {r.consecutivo}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+        <h1 className="mt-1 text-2xl font-semibold text-tinta">
           Editar remisión {r.consecutivo}
-          {r.version > 1 && <span className="ml-2 text-base font-normal text-slate-500">versión {r.version}</span>}
+          {r.version > 1 && <span className="ml-2 text-base font-normal text-tinta-suave">versión {r.version}</span>}
         </h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-tinta-suave">
           Día operativo <strong>{fechaCorta(r.fechaOperativa)}</strong> (no cambia al editar).
         </p>
         {motivoRechazo && (

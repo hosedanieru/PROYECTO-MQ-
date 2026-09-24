@@ -1,10 +1,18 @@
 <!doctype html>
-<html lang="en">
+<!--
+  lang="es": la aplicación está toda en español. Declararla como "en" hacía
+  que Chrome ofreciera traducirla, y el traductor reescribe el DOM por debajo
+  de React: de ahí los errores "removeChild: el nodo no es hijo de este nodo".
+  `translate="no"` y la meta de Google lo bloquean incluso si el usuario lo
+  fuerza a mano.
+-->
+<html lang="es" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <meta name="google" content="notranslate" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Maquila MQ — Inlotrans</title>
   </head>
   <body>
     <div id="root"></div>

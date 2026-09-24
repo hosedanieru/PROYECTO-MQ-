@@ -27,6 +27,8 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 
+import { traducirErrorFirestore } from './errores-firestore.js';
+
 export const COLECCION = {
   usuarios: 'usuarios',
   roles: 'roles',
@@ -61,18 +63,18 @@ export class ClienteFirestore {
   }
 
   obtener(ref: DocumentReference): Promise<DocumentSnapshot> {
-    return this.tx ? this.tx.get(ref) : ref.get();
+    return conNombrePropio(() => (this.tx ? this.tx.get(ref) : ref.get()));
   }
 
   consultar(q: Query): Promise<QuerySnapshot> {
-    return this.tx ? this.tx.get(q) : q.get();
+    return conNombrePropio(() => (this.tx ? this.tx.get(q) : q.get()));
   }
 
   async guardar(ref: DocumentReference, datos: DocumentData, fusionar = false): Promise<void> {
     if (this.tx) {
       this.tx.set(ref, datos, { merge: fusionar });
     } else {
-      await ref.set(datos, { merge: fusionar });
+      await conNombrePropio(() => ref.set(datos, { merge: fusionar }));
     }
   }
 
@@ -80,7 +82,7 @@ export class ClienteFirestore {
     if (this.tx) {
       this.tx.update(ref, datos);
     } else {
-      await ref.update(datos);
+      await conNombrePropio(() => ref.update(datos));
     }
   }
 
@@ -88,8 +90,22 @@ export class ClienteFirestore {
     if (this.tx) {
       this.tx.delete(ref);
     } else {
-      await ref.delete();
+      await conNombrePropio(() => ref.delete());
     }
+  }
+}
+
+/**
+ * Único punto donde los fallos del servicio (cuota agotada, sin
+ * conexión) reciben un nombre entendible. Dentro de una transacción las
+ * escrituras no devuelven promesa —se aplican al confirmar—, así que
+ * ahí el error lo traduce la unidad de trabajo.
+ */
+async function conNombrePropio<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (error) {
+    throw traducirErrorFirestore(error);
   }
 }
 

@@ -164,4 +164,8 @@ export const RemisionMapper = {
     estadoAPrisma(estado: EstadoRemision): EstadoPrisma {
         return A_PRISMA[estado];
     },
+
+    estadoADominio(estado: EstadoPrisma): EstadoRemision {
+        return A_DOMINIO[estado];
+    },
 };

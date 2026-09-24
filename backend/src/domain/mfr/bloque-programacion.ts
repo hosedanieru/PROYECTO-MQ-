@@ -39,6 +39,16 @@ export const EFICIENCIA_MINIMA = 1;
 export const EFICIENCIA_MAXIMA = 100;
 
 export const ORIGENES_BLOQUE = ['MANUAL', 'DPP', 'COPIA'] as const;
+
+/**
+ * Días que admite una sola carga de programación.
+ *
+ * PepsiCo manda el DPP por día o por semana, y el área avisó que podría
+ * llegar mensual; 62 cubre dos meses corridos sin dejar la puerta
+ * abierta a un archivo absurdo. Cada día se carga en su propia
+ * transacción, así que el límite no es técnico sino de sensatez.
+ */
+export const MAXIMO_DIAS_POR_CARGA = 62;
 export type OrigenBloque = (typeof ORIGENES_BLOQUE)[number];
 
 export interface DatosBloque {

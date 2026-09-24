@@ -15,7 +15,7 @@ import {
   validarAsignacion,
   verificarTopeAsignacion,
   type AsignacionLinea,
-  type DatosAsignacion,
+  type DatosAsignacion, 
 } from '../../domain/mfr/asignacion-linea.js';
 import { AsignacionNoEncontradaError, LineaNoEncontradaError } from '../../domain/mfr/mfr.errors.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';

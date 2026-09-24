@@ -120,6 +120,18 @@ export class EstandarRepositorioFalso implements EstandarRepository {
     this.items[i] = { ...this.items[i], ...datos };
     return Promise.resolve(this.items[i]);
   }
+
+  /** Cuenta las veces que se llamó, para verificar que el lote escribe una sola vez. */
+  llamadasAActualizarVarios = 0;
+
+  actualizarVarios(cambios: Array<{ productoId: string; datos: DatosEstandar }>): Promise<void> {
+    this.llamadasAActualizarVarios += 1;
+    for (const { productoId, datos } of cambios) {
+      const i = this.items.findIndex((e) => e.productoId === productoId);
+      this.items[i] = { ...this.items[i], ...datos };
+    }
+    return Promise.resolve();
+  }
 }
 
 export class HorarioRepositorioFalso implements HorarioRepository {

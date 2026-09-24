@@ -31,10 +31,19 @@ Convención: modelos en PascalCase, campos en camelCase, tablas y columnas en sn
 
 | Tabla | Qué guarda |
 |---|---|
-| `producto` | Ítem: código único, descripción, proceso (`MANUAL`/`AUTOMATICA`), unidades por caja, cajas por estiba, estándares de producción (`unidades_por_hora`, `cajas_por_hora` — reservados para MFR), activo. |
-| `turno` / `turno_horario` | T1, T2, T3 y sus horarios por día de la semana con vigencia. `cruza_medianoche` para T3. |
-| `proveedor` | Empresas que operan los turnos (LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX). |
+| `producto` | Ítem: código único, descripción, proceso (`MANUAL`/`AUTOMATICA`), unidades por caja, cajas por estiba, `personas_ideal` (LINEA IDEAL de la hoja TIEMPOS), `subdescripcion` (familia), estándares de producción (`cajas_por_hora`, `peso_neto_kg`), activo. |
+| `turno` / `turno_horario` | T1, T2, T3 y sus horarios por día de la semana con vigencia. `cruza_medianoche` para T3. Desde el 2026-09-18 son los del DPP de PepsiCo, iguales todos los días. |
+| `grupo` | Quien pone el personal del turno (LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX). Antes `proveedor`; renombrada el 2026-09-21. Lleva `descripcion` (el proveedor real, a mano) y `personas_esperadas`. |
 | `lugar` | MAQUILA PEPSICO SANTO DOMINGO. |
+
+### MFR
+
+| Tabla | Qué guarda |
+|---|---|
+| `linea_produccion` | Las 9 plataformas del DPP (L1–L5, MANUAL-1/2, REEMPAQU-2, REEMPAQUES): tipo (`MULTIPACK`/`MANUAL`), capacidad kg/h, orden, activo. |
+| `bloque_programacion` | Un bloque del DPP: línea × franja horaria con producto, `cajas_por_hora`, `eficiencia_porcentaje`, `loop`, `personas_asignadas`, `origen` (`MANUAL`/`DPP`/`COPIA`). El turno se deriva de la hora de inicio. Se congela al cerrar el turno (`cerrado_en`). |
+| `asistencia_turno` | Personas que llegaron de cada grupo, por fecha operativa y turno. Única por `(fecha, turno, grupo)`. |
+| `asignacion_linea` | Qué grupo trabaja en qué línea y con cuántas personas, por fecha operativa y turno. Única por `(fecha, turno, línea, grupo)`. |
 
 ### Seguridad
 
@@ -42,7 +51,7 @@ Convención: modelos en PascalCase, campos en camelCase, tablas y columnas en sn
 |---|---|
 | `usuario` | Documento único, nombre, correo opcional, `password_hash` (bcrypt), activo, rol. |
 | `rol` | ADMINISTRADOR, COORDINADOR_MQ, PATINADOR, CONSULTA. |
-| `permiso` | 13 permisos con módulo (`remision.*`, `catalogo.*`, `admin.*`). |
+| `permiso` | 16 permisos con módulo (`remision.*`, `catalogo.*`, `admin.*`, `mfr.*`). |
 | `rol_permiso` | Relación N:N. El seed la reemplaza en cada corrida: el seed es la fuente de verdad. |
 
 ## Reglas que viven en la base o cerca de ella

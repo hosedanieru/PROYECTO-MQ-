@@ -5,6 +5,7 @@ import type {
   EntradaAuditoria,
   FiltroRemisiones,
   Remision,
+  ResumenRemisiones,
   ResultadoPaginado,
   VersionRemision,
 } from '../../../shared/types/remision'
@@ -14,6 +15,10 @@ export const remisionesApi = {
     http
       .get<ResultadoPaginado<Remision>>('/remisiones', { params: filtro })
       .then((r) => r.data),
+
+  /** Solo los conteos por estado: no trae documentos. */
+  resumen: (filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>) =>
+    http.get<ResumenRemisiones>('/remisiones/resumen', { params: filtro }).then((r) => r.data),
 
   obtener: (id: string) => http.get<Remision>(`/remisiones/${id}`).then((r) => r.data),
 

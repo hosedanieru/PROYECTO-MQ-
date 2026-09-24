@@ -317,6 +317,42 @@ export class RemisionController {
     };
   }
 
+  /**
+   * Cuántas remisiones hay de cada estado en un rango de días
+   * operativos. Devuelve seis números, no documentos.
+   *
+   * Existe para el tablero de inicio, que antes pedía seis listados
+   * (uno por estado) solo para leer sus totales: seis veces el trabajo
+   * del servidor y, en Firestore, seis lecturas completas del día.
+   *
+   * Va ANTES de `GET /:id`, como el resto de rutas con nombre; si no,
+   * NestJS interpretaría "resumen" como un identificador.
+   */
+  @Get('resumen')
+  @RequierePermisos('remision.consultar')
+  async resumen(
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('anio') anio?: string,
+    @Query('turnoId') turnoId?: string,
+    @Query('grupoId') grupoId?: string,
+    @Query('productoId') productoId?: string,
+  ) {
+    const porEstado = await this.remisiones.contarPorEstado({
+      anio: anio ? Number(anio) : undefined,
+      turnoId,
+      grupoId,
+      productoId,
+      fechaOperativaDesde: desde ? new Date(`${desde}T00:00:00.000Z`) : undefined,
+      fechaOperativaHasta: hasta ? new Date(`${hasta}T00:00:00.000Z`) : undefined,
+    });
+
+    return {
+      porEstado,
+      total: Object.values(porEstado).reduce((suma, n) => suma + n, 0),
+    };
+  }
+
   // ==========================================================
   // DOCUMENTOS — van antes de `:id` para que no se confundan con un id
   // ==========================================================

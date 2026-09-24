@@ -36,6 +36,33 @@ export interface DatosEstandar {
   pesoNetoKg: number | null;
 }
 
+/**
+ * Un cambio dentro de una carga en lote.
+ *
+ * A diferencia de `DatosEstandar`, aquí los campos son OPCIONALES y la
+ * distinción importa:
+ *
+ *   undefined  no se toca (conserva lo que ya tenía el producto)
+ *   null       se borra el valor
+ *   número     se asigna
+ *
+ * Sin esa diferencia, cargar solo los pesos borraría las cajas/hora de
+ * todo el catálogo.
+ */
+export interface CambioEstandarLote {
+  productoId: string;
+  cajasPorHora?: number | null;
+  pesoNetoKg?: number | null;
+}
+
+/**
+ * Tope de productos por lote. Lo impone Firestore: una transacción
+ * admite 500 escrituras y cada producto gasta dos (el producto y su
+ * registro de auditoría). 100 deja margen de sobra y cubre el catálogo
+ * completo de una sola pasada.
+ */
+export const MAXIMO_ESTANDARES_POR_LOTE = 100;
+
 export function validarEstandar(datos: DatosEstandar): DatosEstandar {
   const positivoONulo = (v: number | null, nombre: string): void => {
     if (v !== null && !(Number.isFinite(v) && v > 0)) {
@@ -93,6 +120,16 @@ export interface EstandarRepository {
   listar(): Promise<EstandarProducto[]>;
   buscarPorProducto(productoId: string): Promise<EstandarProducto | null>;
   actualizar(productoId: string, datos: DatosEstandar): Promise<EstandarProducto>;
+  /**
+   * Escritura pura de varios estándares: NO lee nada y NO devuelve nada.
+   *
+   * Es lo que hace posible la carga en lote dentro de una transacción de
+   * Firestore, donde todas las lecturas van antes que cualquier
+   * escritura: quien llama ya leyó el estado anterior (lo necesita para
+   * auditar) y compone el resultado por su cuenta. Si este método
+   * releyera, el segundo producto del lote reventaría la transacción.
+   */
+  actualizarVarios(cambios: Array<{ productoId: string; datos: DatosEstandar }>): Promise<void>;
 }
 
 export const ESTANDAR_REPOSITORY = Symbol('EstandarRepository');

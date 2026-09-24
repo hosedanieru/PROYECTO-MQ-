@@ -1,7 +1,20 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src"
+    "rootDir": "./src",
+    /*
+     * El archivo de compilación incremental va DENTRO de dist.
+     *
+     * `nest-cli.json` tiene `deleteOutDir: true`, así que cada build
+     * borra dist. Con el .tsbuildinfo fuera (en la raíz, que es el
+     * valor por defecto) sobrevivía al borrado, y entonces TypeScript
+     * creía que todo seguía compilado y NO volvía a emitir: dist
+     * quedaba vacío y `node dist/main` fallaba con "Cannot find module".
+     *
+     * Dentro de dist, el estado incremental se borra junto con la
+     * salida y los dos no pueden contradecirse.
+     */
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
   "include": ["src"],
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]

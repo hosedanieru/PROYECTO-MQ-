@@ -29,7 +29,7 @@ Ver [workflows.md](../workflows.md) para el flujo de estados, la edición y las 
 
 | Ruta | Qué hace |
 |---|---|
-| `/remisiones` | Listado con filtros en la URL (fecha operativa, estado, turno, proveedor), paginación, selección para imprimir por lote, exportar a Excel. Aprobadas sin conciliar en ámbar. |
+| `/remisiones` | Listado con filtros en la URL (fecha operativa, estado, turno, grupo), paginación, selección para imprimir por lote, exportar a Excel. Aprobadas sin conciliar en ámbar. |
 | `/remisiones/nueva` | Formulario con cálculo asistido: al escribir cajas, sugiere estibas completas, sueltas y unidades a partir del empaque del producto. Muestra el día operativo del registro. |
 | `/remisiones/:id` | Detalle como se firmó, trazabilidad (entrega, OPA, conciliación), botones de flujo según estado y permiso, "Editar datos", "Imprimir PDF", historial (versiones; auditoría para quien tenga `admin.auditoria`). |
 | `/remisiones/:id/editar` | Mismo formulario precargado; solo en BORRADOR o EN_RECTIFICACION; muestra el motivo del rechazo. |

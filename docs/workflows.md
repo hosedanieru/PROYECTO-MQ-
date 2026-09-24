@@ -23,7 +23,7 @@ El formulario de creación muestra al coordinador a qué día operativo quedará
 
 | Paso | Estado resultante | Quién (permiso) | Datos que exige |
 |---|---|---|---|
-| Crear | `BORRADOR` | `remision.crear` | turno, proveedor, lugar, producto, vencimiento, cantidades, estibas |
+| Crear | `BORRADOR` | `remision.crear` | turno, grupo, lugar, producto, vencimiento, cantidades, estibas |
 | Editar datos | (no cambia) | `remision.editar` | solo en `BORRADOR` o `EN_RECTIFICACION` |
 | Entregar al OPA | `ENTREGADA` | `remision.entregar` | — (usuario del token) |
 | Registrar aprobación | `APROBADA` | `remision.registrar_aprobacion` | nombre del OPA, cargo opcional |
@@ -40,7 +40,7 @@ Las transiciones válidas están en `TRANSICIONES_PERMITIDAS` dentro de la entid
 
 - `Remision.editar(cambios)` solo funciona en `BORRADOR` o `EN_RECTIFICACION` (409 `REMISION_NO_EDITABLE` en los demás).
 - Se revalida el documento **completo** con las mismas reglas de la creación: una edición parcial no puede dejarlo incoherente.
-- Editables: turno, proveedor, lugar, producto (con snapshot nuevo), vencimiento, cantidades, estibas, números de estiba, observaciones.
+- Editables: turno, grupo, lugar, producto (con snapshot nuevo), vencimiento, cantidades, estibas, números de estiba, observaciones.
 - No editables: consecutivo, fecha operativa, fecha/hora de registro, autor, estado, versión.
 - Flujo típico tras un rechazo: **Rechazada → Rectificar → Editar datos → Entregar de nuevo**. La pantalla de edición muestra el motivo del rechazo.
 - Cada edición y cada transición dejan auditoría con valor anterior y nuevo.

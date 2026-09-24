@@ -11,5 +11,5 @@ Documentos de referencia del sistema. Se actualizan cuando el área responde una
 | [api.md](api.md) | Todos los endpoints con permisos, cuerpos y errores |
 | [deployment.md](deployment.md) | Desarrollo local, Docker Compose, variables de entorno, CI |
 | [modules/remisiones.md](modules/remisiones.md) | Módulo Remisiones: reglas de negocio, invariantes, documentos (PDF/Excel) |
-| [modules/mfr.md](modules/mfr.md) | MFR: propuesta de diseño **pendiente de validación** por el área |
+| [modules/mfr.md](modules/mfr.md) | MFR: bloques del DPP de PepsiCo, indicadores, tope "ni más ni menos", personal del turno |
 | [requirements.md](requirements.md) | Preguntas abiertas al área, ordenadas por urgencia |

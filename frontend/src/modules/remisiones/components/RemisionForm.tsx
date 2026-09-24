@@ -248,7 +248,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
   })
 
   return (
-    <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-6 rounded-lg bg-white p-6 shadow-sm">
+    <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-6 rounded-lg bg-base p-6 shadow-sm">
       {productos.data?.length === 0 && (
         <Alerta tipo="info">
           El catálogo de productos está vacío. Un administrador debe crear productos antes de
@@ -257,7 +257,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
       )}
 
       <fieldset className="grid gap-4 md:grid-cols-3">
-        <legend className="mb-2 text-sm font-semibold text-slate-700">Contexto</legend>
+        <legend className="mb-2 text-sm font-semibold text-tinta">Contexto</legend>
         <Select etiqueta="Turno" error={errors.turnoId?.message} {...register('turnoId')}>
           <option value="">Seleccione…</option>
           {turnos.data?.filter((t) => t.activo).map((t) => (
@@ -278,9 +278,9 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
         </Select>
       </fieldset>
 
-      <fieldset className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
-        <legend className="px-1 text-sm font-semibold text-amber-800">Pedido de emergencia (fuera del DPP)</legend>
-        <label className="flex items-start gap-2 text-sm text-slate-700">
+      <fieldset className="space-y-3 rounded-md border border-amber-200 bg-alerta-claro p-4">
+        <legend className="px-1 text-sm font-semibold text-alerta">Pedido de emergencia (fuera del DPP)</legend>
+        <label className="flex items-start gap-2 text-sm text-tinta">
           <input type="checkbox" className="mt-0.5" {...register('extraoficial')} />
           <span>
             Remisión <strong>extraoficial</strong>: PepsiCo la pidió por fuera del schedule. Al marcarla se habilita el catálogo
@@ -298,7 +298,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-sm font-semibold text-slate-700">
+        <legend className="mb-2 text-sm font-semibold text-tinta">
           Producto {extraoficial ? '(catálogo completo)' : `(solo lo programado en el DPP del ${fechaOperativa})`}
         </legend>
         {!extraoficial && dia.data && !hayDpp && (
@@ -319,14 +319,14 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
           ))}
         </Select>
         {producto && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-tinta-suave">
             Empaque: {producto.unidadesPorCaja ?? '?'} unidades/caja · {producto.cajasPorEstiba ?? '?'} cajas/estiba
             {producto.proceso && ` · proceso ${producto.proceso}`}
           </p>
         )}
         {producto && dia.data && !extraoficial && hayDpp && (
           programadoHoy ? (
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-tinta-suave">
               DPP del {fechaOperativa}: programadas <strong>{programadoHoy.programadoCajas}</strong> cajas, aprobadas{' '}
               <strong>{programadoHoy.producidoCajas}</strong> → quedan{' '}
               <strong>{Math.max(0, programadoHoy.programadoCajas - programadoHoy.producidoCajas)}</strong> por remisionar.
@@ -346,7 +346,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
       </fieldset>
 
       <fieldset className="grid gap-4 md:grid-cols-2">
-        <legend className="mb-2 text-sm font-semibold text-slate-700">Cantidades</legend>
+        <legend className="mb-2 text-sm font-semibold text-tinta">Cantidades</legend>
         <Campo etiqueta="Cajas" type="number" min={1} error={errors.cantidadCajas?.message} {...register('cantidadCajas')} />
         <Campo etiqueta="Unidades" type="number" min={1} error={errors.cantidadUnidades?.message} {...register('cantidadUnidades')} />
         <Campo etiqueta="Estibas completas" type="number" min={0} error={errors.estibasCompletas?.message} {...register('estibasCompletas')} />

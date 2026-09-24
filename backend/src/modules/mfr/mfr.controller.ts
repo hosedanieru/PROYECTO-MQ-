@@ -7,6 +7,7 @@
  *   PUT    /mfr/bloques                     mfr.cargar_programacion   crea o corrige un bloque (corregir exige motivo)
  *   DELETE /mfr/bloques/:id                 mfr.cargar_programacion   { motivo }
  *   POST   /mfr/bloques/dia                 mfr.cargar_programacion   carga un día completo (manual o importado)
+ *   POST   /mfr/bloques/periodo             mfr.cargar_programacion   carga N días (DPP semanal o mensual); una transacción por día
  *   POST   /mfr/bloques/copiar              mfr.cargar_programacion   copia la programación de otro día
  *   POST   /mfr/dpp/analizar  (multipart)   mfr.cargar_programacion   PDF del DPP → propuesta de bloques
  *   POST   /mfr/turno/cerrar                mfr.configurar_turno      { fechaOperativa, turnoId, motivoFaltante? } (400 MFR_FALTANTE_SIN_MOTIVO con `faltantes` si hay SKU bajo target)
@@ -19,6 +20,7 @@
  *   POST   /mfr/lineas                      catalogo.editar
  *   PATCH  /mfr/lineas/:id                  catalogo.editar
  *   GET    /mfr/estandares                  mfr.consultar             incluye pesoSugeridoKg
+ *   PUT    /mfr/estandares                  catalogo.editar_estandares { cambios[], motivo } carga en lote (una transacción)
  *   PUT    /mfr/estandares/:productoId      catalogo.editar_estandares { cajasPorHora?, pesoNetoKg?, motivo }
  *
  * Las fechas llegan como YYYY-MM-DD y se convierten a medianoche UTC,
@@ -46,12 +48,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AnalizarDppUseCase } from '../../application/mfr/analizar-dpp.use-case.js';
 import {
   CargarDiaUseCase,
+  CargarPeriodoUseCase,
   CerrarTurnoUseCase,
   CopiarDiaUseCase,
   EliminarBloqueUseCase,
   GuardarBloqueUseCase,
 } from '../../application/mfr/bloques.use-cases.js';
 import {
+  ActualizarEstandaresEnLoteUseCase,
   ActualizarEstandarUseCase,
   ActualizarLineaUseCase,
   CrearLineaUseCase,
@@ -83,9 +87,11 @@ import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decor
 import { LectorPdfService } from '../../infrastructure/dpp/lector-pdf.js';
 import {
   ActualizarEstandarDto,
+  ActualizarEstandaresLoteDto,
   ActualizarLineaDto,
   AsignarGrupoLineaDto,
   CargarDiaDto,
+  CargarPeriodoDto,
   CerrarTurnoDto,
   CopiarDiaDto,
   CrearLineaDto,
@@ -128,6 +134,7 @@ export class MfrController {
     private readonly guardarBloque: GuardarBloqueUseCase,
     private readonly eliminarBloque: EliminarBloqueUseCase,
     private readonly cargarDia: CargarDiaUseCase,
+    private readonly cargarPeriodo: CargarPeriodoUseCase,
     private readonly copiarDia: CopiarDiaUseCase,
     private readonly cerrarTurno: CerrarTurnoUseCase,
     private readonly registrarAsistencia: RegistrarAsistenciaUseCase,
@@ -138,6 +145,7 @@ export class MfrController {
     private readonly crearLinea: CrearLineaUseCase,
     private readonly actualizarLinea: ActualizarLineaUseCase,
     private readonly actualizarEstandar: ActualizarEstandarUseCase,
+    private readonly actualizarEstandaresEnLote: ActualizarEstandaresEnLoteUseCase,
     @Inject(LINEA_REPOSITORY) private readonly lineas: LineaRepository,
     @Inject(ESTANDAR_REPOSITORY) private readonly estandares: EstandarRepository,
     @Inject(ASISTENCIA_REPOSITORY) private readonly asistencias: AsistenciaRepository,
@@ -200,6 +208,32 @@ export class MfrController {
       usuarioId: actual.id,
     });
     return creados.map(presentarBloque);
+  }
+
+  /**
+   * Carga de N días: el DPP semanal o mensual. Cada día se carga en su
+   * propia transacción, así que la respuesta dice qué pasó con cada uno
+   * (CARGADO / OMITIDO / ERROR) en vez de fallar entera.
+   */
+  @Post('bloques/periodo')
+  @RequierePermisos('mfr.cargar_programacion')
+  async cargarPeriodoHttp(@Body() dto: CargarPeriodoDto, @UsuarioActual() actual: Usuario) {
+    const resultado = await this.cargarPeriodo.ejecutar({
+      bloques: dto.bloques.map((b) => ({
+        ...b,
+        fechaOperativa: fechaOperativaADate(b.fechaOperativa),
+        loop: b.loop ?? null,
+        personasAsignadas: b.personasAsignadas ?? null,
+      })),
+      origen: dto.origen,
+      reemplazar: dto.reemplazar,
+      motivo: dto.motivo ?? null,
+      usuarioId: actual.id,
+    });
+    return {
+      ...resultado,
+      dias: resultado.dias.map((d) => ({ ...d, fechaOperativa: d.fechaOperativa.toISOString().slice(0, 10) })),
+    };
   }
 
   @Post('bloques/copiar')
@@ -324,6 +358,22 @@ export class MfrController {
   @RequierePermisos('mfr.consultar')
   async listarEstandares() {
     return (await this.estandares.listar()).map((e) => ({ ...e, pesoSugeridoKg: pesoNetoSugeridoKg(e.descripcion) }));
+  }
+
+  /**
+   * Carga en lote. Va ANTES de `estandares/:productoId`: si estuviera
+   * después, no habría conflicto de rutas (una lleva parámetro y la otra
+   * no), pero se deja junto a su hermana y en este orden para que se lea
+   * de lo general a lo particular.
+   */
+  @Put('estandares')
+  @RequierePermisos('catalogo.editar_estandares')
+  actualizarEstandaresEnLoteHttp(@Body() dto: ActualizarEstandaresLoteDto, @UsuarioActual() actual: Usuario) {
+    return this.actualizarEstandaresEnLote.ejecutar({
+      cambios: dto.cambios,
+      motivo: dto.motivo,
+      usuarioId: actual.id,
+    });
   }
 
   @Put('estandares/:productoId')

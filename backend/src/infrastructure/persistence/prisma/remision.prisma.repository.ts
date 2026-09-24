@@ -17,11 +17,13 @@
 import { Injectable } from '@nestjs/common';
 
 import type { EstadoRemision, Remision } from '../../../domain/remision/remision.entity.js';
-import type {
-  CajasAgrupadas,
-  FiltroRemisiones,
-  RemisionRepository,
-  ResultadoPaginado,
+import {
+  conteoEnCero,
+  type CajasAgrupadas,
+  type ConteoPorEstado,
+  type FiltroRemisiones,
+  type RemisionRepository,
+  type ResultadoPaginado,
 } from '../../../domain/remision/remision.repository.js';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import type { ClientePrisma } from './cliente-prisma.js';
@@ -210,6 +212,23 @@ export class RemisionPrismaRepository implements RemisionRepository {
     });
     const porId = new Map(registros.map((r) => [r.id, RemisionMapper.aDominio(r)]));
     return ids.map((id) => porId.get(id)).filter((r): r is Remision => r !== undefined);
+  }
+
+  /** Cuenta en la base con GROUP BY: no trae ni una fila de remisión. */
+  async contarPorEstado(
+    filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>,
+  ): Promise<ConteoPorEstado> {
+    const grupos = await this.cliente.remision.groupBy({
+      by: ['estado'],
+      where: this.construirWhere(filtro),
+      _count: { _all: true },
+    });
+
+    const conteo = conteoEnCero();
+    for (const grupo of grupos) {
+      conteo[RemisionMapper.estadoADominio(grupo.estado)] = grupo._count._all;
+    }
+    return conteo;
   }
 
   async totalizarCajas(

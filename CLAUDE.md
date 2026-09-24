@@ -341,8 +341,8 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ### Terminado
 
-- Base de datos: 14 tablas (`schema.prisma`), migraciones aplicadas
-- Seed idempotente: 13 permisos, 4 roles, 3 turnos con 14 horarios, 1 lugar, 4 grupos
+- Base de datos: 18 tablas (`schema.prisma`), migraciones aplicadas
+- Seed idempotente: 16 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción
 - Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
 - Regla `fecha_operativa` con pruebas de casos borde
 - 6 casos de uso: crear + las 5 transiciones
@@ -354,8 +354,12 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 - Edición de remisiones en BORRADOR / EN_RECTIFICACION (backend + pantalla), con lo que rectificar sí corrige
 - Historial de versiones y auditoría en el detalle; "Recordar sesión" (localStorage / sessionStorage)
 - PDF (Puppeteer, dos por hoja, marca de estado) y exportación a Excel (exceljs) con los filtros del listado
-- **MFR regido por el DPP de PepsiCo** (2026-09-18): bloques por línea y hora (producto, **cajas/hora**, E) con `Mx = cajasPorHora × h`, `T = Mx × E` (decisión 2026-09-19: el ritmo se maneja por hora, no en BPM; al importar el PDF, cajas/h = Mx ÷ horas del bloque, así T queda exacto; el estándar del producto —hoja TIEMPOS— es solo el valor por defecto para bloques a mano y se puede dar al crear el producto); 8 líneas físicas con tipo y capacidad kg/h; importador del PDF del DPP (`pdf-parse`, lector puro en `domain/mfr/dpp-pepsico.ts`), copiar día, corregir con motivo, cerrar turno; tablero con MFR por SKU, turnos (eficiencia planeada/real) y vista horaria en kg (Target/Instant/Capacity/Overpull). Decisiones: cajas; cuenta al aprobar el OPA; meta 95 %; la remisión NO registra línea. Ver `docs/modules/mfr.md`. Archivos obsoletos vacíos por borrar: `domain/mfr/{programacion,config-turno}.ts`, `application/mfr/{programacion,config-turno}.use-cases.ts`, `frontend/.../ConfigTurnoPage.tsx`.
-- 152 pruebas unitarias sin base de datos + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`)
+- **MFR regido por el DPP de PepsiCo** (2026-09-18): bloques por línea y hora (producto, **cajas/hora**, E) con `Mx = cajasPorHora × h`, `T = Mx × E` (decisión 2026-09-19: el ritmo se maneja por hora, no en BPM; al importar el PDF, cajas/h = Mx ÷ horas del bloque, así T queda exacto; el estándar del producto —hoja TIEMPOS— es solo el valor por defecto para bloques a mano y se puede dar al crear el producto); 8 líneas físicas con tipo y capacidad kg/h; importador del PDF del DPP (`pdf-parse`, lector puro en `domain/mfr/dpp-pepsico.ts`), copiar día, corregir con motivo, cerrar turno; tablero con MFR por SKU, turnos (eficiencia planeada/real) y vista horaria en kg (Target/Instant/Capacity/Overpull). Decisiones: cajas; cuenta al aprobar el OPA; meta 95 %; la remisión NO registra línea. Ver `docs/modules/mfr.md`.
+- **Tope "ni más ni menos"** (2026-09-18): al crear, editar y aprobar se verifica contra el DPP del día; sin DPP o con SKU fuera del DPP se bloquea; al cerrar el turno, los faltantes exigen motivo. Excepción: remisión extraoficial con motivo
+- **Personal del turno** (2026-09-21): grupos (antes proveedores) con personas esperadas, asistencia por turno y grupo, asignación de grupos a líneas con la regla de no asignar más personas de las que llegaron
+- **DPP de N días** (área, 2026-09-22: PepsiCo también lo manda semanal, y podría mandarlo mensual): no hay camino "semanal"; el sistema carga **N días** y el diario es N = 1. El día de cada bloque sale de su propia fecha y hora con el corte de las 06:00 (`fechaOperativaDeHoraLocal`), no de la pantalla. Una transacción **por día** (límite de 500 escrituras en Firestore + un turno cerrado no debe frenar la semana); la respuesta dice qué pasó con cada día: CARGADO / OMITIDO / ERROR. Falta verificar con un PDF semanal real
+- **Carga de estándares en lote** (2026-09-22): `PUT /mfr/estandares` y pantalla `/admin/pesos` para confirmar de una pasada el peso neto por caja (sin él el tablero no muestra kilos). Una sola transacción con un motivo común; lo que no se envía no se toca. `EstandarRepository.actualizarVarios` es escritura pura por la regla de Firestore (lecturas antes que escrituras)
+- 189 pruebas unitarias sin base de datos (`npm test`) + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -368,7 +372,9 @@ frontend/src/
 │   ├── auth/       api, SesionContext (provider), useSesion, RutaProtegida, LoginPage
 │   ├── remisiones/ api, hooks (useRemisiones, useAccionRemision), pages (lista, detalle, crear), AccionesRemision
 │   ├── catalogo/   api, hooks (useTurnos, useGrupos, useLugares, useRoles, useProductos)
-│   └── admin/      UsuariosPage, ProductosPage
+│   ├── mfr/        api, hooks (useMfr, useFechaOperativa), TableroMfrPage, ProgramacionPage,
+│   │               componentes (LineasTurno, PersonalTurno, SelectorFecha, SemaforoBadge)
+│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage
 ├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando
 ├── services/       http.ts (axios: token, 401 → cerrar sesión, ErrorApi), almacen-token.ts (localStorage)
 └── shared/         types (api, remision, catalogo), utils/fechas (fechaOperativaDe espejo del backend)
@@ -406,6 +412,7 @@ POST   /api/remisiones/:id/rectificar   remision.rectificar
 POST   /api/remisiones/:id/validar      remision.validar
 
 GET    /api/remisiones?anio=&turnoId=&grupoId=&productoId=&estado=&desde=&hasta=&pagina=&porPagina=
+GET    /api/remisiones/resumen?desde=&hasta=…      remision.consultar  { porEstado, total } sin documentos
 GET    /api/remisiones/pdf?ids=a,b,c                  remision.consultar  (PDF, dos por hoja)
 GET    /api/remisiones/exportar?…filtros              remision.exportar   (.xlsx)
 GET    /api/remisiones/:id/pdf                        remision.consultar
@@ -413,6 +420,27 @@ GET    /api/remisiones/consecutivo/:anio/:numero      remision.consultar
 GET    /api/remisiones/:id/versiones                  remision.consultar
 GET    /api/remisiones/:id/auditoria                  remision.consultar + admin.auditoria
 GET    /api/remisiones/:id                            remision.consultar
+
+GET    /mfr/dia?fecha=                  mfr.consultar             tablero del día
+GET    /mfr/bloques?fecha=              mfr.consultar
+PUT    /mfr/bloques                     mfr.cargar_programacion   crea o corrige (corregir exige motivo)
+DELETE /mfr/bloques/:id                 mfr.cargar_programacion   { motivo }
+POST   /mfr/bloques/dia                 mfr.cargar_programacion   carga un día completo
+POST   /mfr/bloques/periodo             mfr.cargar_programacion   carga N días (semanal/mensual), una transacción por día
+POST   /mfr/bloques/copiar              mfr.cargar_programacion
+POST   /mfr/dpp/analizar                mfr.cargar_programacion   multipart; PDF → propuesta, no escribe
+POST   /mfr/turno/cerrar                mfr.configurar_turno      irreversible
+GET    /mfr/asistencia?fecha=           mfr.consultar
+PUT    /mfr/asistencia                  mfr.configurar_turno      personas que llegaron por grupo
+GET    /mfr/asignaciones?fecha=         mfr.consultar
+PUT    /mfr/asignaciones                mfr.configurar_turno      grupo → línea, con personas
+DELETE /mfr/asignaciones/:id            mfr.configurar_turno
+GET    /mfr/lineas                      mfr.consultar             (POST/PATCH con catalogo.editar)
+GET    /mfr/estandares                  mfr.consultar             incluye pesoSugeridoKg
+PUT    /mfr/estandares                  catalogo.editar_estandares carga en lote { cambios[], motivo }, máx. 100
+PUT    /mfr/estandares/:productoId      catalogo.editar_estandares { cajasPorHora, pesoNetoKg, motivo }
+
+GET    /api                             público                   comprobación de vida (healthcheck de Docker)
 ```
 
 Detalle completo de la API en `docs/api.md`.
@@ -432,6 +460,7 @@ Decisión del usuario (2026-09-16). Requiere un Chrome/Chromium: `PUPPETEER_EXEC
 - **Roles:** `ADMINISTRADOR`, `COORDINADOR_MQ`, `PATINADOR`, `CONSULTA`
 - **Grupos** (antes "proveedores"; renombrados el 2026-09-21 sin excepción, el proveedor real se escribe a mano en `descripcion`): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX. Cada grupo tiene `personasEsperadas` (personas que debe enviar por turno). En la programación se registra, por turno y grupo, cuántas llegaron (`asistencia_turno`); el tablero marca el personal como A_FIN / AFECTADA comparando **solo** contra las esperadas del grupo (la línea ideal del DPP es referencia). Los grupos se asignan a líneas por día y turno con número de personas (`asignacion_linea`; CUBIERTA / INCOMPLETA contra la línea ideal) y **nunca más personas de las que llegaron** (asistencia primero; 409 si excede o si la asistencia baja de lo asignado). El coordinador tiene `catalogo.editar` para gestionar grupos. Ver `docs/modules/mfr.md`.
 - **Lugar:** MAQUILA PEPSICO SANTO DOMINGO
+- **Líneas de producción:** las 9 plataformas del DPP (L1–L4 MULTIPACK 306 kg/h; **L5 MANUAL 306 kg/h**, agregada el 2026-09-22 al aparecer en el DPP semanal; MANUAL-1/2 249 kg/h; REEMPAQU-2 y REEMPAQUES 203 kg/h). `PENDIENTE DE CONFIRMAR`: L5 es MANUAL pero con la capacidad de una MULTIPACK
 
 ---
 
@@ -471,7 +500,7 @@ No implementar nada que dependa de estos puntos sin confirmarlos.
 | 6 | ¿`LINEA` y `AUTOMATICA` son el mismo proceso con dos nombres? | Catálogo |
 | 7 | ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? (2026-09-19: el catálogo se completó a mano en el panel; `npm run importar:tiempos` simula y reporta diferencias sin resolverlas) | Catálogo |
 | 8 | ¿Qué es el "cuaderno virtual"? | Módulo posterior |
-| 9 | ¿El módulo de inventario lleva inventario propio o concilia contra el WMS? | Inventario |
+| 9 | ~~¿El módulo de inventario lleva inventario propio o concilia contra el WMS?~~ **Respondido 2026-09-22: las dos cosas, sobre objetos distintos.** Inventario propio de **insumos**; el PT se concilia contra el WMS. La receta (lista de materiales por SKU) es la pieza que los une. Último bloque del orden | — |
 | 10 | ¿El WMS registra el número de remisión de origen? | Inventario |
 | 11 | ~~¿Quién registra la respuesta del OPA?~~ **Respondido 2026-09-16: solo el coordinador.** Aplicado en el seed. | — |
 | 12 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) | Validación |
@@ -482,7 +511,9 @@ No implementar nada que dependa de estos puntos sin confirmarlos.
 | 16 | Política de contraseñas: ¿complejidad, rotación, bloqueo por intentos? (hoy solo mínimo 8) | Ninguna |
 | 17 | ¿Deben auditarse los inicios de sesión (exitosos y fallidos)? | Ninguna |
 
-**Sobre el punto 9:** el patinador ya carga el PT al WMS de bodega. Construir un inventario paralelo al WMS generaría dos verdades sobre lo mismo. El usuario indicó que puede resolverse por API (si se consigue la clave) o por comparativo; ambas opciones quedan detrás de una interfaz, así que la decisión no bloquea el diseño.
+**Sobre el punto 9:** el patinador ya carga el PT al WMS de bodega, así que un inventario paralelo de PT generaría dos verdades sobre lo mismo; eso se concilia (por API si se consigue la clave, o por comparativo — ambas detrás de una interfaz, así que no bloquea el diseño). Lo que **sí** necesita inventario propio son los **insumos**, que no viven en el WMS. La receta por SKU permite calcular el consumo teórico (`remisión × receta`) y compararlo con el real para medir merma. Detalle en la Parte D del ROADMAP (D3 y D9).
+
+**Lo único urgente de ese módulo, aunque vaya de último:** el consumo **real** de insumos no se está capturando y no se puede reconstruir después. El teórico sí, porque las remisiones ya se guardan.
 
 **Sobre el punto 10:** determina la precisión de la conciliación. Con el número de remisión se identifica el registro exacto que falló; sin él, solo se detectan diferencias de totales.
 
@@ -529,14 +560,15 @@ El Excel `REMISIONES_AUTOMATIZADO_2026.xlsx` tiene problemas que deben tratarse 
 
 ## 11. Próximos pasos
 
-Autenticación (B1) está cerrada. Siguen, según el orden del ROADMAP (Parte G):
+Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP (Parte G):
 
 | Camino | Qué resuelve | Cuándo conviene |
 |---|---|---|
-| **Importación de catálogo (B3)** | Sin productos no se puede crear ninguna remisión | Parcialmente bloqueado por preguntas al área; el script con `--dry-run` se puede construir ya |
-| **Frontend de Remisiones (B5)** | Formulario y listado; algo visible para el área | Ya tiene login del que colgarse |
-| **Pruebas de integración (B2)** | Verifica atomicidad y bloqueo del consecutivo contra PostgreSQL real | No depende de nada |
+| **Levantamiento de Averías** | Es el siguiente módulo en prioridad según el área | Ya; no depende de código, sino de las 13 preguntas de levantamiento (Parte D del ROADMAP) |
+| **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y `personasEsperadas` de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
+| **Migración del histórico 2026 (B6)** | ~2.195 registros del Excel | Requiere la decisión del área: migrar, descartar, o migrar marcado `HISTORICO_EXCEL` |
+| **Importación del catálogo desde el Excel** | Hoy el catálogo se carga a mano; `npm run importar:tiempos` simula y reporta diferencias | Bloqueado por qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen |
 
-Pendientes menores en Remisiones: generación del PDF (formato dos por hoja), importación del catálogo de productos con reporte de excepciones, y migración del histórico 2026.
+Pendientes del MFR que no dependen del área: cierre automático del turno al terminar su hora (hoy es manual) y la vista de estadística histórica por línea.
 
-Después: levantamiento y desarrollo de MFR (parcialmente bloqueado), luego Averías, Calidad e Inventario.
+Pendiente transversal: **vistas por rol × área**, que esperan a que el área defina áreas y roles.

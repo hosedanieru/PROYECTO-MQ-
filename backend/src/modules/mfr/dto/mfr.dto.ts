@@ -9,6 +9,7 @@
 
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -27,6 +28,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { MAXIMO_ESTANDARES_POR_LOTE } from '../../../domain/mfr/estandar-produccion.js';
 import { TIPOS_LINEA } from '../../../domain/mfr/linea-produccion.js';
 import { EsId } from '../../../infrastructure/http/validadores.js';
 
@@ -91,6 +93,37 @@ export class MotivoDto {
   @MinLength(5)
   @MaxLength(500)
   motivo!: string;
+}
+
+/**
+ * Un bloque que trae su propio día. Es lo que permite importar un DPP
+ * de varios días: el día lo decide el bloque, no la pantalla.
+ */
+export class BloqueConFechaDto extends DatosBloqueDto {
+  @Matches(FECHA_OPERATIVA, { message: 'fechaOperativa debe ser YYYY-MM-DD' })
+  fechaOperativa!: string;
+}
+
+/** Carga de N días (DPP diario, semanal o mensual). Cada día es una transacción. */
+export class CargarPeriodoDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => BloqueConFechaDto)
+  bloques!: BloqueConFechaDto[];
+
+  @IsIn(['MANUAL', 'DPP'])
+  origen!: 'MANUAL' | 'DPP';
+
+  /** Aplica a cada día por separado: reemplaza el que ya tenga bloques abiertos. */
+  @IsBoolean()
+  reemplazar!: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  motivo?: string;
 }
 
 export class CargarDiaDto {
@@ -262,6 +295,41 @@ export class ActualizarEstandarDto {
   @IsPositive()
   pesoNetoKg?: number | null;
 
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  motivo!: string;
+}
+
+/**
+ * Un producto dentro de la carga en lote. Omitir un campo significa
+ * "no lo toques"; enviarlo en `null`, "bórralo". Por eso no se usa
+ * `@IsOptional()`, que trataría ambos casos igual.
+ */
+export class CambioEstandarLoteDto {
+  @EsId()
+  productoId!: string;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsNumber()
+  @IsPositive()
+  cajasPorHora?: number | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsNumber()
+  @IsPositive()
+  pesoNetoKg?: number | null;
+}
+
+export class ActualizarEstandaresLoteDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAXIMO_ESTANDARES_POR_LOTE)
+  @ValidateNested({ each: true })
+  @Type(() => CambioEstandarLoteDto)
+  cambios!: CambioEstandarLoteDto[];
+
+  /** Un solo motivo para todo el lote; queda en la auditoría de cada producto. */
   @IsString()
   @MinLength(5)
   @MaxLength(500)

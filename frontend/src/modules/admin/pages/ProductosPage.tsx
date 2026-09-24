@@ -10,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { Link } from 'react-router-dom'
 import { z } from 'zod'
 
 import { Alerta } from '../../../components/Alerta'
@@ -165,8 +166,15 @@ export function ProductosPage() {
   return (
     <section className="space-y-4">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Productos</h1>
-        <Boton onClick={() => setEditando('nuevo')}>Nuevo producto</Boton>
+        <h1 className="text-2xl font-semibold text-tinta">Productos</h1>
+        <div className="flex items-center gap-3">
+          {tienePermiso('catalogo.editar_estandares') && (
+            <Link to="/admin/pesos" className="text-sm text-marca hover:underline">
+              Pesos por caja en lote
+            </Link>
+          )}
+          <Boton onClick={() => setEditando('nuevo')}>Nuevo producto</Boton>
+        </div>
       </header>
 
       <Campo
@@ -178,9 +186,9 @@ export function ProductosPage() {
       {productos.isError && <Alerta tipo="error">{comoErrorApi(productos.error).mensaje}</Alerta>}
       {cambiarActivo.isError && <Alerta tipo="error">{comoErrorApi(cambiarActivo.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
               <th className="px-4 py-2">Código</th>
               <th className="px-4 py-2">Descripción</th>
@@ -195,13 +203,13 @@ export function ProductosPage() {
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-borde">
             {productos.data?.length === 0 && (
-              <tr><td colSpan={11} className="px-4 py-6 text-center text-slate-500">Sin productos.</td></tr>
+              <tr><td colSpan={11} className="px-4 py-6 text-center text-tinta-suave">Sin productos.</td></tr>
             )}
             {productos.data?.map((p) => (
-              <tr key={p.id} className={p.activo ? '' : 'text-slate-400'}>
-                <td className="px-4 py-2 font-mono">{p.codigo}</td>
+              <tr key={p.id} className={p.activo ? '' : 'text-tinta-suave'}>
+                <td className="px-4 py-2 cifra">{p.codigo}</td>
                 <td className="px-4 py-2">{p.descripcion}</td>
                 <td className="px-4 py-2">{p.proceso ?? '—'}</td>
                 <td className="px-4 py-2 text-xs">{p.subdescripcion ?? '—'}</td>
@@ -213,10 +221,10 @@ export function ProductosPage() {
                 <td className="px-4 py-2">{p.activo ? 'Activo' : 'Inactivo'}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
                   {tienePermiso('catalogo.editar_estandares') && (
-                    <button className="mr-3 text-slate-600 hover:underline" onClick={() => abrirEstandar(p)}>Estándar</button>
+                    <button className="mr-3 text-tinta-suave hover:underline" onClick={() => abrirEstandar(p)}>Estándar</button>
                   )}
                   <button className="text-marca hover:underline" onClick={() => setEditando(p)}>Editar</button>
-                  <button className="ml-3 text-slate-600 hover:underline" onClick={() => cambiarActivo.mutate(p)}>
+                  <button className="ml-3 text-tinta-suave hover:underline" onClick={() => cambiarActivo.mutate(p)}>
                     {p.activo ? 'Desactivar' : 'Activar'}
                   </button>
                 </td>
@@ -249,14 +257,14 @@ export function ProductosPage() {
               </datalist>
             </div>
           </div>
-          <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase text-slate-500">Estándar de producción (MFR)</legend>
+          <fieldset className="space-y-3 rounded-md border border-borde p-3">
+            <legend className="px-1 text-xs font-semibold uppercase text-tinta-suave">Estándar de producción (MFR)</legend>
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta="Cajas por hora (hoja TIEMPOS)" type="number" min={0.01} step="0.01" error={errors.cajasPorHora?.message} {...register('cajasPorHora')} />
               <Campo etiqueta="Peso neto por caja (kg)" type="number" min={0.001} step="0.001" error={errors.pesoNetoKg?.message} {...register('pesoNetoKg')} />
             </div>
             {sugerenciaPeso !== null && (
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-tinta-suave">
                 Según la descripción el peso sería <strong>{sugerenciaPeso} kg</strong>.{' '}
                 <button type="button" className="text-marca hover:underline" onClick={() => setValue('pesoNetoKg', String(sugerenciaPeso), { shouldDirty: true })}>
                   Usar sugerido
@@ -272,7 +280,7 @@ export function ProductosPage() {
               />
             )}
             {editando === 'nuevo' && (
-              <p className="text-xs text-slate-500">Al crear no hace falta motivo: es el valor inicial. Después, cambiarlos queda auditado con motivo.</p>
+              <p className="text-xs text-tinta-suave">Al crear no hace falta motivo: es el valor inicial. Después, cambiarlos queda auditado con motivo.</p>
             )}
           </fieldset>
           {guardar.isError && <Alerta tipo="error">{comoErrorApi(guardar.error).mensaje}</Alerta>}
@@ -292,7 +300,7 @@ export function ProductosPage() {
           onSubmit={(e) => { e.preventDefault(); guardarEstandar.mutate() }}
           className="space-y-4"
         >
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-tinta-suave">
             <strong>Cajas por hora</strong> al 100 % (columna CAJAS POR HORA de la hoja TIEMPOS; es el valor por defecto al armar bloques a mano) y{' '}
             <strong>peso neto por caja</strong> en kilos para pasar cajas a kilogramos. Cada cambio queda auditado con su motivo.
           </p>
@@ -301,7 +309,7 @@ export function ProductosPage() {
             <Campo etiqueta="Peso neto por caja (kg)" type="number" min={0.001} step="0.001" value={formEstandar.pesoNetoKg} onChange={(e) => setFormEstandar({ ...formEstandar, pesoNetoKg: e.target.value })} />
           </div>
           {estandarActual?.pesoSugeridoKg != null && (
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-tinta-suave">
               Según la descripción ({estandarDe?.descripcion}) el peso sería <strong>{estandarActual.pesoSugeridoKg} kg</strong>.{' '}
               <button type="button" className="text-marca hover:underline" onClick={() => setFormEstandar({ ...formEstandar, pesoNetoKg: String(estandarActual.pesoSugeridoKg) })}>
                 Usar sugerido

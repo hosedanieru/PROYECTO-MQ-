@@ -26,7 +26,7 @@ npm run dev                 # http://localhost:5173 (proxy /api → 3000)
 
 ```powershell
 cd backend
-npm test            # 129 unitarias, sin base de datos (~3 s)
+npm test            # 189 unitarias, sin base de datos
 npm run test:e2e    # 8 de integración contra la base mq_test (~70 s; crea la base y migra)
 
 cd frontend
