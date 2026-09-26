@@ -504,7 +504,7 @@ La última pregunta es clave: si calidad debe aprobar antes de que el patinador 
 
 ## D3 · Inventario
 
-**Estado:** SIN LEVANTAR · Decisión de alcance pendiente · **Último bloque del orden** (usuario, 2026-09-22)
+**Estado:** EN LEVANTAMIENTO · **Siguiente módulo** (usuario, 2026-09-24; antes estaba de último)
 
 ### Alcance aclarado por el usuario (2026-09-22)
 
@@ -569,7 +569,7 @@ El usuario indicó que puede resolverse por **API** (si se consigue la clave) o 
 
 - ~~¿El inventario de MQ es el mismo del WMS, o cubre algo distinto?~~ **Respondido 2026-09-22: insumos con los que se arman los productos.** El PT sigue siendo del WMS
 - ~~¿Se necesita controlar el **consumo** de insumos?~~ **Sí**, es el propósito del módulo
-- ¿Qué es un insumo aquí? ¿Bolsa, caja, etiqueta, cinta, producto a granel que llega de PepsiCo? ¿Todos o solo algunos?
+- ~~¿Qué es un insumo aquí?~~ **Respondido 2026-09-24 (usuario): todo lo que entra al armado, desde los productos base hasta cintas, cajas, etc.** El inventario se divide en **PT** e **insumos**. Sigue abierto: ¿qué es exactamente un "producto base" (¿el producto que llega de PepsiCo para reempacar?) y la lista completa de tipos de insumo
 - ¿De quién son los insumos: los pone PepsiCo o los compra Inlotrans? (cambia si hay costos, proveedores y órdenes de compra, o solo control de existencias)
 - ¿Cómo entran hoy los insumos a la planta y quién lo registra?
 - ¿Se cuentan físicamente cada cuánto? ¿Hay conteo cíclico o inventario general?
@@ -814,10 +814,12 @@ En paralelo: levantamiento de Averías, que es el siguiente en importancia segú
 
 ## Bloque 4 — En adelante
 
+**Decisión del usuario (2026-09-24): Inventario pasa antes que Averías.** Motivo: el consumo real de insumos que no se captura hoy no se puede reconstruir, y el impacto de no medirlo es mayor. Esto reemplaza el "último bloque del orden" del 2026-09-22.
+
 ```text
-9.  Averías
-10. Calidad
-11. Inventario / conciliación WMS
+9.  Inventario (insumos primero, luego conciliación de PT contra el WMS)
+10. Averías
+11. Calidad
 12. Planes de trabajo
 13. Cuaderno virtual
 14. Entrega de turno
