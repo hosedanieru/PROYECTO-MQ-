@@ -368,7 +368,7 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
   - Tablas `causal_averia`, `reporte_averia`, `registro_averia`, `evidencia_averia`; Firestore `causalesAveria`, `reportesAveria` (registros embebidos).
   - Pantallas: `/averias` (listado con filtros en la URL), `/averias/nuevo` (formulario para celular, cámara directa), `/averias/:id` (detalle con fotos, corregir/anular), `/admin/causales`.
   - Falta la fase 4: % de averías contra lo programado en el DPP, por día y turno. Ver ROADMAP D1
-- 248 pruebas unitarias sin base de datos (`npm test`) + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
+- 248 pruebas unitarias sin base de datos (`npm test`) + 11 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -471,7 +471,7 @@ Detalle completo de la API en `docs/api.md`.
 
 ### Fechas: regla de formato
 
-Las fechas de solo día (`fechaOperativa`, `fechaVencimiento`) se guardan a medianoche UTC y **se formatean en UTC**; formatearlas en zona Bogotá retrocede un día. Los instantes reales (`fechaHoraRegistro`, entrega, aprobación, validación) se muestran en `America/Bogota`. Aplica a PDF, Excel y frontend.
+La base trabaja en **UTC** (la sesión la fija `crearAdaptadorPostgres()`; ver sección 7). Las fechas de solo día (`fechaOperativa`, `fechaVencimiento`) se guardan a medianoche UTC y **se formatean en UTC**; formatearlas en zona Bogotá retrocede un día. Los instantes reales (`fechaHoraRegistro`, entrega, aprobación, validación) se muestran en `America/Bogota`. Aplica a PDF, Excel y frontend.
 
 ### PDF con Puppeteer
 
@@ -496,12 +496,19 @@ Los DTOs ya no reciben `*PorId` del cliente. El usuario sale del token y cada en
 
 ### Pendientes técnicos
 
-- **Instantes guardados corridos +5 h en PostgreSQL** (hallado el 2026-09-28, sin corregir, espera decisión). La sesión de la base usa `America/Bogota` y Prisma (`@prisma/adapter-pg`) escribe la hora UTC sin zona: un registro de las 12:46 de Bogotá queda en la base como `17:46-05` (o sea, 22:46 UTC). Al leer, Prisma deshace el error, así que **la aplicación muestra bien las horas**. Pero la base guarda mal el instante: cualquier consulta SQL directa, reporte externo, pgAdmin o la futura conciliación con el WMS verá 5 horas de más, y si la base corre en UTC (p. ej. Postgres en Docker) todas las horas históricas se corren en la aplicación. Afecta a todas las columnas `Timestamptz` (remisiones, auditoría, MFR, averías). Arreglo probable: fijar la sesión en UTC y corregir los datos existentes con una migración.
 
 - Un JWT no se puede revocar antes de expirar (12 h). Si el área lo exige, habría que agregar refresh token o lista de revocación.
 - `infrastructure/docker-compose.yml` se escribió sin poder ejecutarlo (Docker sin plugin Compose en el equipo de desarrollo). Validar con `docker compose config` antes del primer despliegue.
 - La imagen del backend instala también las dependencias de desarrollo (la CLI de Prisma y `tsx` corren en el arranque para migrar y sembrar). Se puede adelgazar después.
 - Los usuarios no pueden cambiar su propia contraseña; solo el administrador la restablece.
+
+### Bug corregido el 2026-09-28: instantes corridos 5 horas
+
+La sesión de PostgreSQL estaba en `America/Bogota` y `@prisma/adapter-pg` envía las fechas como hora UTC **sin zona**: la base guardaba cada instante 5 h adelantado. La aplicación no lo notaba porque al leer se deshacía el error, pero lo que generaba la propia base (`now()`) se leía 5 h atrasado, y cualquier consulta SQL directa veía horas falsas.
+
+- **Regla:** toda conexión a PostgreSQL se crea con `crearAdaptadorPostgres()` (`infrastructure/database/prisma/adaptador-postgres.ts`), que fija `TimeZone=UTC` en la sesión. **Nunca** `new PrismaPg(...)` directo. La hora de Colombia se aplica solo al mostrar y al calcular la fecha operativa.
+- Datos corregidos con la migración `20260928200000_instantes_a_utc` (resta el desfase de la zona de la sesión a todas las columnas `timestamptz`; en una base ya en UTC no cambia nada).
+- Regresión cubierta por `test/zona-horaria.e2e-spec.ts` (mira la base por debajo de Prisma).
 
 ### Bugs corregidos el 2026-09-16 (para no repetirlos)
 

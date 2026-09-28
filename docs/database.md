@@ -57,6 +57,7 @@ Convención: modelos en PascalCase, campos en camelCase, tablas y columnas en sn
 ## Reglas que viven en la base o cerca de ella
 
 - **Fecha operativa** (`remision.fecha_operativa`, tipo `DATE`): día productivo con corte 06:00–06:00 en hora de Bogotá. Se calcula en el dominio (`calcularFechaOperativa`) y se guarda como fecha a medianoche UTC. **Al mostrarla se formatea en UTC**, nunca en zona Bogotá (retrocedería un día). Los instantes reales (`fecha_hora_registro`, `fecha_entrega`, …) son `timestamptz` y sí se muestran en hora de Colombia.
+- **Zona de la sesión: UTC.** La aplicación fija `TimeZone=UTC` en cada conexión (`crearAdaptadorPostgres()`), porque el adaptador de Prisma envía las fechas sin zona y, con la sesión en Bogotá, se guardaban 5 horas corridas (corregido el 2026-09-28, migración `20260928200000_instantes_a_utc`). Para consultar a mano en hora de Colombia: `SELECT fecha_hora_registro AT TIME ZONE 'America/Bogota' FROM …`.
 - **Consecutivo anual**: el año sale de la fecha operativa. Una remisión del 1 de enero a las 02:00 lleva consecutivo del año anterior.
 - **Nunca se borran remisiones**: no hay endpoint DELETE, y `database/crear-usuario-app.sql` revoca `DELETE` sobre `remision`, `remision_version` y `auditoria` al usuario de aplicación.
 - **Snapshot de producto**: `codigo_snapshot` y `descripcion_snapshot` se copian al crear o al cambiar el producto en una edición; el catálogo puede cambiar después sin alterar el documento.
