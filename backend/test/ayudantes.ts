@@ -6,14 +6,12 @@
  * casos y los catálogos mínimos que toda remisión necesita.
  */
 
-import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { crearAdaptadorPostgres } from '../src/infrastructure/database/prisma/adaptador-postgres.js';
 
-export const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
+export const prisma = new PrismaClient({ adapter: crearAdaptadorPostgres() });
 
 /** Vacía las tablas de datos (no los catálogos) en orden de dependencias. */
 export async function limpiarDatos(): Promise<void> {

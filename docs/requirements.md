@@ -60,7 +60,7 @@ El MFR quedó desbloqueado (ver la tabla de respondidas y [modules/mfr.md](modul
 | M4 | ¿Migrar el histórico 2026, dejarlo como archivo, o migrarlo marcado `HISTORICO_EXCEL`? |
 | M5 | ¿`LINEA` y `AUTOMATICA` son el mismo proceso? ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? ¿Los códigos duplicados son repetidos o variantes? (solo si se retoma la importación) |
 | M6 | ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? (13 diferencias y 3 códigos repetidos detectados el 2026-09-19, sin aplicar) |
-| M7 | ¿Qué significan PT y PI exactamente? |
+| M7 | ~~¿Qué significan PT y PI exactamente?~~ **PT = Producto Terminado; PI = Producto Intermedio** (2026-09-28) |
 | M8 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) |
 | M9 | ¿Qué es el **cuaderno virtual**? |
 | M10 | ¿El WMS registra el número de remisión de origen? (sigue abierto: define si la conciliación de PT es exacta o solo por totales) |

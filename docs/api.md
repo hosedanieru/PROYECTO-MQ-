@@ -176,6 +176,26 @@ El tope de 100 lo impone Firestore: una transacción admite 500 escrituras y cad
 
 **Trazabilidad del personal** (regla dura): no se pueden asignar más personas de las que llegaron. Primero la asistencia, después la asignación.
 
+## Averías
+
+Solo PT por ahora (2026-09-28). Falta el indicador (% contra el DPP). Ver ROADMAP D1.
+
+| Método | Ruta | Permiso | Notas |
+|---|---|---|---|
+| GET | `/averias/causales` | `catalogo.consultar` | activas e inactivas, ordenadas por `orden` y nombre |
+| POST | `/averias/causales` | `catalogo.editar` | `{ codigo, nombre, orden }` · 409 `CAUSAL_CODIGO_DUPLICADO` |
+| PATCH | `/averias/causales/:id` | `catalogo.editar` | parcial; `activo` para desactivar (no se eliminan) |
+| GET | `/averias?desde=&hasta=&turnoId=&grupoId=&estado=` | `averia.consultar` | fechas operativas; rango máx. 93 días; más recientes primero |
+| GET | `/averias/:id` | `averia.consultar` | reporte con registros y `total` |
+| GET | `/averias/:id/registros/:registroId/fotos/:tipo` | `averia.consultar` | la imagen; `tipo` = `UNIDAD` · `LOTE_FECHA` · `CONJUNTO` |
+| POST | `/averias` | `averia.reportar` | multipart (ver abajo) · 201 |
+| PATCH | `/averias/:id/registros/:registroId` | `averia.corregir` | parcial; las fotos no cambian |
+| POST | `/averias/:id/anular` | `averia.corregir` | `{ motivo }` · 409 `AVERIA_NO_MODIFICABLE` si ya está anulado |
+
+**Crear (multipart):** campo `datos` con `{ grupoId, registros: [{ productoId, fechaVencimiento: 'YYYY-MM-DD', lote, causalId, cantidad, unidadMedida }] }` (1 a 30 registros; `unidadMedida` = `UNIDAD` · `DOCENA` · `SIX` · `BOLSA`) y un archivo por foto, `foto_{fila}_{TIPO}` (fila desde 0). JPG, PNG o WEBP, máx. 5 MB cada una. Fecha, hora, turno y quién reporta los pone el servidor. Si algo falla, no queda ni el reporte ni las fotos.
+
+**Respuesta:** el reporte con `fechaOperativa` (`YYYY-MM-DD`), `estado` (`REGISTRADO` · `ANULADO`), `reportadoPorNombre`, `registros[]` (con copia `productoCodigo` / `productoDescripcion` y `evidencias: [{ tipo }]`, sin rutas internas) y `total: { unidades, sinConvertir: { BOLSA? } }`.
+
 ## Códigos de error de dominio
 
 | Código | HTTP |
@@ -190,5 +210,8 @@ El tope de 100 lo impone Firestore: una transacción admite 500 escrituras y cad
 | `MFR_BLOQUE_NO_ENCONTRADO`, `MFR_LINEA_NO_ENCONTRADA`, `MFR_ASIGNACION_NO_ENCONTRADA` | 404 |
 | `MFR_TURNO_CERRADO`, `MFR_BLOQUES_SOLAPADOS`, `MFR_DIA_CON_PROGRAMACION`, `MFR_LINEA_CODIGO_DUPLICADO` | 409 |
 | `MFR_ASIGNACION_SIN_ASISTENCIA`, `MFR_ASIGNACION_EXCEDE_ASISTENCIA`, `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS` | 409 |
+| `CAUSAL_DATOS_INVALIDOS`, `AVERIA_DATOS_INVALIDOS` | 400 |
+| `CAUSAL_NO_ENCONTRADA`, `AVERIA_NO_ENCONTRADA` | 404 |
+| `CAUSAL_CODIGO_DUPLICADO`, `AVERIA_NO_MODIFICABLE`, `AVERIA_SIN_TURNO` | 409 |
 
 `MFR_FALTANTE_SIN_MOTIVO` añade `faltantes[]` al cuerpo de la respuesta, para que el cliente muestre qué SKU quedaron cortos.

@@ -23,6 +23,8 @@ export const en: Record<ClaveTexto, string> = {
   'nav.lineas': 'Lines',
   'nav.pesos': 'Weight per case',
   'nav.grupos': 'Crews',
+  'nav.averias': 'Damages',
+  'nav.causales': 'Damage causes',
   'nav.usuarios': 'Users',
   'nav.abrirMenu': 'Open menu',
   'nav.cerrarMenu': 'Close menu',

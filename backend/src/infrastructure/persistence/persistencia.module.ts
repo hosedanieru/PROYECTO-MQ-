@@ -17,6 +17,8 @@
 
 import { Module, type Provider } from '@nestjs/common';
 
+import { CAUSAL_AVERIA_REPOSITORY } from '../../domain/averia/causal-averia.js';
+import { REPORTE_AVERIA_REPOSITORY } from '../../domain/averia/reporte-averia.js';
 import { CATALOGO_REPOSITORY } from '../../domain/catalogo/catalogo.repository.js';
 import { GRUPO_REPOSITORY } from '../../domain/grupo/grupo.repository.js';
 import { ASIGNACION_REPOSITORY } from '../../domain/mfr/asignacion-linea.js';
@@ -35,6 +37,8 @@ import { PrismaService } from '../database/prisma/prisma.service.js';
 import { ClienteFirestore } from '../firestore/cliente-firestore.js';
 import { FirestoreService } from '../firestore/firestore.service.js';
 import { CatalogoFirestoreRepository } from '../firestore/repositorios/catalogo.firestore.repository.js';
+import { CausalAveriaFirestoreRepository } from '../firestore/repositorios/causal-averia.firestore.repository.js';
+import { ReporteAveriaFirestoreRepository } from '../firestore/repositorios/reporte-averia.firestore.repository.js';
 import { AsignacionFirestoreRepository } from '../firestore/repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from '../firestore/repositorios/asistencia.firestore.repository.js';
 import { GrupoFirestoreRepository } from '../firestore/repositorios/grupo.firestore.repository.js';
@@ -51,6 +55,8 @@ import {
 import { UsuarioFirestoreRepository } from '../firestore/repositorios/usuario.firestore.repository.js';
 import { UnidadDeTrabajoFirestore } from '../firestore/unidad-de-trabajo.firestore.js';
 import { CatalogoPrismaRepository } from './prisma/catalogo.prisma.repository.js';
+import { CausalAveriaPrismaRepository } from './prisma/causal-averia.prisma.repository.js';
+import { ReporteAveriaPrismaRepository } from './prisma/reporte-averia.prisma.repository.js';
 import { AsignacionPrismaRepository } from './prisma/asignacion.prisma.repository.js';
 import { AsistenciaPrismaRepository } from './prisma/asistencia.prisma.repository.js';
 import { GrupoPrismaRepository } from './prisma/grupo.prisma.repository.js';
@@ -90,6 +96,8 @@ const TOKENS = [
   LINEA_REPOSITORY,
   ESTANDAR_REPOSITORY,
   HORARIO_REPOSITORY,
+  CAUSAL_AVERIA_REPOSITORY,
+  REPORTE_AVERIA_REPOSITORY,
 ];
 
 // ---------- PostgreSQL ----------
@@ -114,6 +122,8 @@ const REGISTROS_POSTGRES: Provider[] = [
   conPrisma(LINEA_REPOSITORY, LineaPrismaRepository),
   conPrisma(ESTANDAR_REPOSITORY, EstandarPrismaRepository),
   conPrisma(HORARIO_REPOSITORY, HorarioPrismaRepository),
+  conPrisma(CAUSAL_AVERIA_REPOSITORY, CausalAveriaPrismaRepository),
+  conPrisma(REPORTE_AVERIA_REPOSITORY, ReporteAveriaPrismaRepository),
 ];
 
 // ---------- Firestore ----------
@@ -139,6 +149,8 @@ const REGISTROS_FIRESTORE: Provider[] = [
   conFirestore(BLOQUE_REPOSITORY, BloqueFirestoreRepository),
   conFirestore(LINEA_REPOSITORY, LineaFirestoreRepository),
   conFirestore(ESTANDAR_REPOSITORY, EstandarFirestoreRepository),
+  conFirestore(CAUSAL_AVERIA_REPOSITORY, CausalAveriaFirestoreRepository),
+  conFirestore(REPORTE_AVERIA_REPOSITORY, ReporteAveriaFirestoreRepository),
 ];
 
 const tipo = tipoPersistencia();

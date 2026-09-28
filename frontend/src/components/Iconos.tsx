@@ -52,6 +52,26 @@ export function IconoRemision(props: Props) {
   )
 }
 
+/** Triángulo de advertencia: averías. */
+export function IconoAveria(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </Base>
+  )
+}
+
+/** Lista con viñetas: catálogos simples (causales). */
+export function IconoLista(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+    </Base>
+  )
+}
+
 export function IconoTablero(props: Props) {
   return (
     <Base {...props}>

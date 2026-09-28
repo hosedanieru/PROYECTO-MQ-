@@ -68,23 +68,23 @@ enum OrigenBloque {
 // ============================================================
 
 model Usuario {
-  id           String   @id @default(uuid())
-  documento    String   @unique
+  id           String  @id @default(uuid())
+  documento    String  @unique
   nombre       String
-  email        String?  @unique
-  passwordHash String   @map("password_hash")
-  activo       Boolean  @default(true)
+  email        String? @unique
+  passwordHash String  @map("password_hash")
+  activo       Boolean @default(true)
 
   rolId String @map("rol_id")
   rol   Rol    @relation(fields: [rolId], references: [id])
 
-  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
   // Relaciones con Remisión (nombradas por ser múltiples hacia Usuario)
-  remisionesCreadas    Remision[] @relation("RemisionCreadaPor")
-  remisionesEntregadas Remision[] @relation("RemisionEntregadaPor")
-  remisionesValidadas  Remision[] @relation("RemisionValidadaPor")
+  remisionesCreadas    Remision[]        @relation("RemisionCreadaPor")
+  remisionesEntregadas Remision[]        @relation("RemisionEntregadaPor")
+  remisionesValidadas  Remision[]        @relation("RemisionValidadaPor")
   rectificaciones      RemisionVersion[]
   auditorias           Auditoria[]
 
@@ -93,6 +93,10 @@ model Usuario {
   bloquesCerrados BloqueProgramacion[] @relation("BloqueCerradoPor")
   asistencias     AsistenciaTurno[]    @relation("AsistenciaRegistradaPor")
   asignaciones    AsignacionLinea[]    @relation("AsignacionRegistradaPor")
+
+  // Averías
+  averiasReportadas ReporteAveria[] @relation("AveriaReportadaPor")
+  averiasAnuladas   ReporteAveria[] @relation("AveriaAnuladaPor")
 
   @@map("usuario")
 }
@@ -104,8 +108,8 @@ model Rol {
   descripcion String?
   activo      Boolean @default(true)
 
-  usuarios  Usuario[]
-  permisos  RolPermiso[]
+  usuarios Usuario[]
+  permisos RolPermiso[]
 
   @@map("rol")
 }
@@ -113,7 +117,7 @@ model Rol {
 model Permiso {
   id          String  @id @default(uuid())
   codigo      String  @unique // remision.crear, remision.aprobar, catalogo.editar
-  modulo      String            // remision, catalogo, mfr, admin
+  modulo      String // remision, catalogo, mfr, admin
   descripcion String?
 
   roles RolPermiso[]
@@ -157,12 +161,13 @@ model Grupo {
   codigo            String  @unique
   descripcion       String?
   personasEsperadas Int?    @map("personas_esperadas")
-  nombre String
-  activo Boolean @default(true)
+  nombre            String
+  activo            Boolean @default(true)
 
   remisiones   Remision[]
   asistencias  AsistenciaTurno[]
   asignaciones AsignacionLinea[]
+  averias      ReporteAveria[]
 
   @@map("grupo")
 }
@@ -172,23 +177,23 @@ model Grupo {
 /// El estándar por hora es atributo del SKU; las horas del turno NO
 /// (ver decisión 2.2 del plan de desarrollo).
 model Producto {
-  id          String          @id @default(uuid())
-  codigo      String          @unique // código de ítem, ej. 300058141
+  id          String           @id @default(uuid())
+  codigo      String           @unique // código de ítem, ej. 300058141
   descripcion String
   proceso     ProcesoProducto?
 
-  unidadesPorCaja  Int? @map("unidades_por_caja")
-  cajasPorEstiba   Int? @map("cajas_por_estiba")
+  unidadesPorCaja Int?    @map("unidades_por_caja")
+  cajasPorEstiba  Int?    @map("cajas_por_estiba")
   /// LINEA IDEAL de la hoja TIEMPOS: personas necesarias en la línea para ese SKU.
-  personasIdeal    Int? @map("personas_ideal")
+  personasIdeal   Int?    @map("personas_ideal")
   /// SUBDESCRIPCION: familia (SURTIDO, OFERTA, REEMPAQUE, MULTIPACK…). Agrupa el "Flavor Breakdown".
-  subdescripcion   String?
+  subdescripcion  String?
 
   // Estándar de producción, con los nombres del DPP de PepsiCo:
   //   cajasPorHora ritmo al 100 % (hoja TIEMPOS); por defecto para bloques a mano
   //   pesoNetoKg kilos netos de una caja (para Target/Instant Kilograms)
   cajasPorHora Decimal? @map("cajas_por_hora") @db.Decimal(8, 2)
-  pesoNetoKg Decimal? @map("peso_neto_kg") @db.Decimal(8, 3)
+  pesoNetoKg   Decimal? @map("peso_neto_kg") @db.Decimal(8, 3)
 
   activo Boolean @default(true)
 
@@ -197,6 +202,7 @@ model Producto {
 
   remisiones Remision[]
   bloques    BloqueProgramacion[]
+  averias    RegistroAveria[]
 
   @@index([activo])
   @@map("producto")
@@ -208,11 +214,12 @@ model Turno {
   nombre String
   activo Boolean @default(true)
 
-  horarios    TurnoHorario[]
-  remisiones  Remision[]
+  horarios     TurnoHorario[]
+  remisiones   Remision[]
   bloques      BloqueProgramacion[]
   asistencias  AsistenciaTurno[]
   asignaciones AsignacionLinea[]
+  averias      ReporteAveria[]
 
   @@map("turno")
 }
@@ -221,13 +228,13 @@ model Turno {
 /// Decisión del 2026-09-18: se usan los del DPP de PepsiCo todos los días:
 ///   T1 06:00-13:30 · T2 14:00-21:30 · T3 22:00-05:30
 model TurnoHorario {
-  id      String    @id @default(uuid())
-  turnoId String    @map("turno_id")
-  turno   Turno     @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  id        String    @id @default(uuid())
+  turnoId   String    @map("turno_id")
+  turno     Turno     @relation(fields: [turnoId], references: [id], onDelete: Cascade)
   diaSemana DiaSemana @map("dia_semana")
 
   horaInicio String @map("hora_inicio") // "HH:mm"
-  horaFin    String @map("hora_fin")    // "HH:mm"
+  horaFin    String @map("hora_fin") // "HH:mm"
 
   /// true cuando horaFin < horaInicio (T3)
   cruzaMedianoche Boolean @default(false) @map("cruza_medianoche")
@@ -251,10 +258,10 @@ model TurnoHorario {
 /// Un rechazo se corrige mediante rectificación (nueva versión),
 /// conservando el mismo consecutivo.
 model Remision {
-  id     String @id @default(uuid())
-  anio   Int
-  numero Int
-  version Int   @default(1)
+  id      String @id @default(uuid())
+  anio    Int
+  numero  Int
+  version Int    @default(1)
 
   // --- Temporalidad ---
   /// Día productivo al que pertenece. Corte 6:00 a 6:00.
@@ -308,8 +315,8 @@ model Remision {
   creadaPorId String  @map("creada_por_id")
   creadaPor   Usuario @relation("RemisionCreadaPor", fields: [creadaPorId], references: [id])
 
-  entregadaPorId String?  @map("entregada_por_id")
-  entregadaPor   Usuario? @relation("RemisionEntregadaPor", fields: [entregadaPorId], references: [id])
+  entregadaPorId String?   @map("entregada_por_id")
+  entregadaPor   Usuario?  @relation("RemisionEntregadaPor", fields: [entregadaPorId], references: [id])
   fechaEntrega   DateTime? @map("fecha_entrega") @db.Timestamptz(3)
 
   /// El OPA es personal de PepsiCo: NO es usuario del sistema.
@@ -330,7 +337,7 @@ model Remision {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
-  estibas  RemisionEstiba[]
+  estibas   RemisionEstiba[]
   versiones RemisionVersion[]
 
   @@unique([anio, numero])
@@ -388,7 +395,7 @@ model RemisionVersion {
 model Auditoria {
   id String @id @default(uuid())
 
-  entidad   String          // "remision", "producto", "turno_horario"
+  entidad   String // "remision", "producto", "turno_horario"
   entidadId String          @map("entidad_id")
   accion    AccionAuditoria
 
@@ -401,8 +408,8 @@ model Auditoria {
   usuarioId String  @map("usuario_id")
   usuario   Usuario @relation(fields: [usuarioId], references: [id])
 
-  ip        String?
-  creadoEn  DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  ip       String?
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
 
   @@index([entidad, entidadId])
   @@index([usuarioId, creadoEn])
@@ -532,4 +539,110 @@ model AsignacionLinea {
   @@unique([fechaOperativa, turnoId, lineaId, grupoId])
   @@index([fechaOperativa])
   @@map("asignacion_linea")
+}
+
+// ============================================================
+// AVERÍAS
+// ============================================================
+
+/// Causal de avería: lista generalizada del formulario del área
+/// (2026-09-28). Administrable desde el panel; no se elimina, se
+/// desactiva. `orden` es la posición en la lista desplegable.
+model CausalAveria {
+  id     String  @id @default(uuid())
+  codigo String  @unique
+  nombre String
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  registros RegistroAveria[]
+
+  @@map("causal_averia")
+}
+
+enum EstadoReporteAveria {
+  REGISTRADO
+  ANULADO
+}
+
+enum UnidadMedidaAveria {
+  UNIDAD
+  DOCENA
+  SIX
+  BOLSA
+}
+
+enum TipoEvidenciaAveria {
+  UNIDAD
+  LOTE_FECHA
+  CONJUNTO
+}
+
+/// Encabezado del reporte de averías. Fecha, hora y turno los pone el
+/// servidor; quién reporta sale del token. No se elimina: se anula con
+/// motivo (solo el administrador).
+model ReporteAveria {
+  id String @id @default(uuid())
+
+  fechaHoraRegistro DateTime @map("fecha_hora_registro") @db.Timestamptz(3)
+  fechaOperativa    DateTime @map("fecha_operativa") @db.Date
+  turnoId           String   @map("turno_id")
+  turno             Turno    @relation(fields: [turnoId], references: [id])
+  grupoId           String   @map("grupo_id")
+  grupo             Grupo    @relation(fields: [grupoId], references: [id])
+
+  reportadoPorId     String  @map("reportado_por_id")
+  reportadoPor       Usuario @relation("AveriaReportadaPor", fields: [reportadoPorId], references: [id])
+  /// Copia del nombre al reportar.
+  reportadoPorNombre String  @map("reportado_por_nombre")
+
+  estado          EstadoReporteAveria @default(REGISTRADO)
+  motivoAnulacion String?             @map("motivo_anulacion")
+  anuladoPorId    String?             @map("anulado_por_id")
+  anuladoPor      Usuario?            @relation("AveriaAnuladaPor", fields: [anuladoPorId], references: [id])
+  fechaAnulacion  DateTime?           @map("fecha_anulacion") @db.Timestamptz(3)
+
+  registros RegistroAveria[]
+
+  @@index([fechaOperativa])
+  @@map("reporte_averia")
+}
+
+/// Una fila de "Agregar avería". Solo PT por ahora; PI e insumos llegan
+/// con Inventario. Guarda copia congelada del producto. Sin línea (área,
+/// 2026-09-28: las cajas averiadas a veces llegan sin saber de dónde vienen).
+model RegistroAveria {
+  id        String        @id @default(uuid())
+  reporteId String        @map("reporte_id")
+  reporte   ReporteAveria @relation(fields: [reporteId], references: [id])
+  orden     Int
+
+  productoId          String   @map("producto_id")
+  producto            Producto @relation(fields: [productoId], references: [id])
+  productoCodigo      String   @map("producto_codigo")
+  productoDescripcion String   @map("producto_descripcion")
+
+  fechaVencimiento DateTime           @map("fecha_vencimiento") @db.Date
+  lote             String
+  causalId         String             @map("causal_id")
+  causal           CausalAveria       @relation(fields: [causalId], references: [id])
+  cantidad         Int
+  unidadMedida     UnidadMedidaAveria @map("unidad_medida")
+
+  evidencias EvidenciaAveria[]
+
+  @@index([reporteId])
+  @@map("registro_averia")
+}
+
+/// Foto de evidencia: la imagen vive en el almacén; aquí solo la ruta.
+model EvidenciaAveria {
+  id         String              @id @default(uuid())
+  registroId String              @map("registro_id")
+  registro   RegistroAveria      @relation(fields: [registroId], references: [id])
+  tipo       TipoEvidenciaAveria
+  ruta       String
+
+  @@unique([registroId, tipo])
+  @@map("evidencia_averia")
 }

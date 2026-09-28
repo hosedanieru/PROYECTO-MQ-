@@ -19,6 +19,7 @@ import bcrypt from 'bcrypt';
 import { COLECCION } from './cliente-firestore.js';
 import { FirestoreService } from './firestore.service.js';
 import {
+  CAUSALES_AVERIA,
   cruzaMedianoche,
   LINEAS_PRODUCCION,
   LUGARES,
@@ -134,6 +135,12 @@ async function main(): Promise<void> {
   }
   console.log(`  grupos: ${GRUPOS.length}`);
   await sembrarLineas();
+  // Causales de avería: solo se asegura que existan (las mantiene el administrador).
+  for (const causal of CAUSALES_AVERIA) {
+    const ref = db.collection(COLECCION.causalesAveria).doc(causal.codigo);
+    if (!(await ref.get()).exists) await ref.set({ ...causal, activo: true });
+  }
+  console.log(`  causalesAveria: ${CAUSALES_AVERIA.length}`);
   await sembrarAdministradorInicial();
   console.log('\nListo. El catálogo de productos se carga desde el panel.');
 }

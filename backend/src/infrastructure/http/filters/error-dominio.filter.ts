@@ -41,6 +41,15 @@ import {
   TurnoCerradoError,
 } from '../../../domain/mfr/mfr.errors.js';
 import {
+  CausalNoEncontradaError,
+  CodigoCausalDuplicadoError,
+  DatosAveriaInvalidosError,
+  DatosCausalInvalidosError,
+  ReporteAveriaNoEncontradoError,
+  ReporteAveriaNoModificableError,
+  SinTurnoParaLaHoraError,
+} from '../../../domain/averia/averia.errors.js';
+import {
   CodigoGrupoDuplicadoError,
   DatosGrupoInvalidosError,
   GrupoNoEncontradoError,
@@ -127,6 +136,16 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   [BloqueNoEncontradoError, HttpStatus.NOT_FOUND],
   [AsignacionNoEncontradaError, HttpStatus.NOT_FOUND],
   [LineaNoEncontradaError, HttpStatus.NOT_FOUND],
+
+  // --- Averías ---
+  [DatosCausalInvalidosError, HttpStatus.BAD_REQUEST],
+  [DatosAveriaInvalidosError, HttpStatus.BAD_REQUEST],
+  [CodigoCausalDuplicadoError, HttpStatus.CONFLICT],
+  [ReporteAveriaNoModificableError, HttpStatus.CONFLICT],
+  // Configuración de turnos incompleta: no es un error del cliente.
+  [SinTurnoParaLaHoraError, HttpStatus.CONFLICT],
+  [CausalNoEncontradaError, HttpStatus.NOT_FOUND],
+  [ReporteAveriaNoEncontradoError, HttpStatus.NOT_FOUND],
 ];
 
 @Catch(ErrorDominio)

@@ -23,6 +23,8 @@ export const es = {
   'nav.lineas': 'Líneas',
   'nav.pesos': 'Pesos por caja',
   'nav.grupos': 'Grupos',
+  'nav.averias': 'Averías',
+  'nav.causales': 'Causales de avería',
   'nav.usuarios': 'Usuarios',
   'nav.abrirMenu': 'Abrir menú',
   'nav.cerrarMenu': 'Cerrar menú',

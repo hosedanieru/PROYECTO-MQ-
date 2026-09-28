@@ -15,13 +15,14 @@
  */
 
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { crearAdaptadorPostgres } from '../src/infrastructure/database/prisma/adaptador-postgres.js';
 // Los datos base (permisos, roles, turnos, lugar, grupos) viven en un
 // archivo neutral compartido con el seed de Firestore.
 import {
+  CAUSALES_AVERIA,
   cruzaMedianoche,
   LINEAS_PRODUCCION,
   LUGARES,
@@ -32,11 +33,8 @@ import {
   VIGENTE_DESDE,
 } from '../src/infrastructure/datos-base.js';
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({ adapter });
+// Sesión en UTC, igual que la aplicación (ver adaptador-postgres.ts).
+const prisma = new PrismaClient({ adapter: crearAdaptadorPostgres() });
 
 // ============================================================
 // EJECUCIÓN
@@ -155,6 +153,19 @@ async function sembrarLineas(): Promise<void> {
   console.log(`  Líneas de producción: ${LINEAS_PRODUCCION.length}`);
 }
 
+async function sembrarCausalesAveria(): Promise<void> {
+  for (const causal of CAUSALES_AVERIA) {
+    // Solo se asegura que exista: nombre, orden y estado los mantiene el
+    // administrador desde el panel y el seed no los pisa.
+    await prisma.causalAveria.upsert({
+      where: { codigo: causal.codigo },
+      update: {},
+      create: causal,
+    });
+  }
+  console.log(`  Causales de avería: ${CAUSALES_AVERIA.length}`);
+}
+
 /**
  * Administrador inicial. Sin él nadie podría entrar al sistema para crear
  * a los demás usuarios.
@@ -209,6 +220,7 @@ async function main(): Promise<void> {
   await sembrarLugares();
   await sembrarGrupos();
   await sembrarLineas();
+  await sembrarCausalesAveria();
   await sembrarAdministradorInicial();
 
   console.log('\nListo. El catálogo de productos se carga aparte.');

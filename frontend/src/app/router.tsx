@@ -11,6 +11,10 @@
  *   /admin/usuarios          administración
  *   /admin/productos         administración
  *   /admin/pesos             pesos por caja en lote (estándar del MFR)
+ *   /admin/causales          causales de avería (lista del formulario)
+ *   /averias                 listado de reportes de averías
+ *   /averias/nuevo           formulario (va ANTES de /:id)
+ *   /averias/:id             detalle con fotos; corregir / anular (administrador)
  *
  * `RutaProtegida` envuelve al layout: si no hay sesión, ninguna ruta
  * hija se renderiza. La autorización fina (permisos) la hace el
@@ -19,7 +23,11 @@
 
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 
+import { CausalesPage } from '../modules/admin/pages/CausalesPage'
 import { GruposPage } from '../modules/admin/pages/GruposPage'
+import { AveriasListaPage } from '../modules/averias/pages/AveriasListaPage'
+import { NuevoReporteAveriaPage } from '../modules/averias/pages/NuevoReporteAveriaPage'
+import { ReporteAveriaDetallePage } from '../modules/averias/pages/ReporteAveriaDetallePage'
 import { LineasPage } from '../modules/admin/pages/LineasPage'
 import { PesosPage } from '../modules/admin/pages/PesosPage'
 import { ProductosPage } from '../modules/admin/pages/ProductosPage'
@@ -52,11 +60,15 @@ export const router = createBrowserRouter([
           { path: 'mfr/programacion', element: <ProgramacionPage /> },
           // Ruta anterior de "configurar turno": ahora vive en la programación del día.
           { path: 'mfr/turno', element: <Navigate to="/mfr/programacion" replace /> },
+          { path: 'averias', element: <AveriasListaPage /> },
+          { path: 'averias/nuevo', element: <NuevoReporteAveriaPage /> },
+          { path: 'averias/:id', element: <ReporteAveriaDetallePage /> },
           { path: 'admin/usuarios', element: <UsuariosPage /> },
           { path: 'admin/productos', element: <ProductosPage /> },
           { path: 'admin/lineas', element: <LineasPage /> },
           { path: 'admin/grupos', element: <GruposPage /> },
           { path: 'admin/pesos', element: <PesosPage /> },
+          { path: 'admin/causales', element: <CausalesPage /> },
         ],
       },
     ],

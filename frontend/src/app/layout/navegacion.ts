@@ -17,11 +17,13 @@ import type { ComponentType, SVGProps } from 'react'
 
 import type { ClaveTexto } from '../../shared/idioma/textos/es'
 import {
+  IconoAveria,
   IconoBalanza,
   IconoCaja,
   IconoCalendario,
   IconoInicio,
   IconoLinea,
+  IconoLista,
   IconoPersonas,
   IconoRemision,
   IconoTablero,
@@ -54,6 +56,7 @@ export const NAVEGACION: SeccionNav[] = [
       { a: '/remisiones', texto: 'nav.remisiones', permiso: 'remision.consultar', Icono: IconoRemision },
       { a: '/mfr', texto: 'nav.mfr', permiso: 'mfr.consultar', Icono: IconoTablero, exacta: true },
       { a: '/mfr/programacion', texto: 'nav.programacion', permiso: 'mfr.consultar', Icono: IconoCalendario },
+      { a: '/averias', texto: 'nav.averias', permiso: 'averia.consultar', Icono: IconoAveria },
     ],
   },
   {
@@ -63,6 +66,7 @@ export const NAVEGACION: SeccionNav[] = [
       { a: '/admin/lineas', texto: 'nav.lineas', permiso: 'catalogo.editar', Icono: IconoLinea },
       { a: '/admin/pesos', texto: 'nav.pesos', permiso: 'catalogo.editar_estandares', Icono: IconoBalanza },
       { a: '/admin/grupos', texto: 'nav.grupos', permiso: 'catalogo.editar', Icono: IconoPersonas },
+      { a: '/admin/causales', texto: 'nav.causales', permiso: 'catalogo.editar', Icono: IconoLista },
       { a: '/admin/usuarios', texto: 'nav.usuarios', permiso: 'admin.usuarios', Icono: IconoUsuario },
     ],
   },

@@ -48,6 +48,7 @@ import {
   GrupoRepositorioFalso,
   LineaRepositorioFalso,
 } from './dobles-mfr.js';
+import { CausalRepositorioFalso, ReporteAveriaRepositorioFalso } from './dobles-averia.js';
 
 export class AuditoriaRepositorioFalso implements AuditoriaRepository {
   readonly entradas: EntradaAuditoria[] = [];
@@ -214,6 +215,8 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
       estandares: new EstandarRepositorioFalso(),
       asistencias: new AsistenciaRepositorioFalso(),
       asignaciones: new AsignacionRepositorioFalso(),
+      causales: new CausalRepositorioFalso(),
+      reportesAveria: new ReporteAveriaRepositorioFalso(),
       ...parcial,
     };
   }

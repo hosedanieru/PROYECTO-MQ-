@@ -23,9 +23,9 @@
  */
 
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 import { PrismaClient } from '../generated/prisma/client.js';
+import { crearAdaptadorPostgres } from './database/prisma/adaptador-postgres.js';
 import { claveFecha, COLECCION } from './firestore/cliente-firestore.js';
 import { FirestoreService } from './firestore/firestore.service.js';
 
@@ -33,7 +33,7 @@ const SIMULAR = process.argv.includes('--simular');
 /** Migrar solo catálogos, usuarios, productos, líneas, MFR y su auditoría: sin remisiones. */
 const SIN_REMISIONES = process.argv.includes('--sin-remisiones');
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const prisma = new PrismaClient({ adapter: crearAdaptadorPostgres() });
 const db = new FirestoreService().db;
 
 const informe: Record<string, { migrados: number; reutilizados: number; omitidos: string[] }> = {};

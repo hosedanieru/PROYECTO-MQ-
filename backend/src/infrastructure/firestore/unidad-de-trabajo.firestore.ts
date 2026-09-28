@@ -25,6 +25,8 @@ import { FirestoreService } from './firestore.service.js';
 import { AsignacionFirestoreRepository } from './repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from './repositorios/asistencia.firestore.repository.js';
 import { AuditoriaFirestoreRepository } from './repositorios/auditoria.firestore.repository.js';
+import { CausalAveriaFirestoreRepository } from './repositorios/causal-averia.firestore.repository.js';
+import { ReporteAveriaFirestoreRepository } from './repositorios/reporte-averia.firestore.repository.js';
 import { GrupoFirestoreRepository } from './repositorios/grupo.firestore.repository.js';
 import {
   BloqueFirestoreRepository,
@@ -65,6 +67,8 @@ export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
         estandares: new EstandarFirestoreRepository(cliente),
         asistencias: new AsistenciaFirestoreRepository(cliente),
         asignaciones: new AsignacionFirestoreRepository(cliente),
+        causales: new CausalAveriaFirestoreRepository(cliente),
+        reportesAveria: new ReporteAveriaFirestoreRepository(cliente),
       });
     });
   }

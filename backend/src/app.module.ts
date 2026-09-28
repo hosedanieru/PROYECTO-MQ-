@@ -3,6 +3,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { RegistroPeticionesMiddleware } from './infrastructure/http/registro-peticiones.middleware.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { AveriaModule } from './modules/averia/averia.module.js';
 import { CatalogoModule } from './modules/catalogo/catalogo.module.js';
 import { MfrModule } from './modules/mfr/mfr.module.js';
 import { RemisionModule } from './modules/remision/remision.module.js';
@@ -38,6 +39,7 @@ const modulosOpcionales = observeHabilitado
     CatalogoModule,
     RemisionModule,
     MfrModule,
+    AveriaModule,
     ...modulosOpcionales,
   ],
   controllers: [AppController],

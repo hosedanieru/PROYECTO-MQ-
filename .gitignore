@@ -15,5 +15,7 @@ coverage/
 
 # Reportes de importación (se generan al correr importar:tiempos)
 backend/informes/
+# Fotos de las averías (almacén en disco): son datos, no código
+backend/evidencias/
 # Scripts temporales del asistente
 backend/*.tmp.mjs

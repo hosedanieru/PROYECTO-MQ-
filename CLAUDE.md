@@ -24,7 +24,7 @@ REMISIONES
    └── Alertas por desviación (general y por SKU)
 ```
 
-No diseñar ni implementar esos módulos sin levantamiento previo. Remisiones está cerrado y MFR implementado (con la naturaleza de la línea pendiente de confirmar).
+No diseñar ni implementar esos módulos sin levantamiento previo. Remisiones está cerrado y MFR implementado. Averías está en levantamiento (ver sección 11).
 
 ### Perfil del usuario
 
@@ -341,8 +341,8 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ### Terminado
 
-- Base de datos: 18 tablas (`schema.prisma`), migraciones aplicadas
-- Seed idempotente: 16 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción
+- Base de datos: 22 tablas (`schema.prisma`), migraciones aplicadas
+- Seed idempotente: 19 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción, 12 causales de avería
 - Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
 - Regla `fecha_operativa` con pruebas de casos borde
 - 6 casos de uso: crear + las 5 transiciones
@@ -359,7 +359,16 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 - **Personal del turno** (2026-09-21): grupos (antes proveedores) con personas esperadas, asistencia por turno y grupo, asignación de grupos a líneas con la regla de no asignar más personas de las que llegaron
 - **DPP de N días** (área, 2026-09-22: PepsiCo también lo manda semanal, y podría mandarlo mensual): no hay camino "semanal"; el sistema carga **N días** y el diario es N = 1. El día de cada bloque sale de su propia fecha y hora con el corte de las 06:00 (`fechaOperativaDeHoraLocal`), no de la pantalla. Una transacción **por día** (límite de 500 escrituras en Firestore + un turno cerrado no debe frenar la semana); la respuesta dice qué pasó con cada día: CARGADO / OMITIDO / ERROR. Falta verificar con un PDF semanal real
 - **Carga de estándares en lote** (2026-09-22): `PUT /mfr/estandares` y pantalla `/admin/pesos` para confirmar de una pasada el peso neto por caja (sin él el tablero no muestra kilos). Una sola transacción con un motivo común; lo que no se envía no se toca. `EstandarRepository.actualizarVarios` es escritura pura por la regla de Firestore (lecturas antes que escrituras)
-- 189 pruebas unitarias sin base de datos (`npm test`) + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
+- **Rediseño visual del frontend** (2026-09-24): barra lateral + barra superior (`app/layout/navegacion.ts` define el menú), panel de inicio con KPIs, flujo de remisiones, líneas en vivo y avisos del día; tema claro/oscuro, textos en español/inglés, fuente Inter, animaciones con `animejs` y gráficas propias en SVG (sin librería de gráficas)
+- **Averías — fases 1 a 3 de 4** (2026-09-28), solo PT:
+  - Dominio `domain/averia/`: causales (catálogo en BD, 12 sembradas, sin valor por defecto); registro (3 fotos obligatorias UNIDAD / LOTE_FECHA / CONJUNTO, cantidad entera > 0, lote obligatorio, copia congelada del producto; **sin línea**: el área la descartó el 2026-09-28 porque las cajas averiadas a veces llegan sin saber de qué línea vienen, columna eliminada en `20260928190000_averia_sin_linea`); reporte (REGISTRADO → ANULADO con motivo, nunca se borra; máx. 30 registros, límite técnico); conversión Docena = 12, Six = 6, Bolsa `PENDIENTE DE DEFINIR` (se registra pero no suma); el total se calcula, no se guarda.
+  - Fecha, hora y **turno automáticos** (servidor: `registroActual` + `turnoDeHora(horaLocalDe(ahora))`); quien reporta sale del token (con copia del nombre); "Operador MQ" = grupo.
+  - Fotos: puerto `AlmacenDeEvidencias` (`ALMACEN_DE_EVIDENCIAS`), hoy `AlmacenEvidenciasDisco` en `EVIDENCIAS_DIR` (por defecto `backend/evidencias/`, fuera de git), independiente de `PERSISTENCIA`. Se guardan antes de la transacción y se borran si falla. El navegador las comprime (≤1600 px, JPEG). La respuesta nunca expone rutas; la foto se pide por reporte/registro/tipo.
+  - Permisos: `averia.reportar` (coordinador, patinador), `averia.consultar` (+ consulta), `averia.corregir` (solo administrador: corregir registro sin tocar fotos, anular con motivo).
+  - Tablas `causal_averia`, `reporte_averia`, `registro_averia`, `evidencia_averia`; Firestore `causalesAveria`, `reportesAveria` (registros embebidos).
+  - Pantallas: `/averias` (listado con filtros en la URL), `/averias/nuevo` (formulario para celular, cámara directa), `/averias/:id` (detalle con fotos, corregir/anular), `/admin/causales`.
+  - Falta la fase 4: % de averías contra lo programado en el DPP, por día y turno. Ver ROADMAP D1
+- 248 pruebas unitarias sin base de datos (`npm test`) + 8 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -367,17 +376,24 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ```text
 frontend/src/
-├── app/            providers (Query → Sesión → Router), router, layout, InicioPage (panel)
+├── app/            providers (Query → Sesión → Router), router, layout (BarraLateral, BarraSuperior, navegacion),
+│                   pages/InicioPage + inicio/ (AccesosRapidos, AvisosDia, FlujoRemisiones, LineasEnVivo, UltimasRemisiones)
 ├── modules/
 │   ├── auth/       api, SesionContext (provider), useSesion, RutaProtegida, LoginPage
 │   ├── remisiones/ api, hooks (useRemisiones, useAccionRemision), pages (lista, detalle, crear), AccionesRemision
 │   ├── catalogo/   api, hooks (useTurnos, useGrupos, useLugares, useRoles, useProductos)
 │   ├── mfr/        api, hooks (useMfr, useFechaOperativa), TableroMfrPage, ProgramacionPage,
 │   │               componentes (LineasTurno, PersonalTurno, SelectorFecha, SemaforoBadge)
-│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage
-├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando
+│   ├── averias/    api, hooks (useAverias, useUrlDeArchivo), pages (lista, nuevo, detalle),
+│   │               componentes (AgregarAveria, CampoFoto, FotoEvidencia, CorregirRegistro/AnularReporte Dialogo),
+│   │               utils (comprimir-foto, totales)
+│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage, CausalesPage
+├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando,
+│                   Badge, Tarjeta, TarjetaKpi, Dato, Desplegable, Iconos, Logo, BotonTema, BotonIdioma,
+│                   graficas/ (Anillo, Barras, BarraProgreso, Dona)
 ├── services/       http.ts (axios: token, 401 → cerrar sesión, ErrorApi), almacen-token.ts (localStorage)
-└── shared/         types (api, remision, catalogo), utils/fechas (fechaOperativaDe espejo del backend)
+└── shared/         types (api, remision, catalogo, mfr), utils/fechas (fechaOperativaDe espejo del backend),
+                    tema/ (claro/oscuro), idioma/ (textos es/en), animacion/ (animejs), refresco.ts
 ```
 
 Reglas del frontend: nada llama a axios fuera de `services/http.ts`; los permisos solo OCULTAN acciones (la autorización real es del backend); los filtros del listado viven en la URL; las mutaciones invalidan exactamente las claves de caché que tocan.
@@ -440,6 +456,14 @@ GET    /mfr/estandares                  mfr.consultar             incluye pesoSu
 PUT    /mfr/estandares                  catalogo.editar_estandares carga en lote { cambios[], motivo }, máx. 100
 PUT    /mfr/estandares/:productoId      catalogo.editar_estandares { cajasPorHora, pesoNetoKg, motivo }
 
+GET    /api/averias/causales        catalogo.consultar       (POST/PATCH con catalogo.editar; no se eliminan)
+GET    /api/averias?desde=&hasta=&turnoId=&grupoId=&estado=   averia.consultar  (rango máx. 93 días)
+GET    /api/averias/:id             averia.consultar
+GET    /api/averias/:id/registros/:registroId/fotos/:tipo    averia.consultar  (la imagen)
+POST   /api/averias                 averia.reportar          multipart: `datos` (JSON) + `foto_{fila}_{TIPO}`
+PATCH  /api/averias/:id/registros/:registroId               averia.corregir   (no cambia fotos)
+POST   /api/averias/:id/anular      averia.corregir          { motivo }
+
 GET    /api                             público                   comprobación de vida (healthcheck de Docker)
 ```
 
@@ -472,6 +496,8 @@ Los DTOs ya no reciben `*PorId` del cliente. El usuario sale del token y cada en
 
 ### Pendientes técnicos
 
+- **Instantes guardados corridos +5 h en PostgreSQL** (hallado el 2026-09-28, sin corregir, espera decisión). La sesión de la base usa `America/Bogota` y Prisma (`@prisma/adapter-pg`) escribe la hora UTC sin zona: un registro de las 12:46 de Bogotá queda en la base como `17:46-05` (o sea, 22:46 UTC). Al leer, Prisma deshace el error, así que **la aplicación muestra bien las horas**. Pero la base guarda mal el instante: cualquier consulta SQL directa, reporte externo, pgAdmin o la futura conciliación con el WMS verá 5 horas de más, y si la base corre en UTC (p. ej. Postgres en Docker) todas las horas históricas se corren en la aplicación. Afecta a todas las columnas `Timestamptz` (remisiones, auditoría, MFR, averías). Arreglo probable: fijar la sesión en UTC y corregir los datos existentes con una migración.
+
 - Un JWT no se puede revocar antes de expirar (12 h). Si el área lo exige, habría que agregar refresh token o lista de revocación.
 - `infrastructure/docker-compose.yml` se escribió sin poder ejecutarlo (Docker sin plugin Compose en el equipo de desarrollo). Validar con `docker compose config` antes del primer despliegue.
 - La imagen del backend instala también las dependencias de desarrollo (la CLI de Prisma y `tsx` corren en el arranque para migrar y sembrar). Se puede adelgazar después.
@@ -500,13 +526,13 @@ No implementar nada que dependa de estos puntos sin confirmarlos.
 | 6 | ¿`LINEA` y `AUTOMATICA` son el mismo proceso con dos nombres? | Catálogo |
 | 7 | ¿Qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen? (2026-09-19: el catálogo se completó a mano en el panel; `npm run importar:tiempos` simula y reporta diferencias sin resolverlas) | Catálogo |
 | 8 | ¿Qué es el "cuaderno virtual"? | Módulo posterior |
-| 9 | ~~¿El módulo de inventario lleva inventario propio o concilia contra el WMS?~~ **Respondido 2026-09-22: las dos cosas, sobre objetos distintos.** Inventario propio de **insumos**; el PT se concilia contra el WMS. La receta (lista de materiales por SKU) es la pieza que los une. Último bloque del orden | — |
+| 9 | ~~¿El módulo de inventario lleva inventario propio o concilia contra el WMS?~~ **Respondido 2026-09-22: las dos cosas, sobre objetos distintos.** Inventario propio de **insumos**; el PT se concilia contra el WMS. La receta (lista de materiales por SKU) es la pieza que los une. Va después de Averías (usuario, 2026-09-28) | — |
 | 10 | ¿El WMS registra el número de remisión de origen? | Inventario |
 | 11 | ~~¿Quién registra la respuesta del OPA?~~ **Respondido 2026-09-16: solo el coordinador.** Aplicado en el seed. | — |
 | 12 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) | Validación |
 | 13 | Turnos: se adoptaron los del DPP (06:00/14:00/22:00, 7,5 h) todos los días. ¿Algún día opera distinto? | Turnos |
 | 18 | Peso neto por caja de los productos del DPP (el sistema lo sugiere desde la descripción; lo confirma el administrador) | Kilos en el MFR |
-| 14 | ¿Qué significan PT y PI? (PT = Producto Terminado, presumible; PI sin confirmar) | Terminología |
+| 14 | ~~¿Qué significan PT y PI?~~ **Respondido 2026-09-28: PT = Producto Terminado; PI = Producto Intermedio** (con lo que se realizan los PT) | — |
 | 15 | Acceso a SAP para sincronizar el catálogo | Ninguna (catálogo local funciona) |
 | 16 | Política de contraseñas: ¿complejidad, rotación, bloqueo por intentos? (hoy solo mínimo 8) | Ninguna |
 | 17 | ¿Deben auditarse los inicios de sesión (exitosos y fallidos)? | Ninguna |
@@ -560,11 +586,14 @@ El Excel `REMISIONES_AUTOMATIZADO_2026.xlsx` tiene problemas que deben tratarse 
 
 ## 11. Próximos pasos
 
-Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP (Parte G):
+Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP (Parte G, Bloque 4):
+
+**Decisión del usuario (2026-09-28): Averías va primero, Inventario después** (reemplaza la del 2026-09-24, que ponía Inventario antes). Riesgo aceptado: el consumo real de insumos que no se capture mientras tanto no se puede reconstruir. Orden: 9. Averías → 10. Inventario → 11. Calidad → …
 
 | Camino | Qué resuelve | Cuándo conviene |
 |---|---|---|
-| **Levantamiento de Averías** | Es el siguiente módulo en prioridad según el área | Ya; no depende de código, sino de las 13 preguntas de levantamiento (Parte D del ROADMAP) |
+| **Levantamiento de Averías (D1)** | % de averías por día / turno / grupo | Ya; en levantamiento (preguntas en la Parte D1 del ROADMAP) |
+| **Levantamiento de Inventario (D3)** | Insumos (inventario propio) + conciliación de PT contra el WMS; la receta por SKU (D9) los une | Después de Averías. Fases propuestas: insumos (catálogo + movimientos) → existencias/conteo → recetas → conciliación PT vs WMS |
 | **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y `personasEsperadas` de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
 | **Migración del histórico 2026 (B6)** | ~2.195 registros del Excel | Requiere la decisión del área: migrar, descartar, o migrar marcado `HISTORICO_EXCEL` |
 | **Importación del catálogo desde el Excel** | Hoy el catálogo se carga a mano; `npm run importar:tiempos` simula y reporta diferencias | Bloqueado por qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen |

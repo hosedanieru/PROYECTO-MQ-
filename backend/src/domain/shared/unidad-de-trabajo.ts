@@ -22,6 +22,8 @@
  */
 
 import type { AuditoriaRepository } from '../auditoria/auditoria.repository.js';
+import type { CausalAveriaRepository } from '../averia/causal-averia.js';
+import type { ReporteAveriaRepository } from '../averia/reporte-averia.js';
 import type { GrupoRepository } from '../grupo/grupo.repository.js';
 import type { AsignacionRepository } from '../mfr/asignacion-linea.js';
 import type { AsistenciaRepository } from '../mfr/asistencia-turno.js';
@@ -51,6 +53,9 @@ export interface ContextoTransaccional {
   estandares: EstandarRepository;
   asistencias: AsistenciaRepository;
   asignaciones: AsignacionRepository;
+  // Averías
+  causales: CausalAveriaRepository;
+  reportesAveria: ReporteAveriaRepository;
 }
 
 export interface UnidadDeTrabajo {

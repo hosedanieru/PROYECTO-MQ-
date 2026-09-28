@@ -28,6 +28,8 @@ import { ClienteFirestore, COLECCION } from '../src/infrastructure/firestore/cli
 import { FirestoreService } from '../src/infrastructure/firestore/firestore.service.js';
 import { AsignacionFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asistencia.firestore.repository.js';
+import { CausalAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/causal-averia.firestore.repository.js';
+import { ReporteAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/reporte-averia.firestore.repository.js';
 import { AuditoriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/auditoria.firestore.repository.js';
 import { GrupoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/grupo.firestore.repository.js';
 import {
@@ -145,6 +147,8 @@ describe('atomicidad', () => {
           lineas: new LineaFirestoreRepository(c), estandares: new EstandarFirestoreRepository(c),
           asistencias: new AsistenciaFirestoreRepository(c),
           asignaciones: new AsignacionFirestoreRepository(c),
+          causales: new CausalAveriaFirestoreRepository(c),
+          reportesAveria: new ReporteAveriaFirestoreRepository(c),
         });
       }),
   };

@@ -20,6 +20,8 @@ import type {
 import { PrismaService } from '../../database/prisma/prisma.service.js';
 import { AsignacionPrismaRepository } from './asignacion.prisma.repository.js';
 import { AuditoriaPrismaRepository } from './auditoria.prisma.repository.js';
+import { CausalAveriaPrismaRepository } from './causal-averia.prisma.repository.js';
+import { ReporteAveriaPrismaRepository } from './reporte-averia.prisma.repository.js';
 import { AsistenciaPrismaRepository } from './asistencia.prisma.repository.js';
 import { GrupoPrismaRepository } from './grupo.prisma.repository.js';
 import {
@@ -59,6 +61,8 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
           estandares: new EstandarPrismaRepository(tx),
           asistencias: new AsistenciaPrismaRepository(tx),
           asignaciones: new AsignacionPrismaRepository(tx),
+          causales: new CausalAveriaPrismaRepository(tx),
+          reportesAveria: new ReporteAveriaPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

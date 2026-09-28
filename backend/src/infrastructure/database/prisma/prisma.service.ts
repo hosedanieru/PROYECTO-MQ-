@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../../generated/prisma/client.js';
+import { crearAdaptadorPostgres } from './adaptador-postgres.js';
 
 @Injectable()
 export class PrismaService
@@ -8,11 +8,8 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    super({
-      adapter: new PrismaPg({
-        connectionString: process.env.DATABASE_URL,
-      }),
-    });
+    // Sesión en UTC: ver adaptador-postgres.ts.
+    super({ adapter: crearAdaptadorPostgres() });
   }
 
   async onModuleInit(): Promise<void> {

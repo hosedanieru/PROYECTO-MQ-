@@ -40,6 +40,11 @@ export const PERMISOS = [
   { codigo: 'mfr.consultar', modulo: 'mfr', descripcion: 'Ver la programación del día (DPP) e indicadores' },
   { codigo: 'mfr.cargar_programacion', modulo: 'mfr', descripcion: 'Cargar, importar, copiar y corregir los bloques del DPP' },
   { codigo: 'mfr.configurar_turno', modulo: 'mfr', descripcion: 'Cerrar el turno (congela sus bloques)' },
+
+  // Averías
+  { codigo: 'averia.reportar', modulo: 'averia', descripcion: 'Enviar reportes de averías con sus fotos' },
+  { codigo: 'averia.consultar', modulo: 'averia', descripcion: 'Consultar reportes de averías y sus fotos' },
+  { codigo: 'averia.corregir', modulo: 'averia', descripcion: 'Corregir o anular un reporte de averías (administrador)' },
 ] as const;
 
 export type CodigoPermiso = (typeof PERMISOS)[number]['codigo'];
@@ -72,6 +77,8 @@ export const ROLES: ReadonlyArray<{
       'catalogo.editar',
       // MFR: el coordinador carga la programación y arma su turno.
       'mfr.consultar', 'mfr.cargar_programacion', 'mfr.configurar_turno',
+      // Averías (usuario, 2026-09-28): reporta; corregir y anular es del administrador.
+      'averia.reportar', 'averia.consultar',
     ],
   },
   {
@@ -79,13 +86,13 @@ export const ROLES: ReadonlyArray<{
     nombre: 'Patinador / Auxiliar logístico',
     descripcion: 'Entrega la remisión al OPA, firma como verificador e ingresa el PT al WMS de bodega.',
     // Decisión del área (2026-09-16): la respuesta del OPA la registra solo el coordinador.
-    permisos: ['remision.consultar', 'remision.entregar', 'catalogo.consultar'],
+    permisos: ['remision.consultar', 'remision.entregar', 'catalogo.consultar', 'averia.reportar', 'averia.consultar'],
   },
   {
     codigo: 'CONSULTA',
     nombre: 'Consulta',
     descripcion: 'Solo lectura. No modifica información.',
-    permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar', 'mfr.consultar'],
+    permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar', 'mfr.consultar', 'averia.consultar'],
   },
 ];
 
@@ -185,4 +192,28 @@ export const GRUPOS: ReadonlyArray<{ codigo: string; nombre: string; descripcion
   { codigo: 'MAXISERVICE', nombre: 'MAXISERVICE', descripcion: null, personasEsperadas: null },
   { codigo: 'APOYOS_MAXI', nombre: 'APOYOS MAXI', descripcion: null, personasEsperadas: null },
   { codigo: 'MIX', nombre: 'MIX', descripcion: null, personasEsperadas: null },
+];
+
+// ============================================================
+// CAUSALES DE AVERÍA
+// ============================================================
+
+/**
+ * Lista generalizada del formulario de averías del área (2026-09-28),
+ * con los nombres tal como aparecen allí. Se siembran una vez: después
+ * las mantiene el administrador desde el panel y el seed no las pisa.
+ */
+export const CAUSALES_AVERIA: ReadonlyArray<{ codigo: string; nombre: string; orden: number }> = [
+  { codigo: 'ESTALLADO', nombre: 'Estallado', orden: 1 },
+  { codigo: 'MAL_ESTADO_POSICION_CORTE', nombre: 'Mal estado - Posición y corte', orden: 2 },
+  { codigo: 'MAL_ESTADO_SELLO_DEBIL', nombre: 'Mal estado - Sello débil', orden: 3 },
+  { codigo: 'BAJO_DE_AIRE', nombre: 'Bajo de aire', orden: 4 },
+  { codigo: 'BAJO_PESO', nombre: 'Bajo Peso', orden: 5 },
+  { codigo: 'SOBREPESO', nombre: 'Sobrepeso', orden: 6 },
+  { codigo: 'NO_CONFORME_SIN_FECHA', nombre: 'No conforme - Sin fecha', orden: 7 },
+  { codigo: 'NO_CONFORME_HALLAZGO_EMPAQUE', nombre: 'No conforme - hallazgo empaque', orden: 8 },
+  { codigo: 'BOLSA_ROTA', nombre: 'Bolsa - rota', orden: 9 },
+  { codigo: 'BOLSA_MAL_CODIFICADA', nombre: 'Bolsa - mal codificada', orden: 10 },
+  { codigo: 'BOLSA_MAL_SELLADA_QUEMADA', nombre: 'Bolsa - mal sellada / Quemada', orden: 11 },
+  { codigo: 'BOLSA_INSUMO_DEFECTUOSO', nombre: 'Bolsa - insumo y materiales o defectuosos', orden: 12 },
 ];

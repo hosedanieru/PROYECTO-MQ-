@@ -472,7 +472,44 @@ La pregunta 13 es la más importante: todo cuelga de Remisiones.
 
 ## D1 · Averías
 
-**Estado:** SIN LEVANTAR
+**Estado:** IMPLEMENTADO fases 1–3 (2026-09-28): catálogo de causales, reporte con fotos, pantallas. **Falta la fase 4:** % de averías contra lo programado en el DPP, por día y turno. Decisiones aplicadas por defecto (confirmar con el área): "Operador MQ" = grupo, turno automático por la hora, reportan coordinador y patinador, solo el administrador corrige y anula.
+
+### Formulario actual (entregado por el usuario, 2026-09-28)
+
+"Inlotrans | Reporte de averías MQ". Un **reporte** (encabezado) con varios **registros** de avería:
+
+| Parte | Campo | Observación |
+|---|---|---|
+| Encabezado | Fecha y hora de reporte | — |
+| Encabezado | Turno | — |
+| Encabezado | Operador MQ | Lista. PENDIENTE: ¿es el **grupo** (LOGICMARD, MAXISERVICE…)? |
+| Encabezado | Funcionario que reporta (cédula) | En el sistema sale del usuario del token |
+| Registro | EAN 13 → **código SAP** | Cambio del usuario: el EAN ya no se usa; el código SAP es el mismo de las remisiones |
+| Registro | Descripción | Se autocompleta desde el código |
+| Registro | Fecha de vencimiento, # lote | Lote en texto libre, ej. `L127 23:33 DD AM` |
+| Registro | Causal de avería | Lista generalizada (ej. "Estallado"). Cambio del usuario: **catálogo en base de datos**, no fijo en el código |
+| Registro | Procedencia (MQ Santo Domingo / 3PD Santo Domingo) → **línea que la causó o la encontró** | Cambio del usuario |
+| Registro | Cantidad + unidad (Unidad, Docena, Six, Bag/Bolsa) | El total del reporte se da en **unidades** |
+| Registro | 3 fotos obligatorias: unidad, lote y fecha, conjunto | — |
+
+Productos y materias primas deben venir de catálogos en base de datos (usuario). Las materias primas llegan con Inventario.
+
+### Respuestas del usuario (2026-09-28)
+
+- **Qué se averia:** tanto **PT** (código SAP, el mismo catálogo de remisiones) como **insumos** (con lo que se fabrica el PT). Por eso Averías está muy ligado a Inventario
+- **Causales** (lista actual, 12): Estallado · Mal estado - Posición y corte · Mal estado - Sello débil · Bajo de aire · Bajo Peso · Sobrepeso · No conforme - Sin fecha · No conforme - hallazgo empaque · Bolsa - rota · Bolsa - mal codificada · Bolsa - mal sellada / Quemada · Bolsa - insumo y materiales o defectuosos. Van en catálogo de base de datos
+- **% de averías:** contra lo **programado del día** (DPP); también por turno. Mide el porcentaje de afectación
+- ~~**Línea:** "la causó o la encontró" es especulativo; es un dato informativo~~ **Quitada (área, 2026-09-28):** no es viable por ahora, porque las cajas con averías a veces llegan sin que se sepa de qué línea vienen. Sería útil para rastrear el origen; si se retoma, entra como campo opcional
+- **Fecha y hora:** siempre automáticas. Cuentan para la fecha operativa (corte 06:00 a 06:00)
+- **Flujo:** es un reporte, sin aprobación. Se envía con sus fotos para trazabilidad (evitar pérdidas y desbalances). El **administrador** puede modificarlo si quedó mal
+- **MFR:** las averías **no** justifican el faltante del MFR; la meta de producción se debe cumplir igual
+
+- **Alcance inicial (2026-09-28): solo PT.** Cuando Averías esté verificado y funcionando se empieza Inventario, y ahí se agregan las averías de **PI** (producto intermedio) e insumos
+- **Fotos (2026-09-28):** por ahora, lo simple. Se guardan en una carpeta del servidor (disco local) detrás del puerto `AlmacenDeEvidencias`; la base solo guarda la ruta. Funciona igual con PostgreSQL y con Firestore. El almacenamiento de producción (Firebase Storage u otro) se decide después, con lo que se planee con el jefe
+
+### Hallazgo en los datos
+
+En el formulario actual, **"Estallado" aparece antes de "Seleccione una causal"** y viene preseleccionado. Quien no cambia la lista registra "Estallado" sin haberlo elegido. Es probable que el histórico tenga "Estallado" sobrerrepresentado. En el sistema nuevo la causal no tiene valor por defecto
 
 Lo único que se sabe: se quiere el **% de averías por día y por turno, segmentado por proveedor** (en el vocabulario actual del sistema, probablemente por **grupo**; hay que confirmarlo).
 
@@ -491,7 +528,7 @@ Preguntas mínimas:
 Lo que se sabe: se quiere **% de muestreo, controles de calidad, PI, PT, insumos, rotulado**, y controles basados en **muestreos estadísticos**.
 
 Preguntas mínimas:
-- ¿Qué significan exactamente **PI** y **PT**? (PT = Producto Terminado es presumible; PI sin confirmar)
+- ~~¿Qué significan exactamente **PI** y **PT**?~~ **Respondido 2026-09-28: PT = Producto Terminado; PI = Producto Intermedio** (con lo que se realizan los PT)
 - ¿Qué método de muestreo estadístico se usa? ¿Hay una norma o tabla de referencia?
 - ¿Cuáles son los criterios de aceptación?
 - ¿Qué tipos de defecto existen?
@@ -504,7 +541,7 @@ La última pregunta es clave: si calidad debe aprobar antes de que el patinador 
 
 ## D3 · Inventario
 
-**Estado:** EN LEVANTAMIENTO · **Siguiente módulo** (usuario, 2026-09-24; antes estaba de último)
+**Estado:** EN LEVANTAMIENTO (parcial) · **Después de Averías** (usuario, 2026-09-28; del 24 al 28 estuvo como siguiente)
 
 ### Alcance aclarado por el usuario (2026-09-22)
 
@@ -765,7 +802,7 @@ Y actualizar `CLAUDE.md` cada vez que el área responda una de las preguntas pen
 
 | # | Pregunta |
 |---|---|
-| 15 | ¿Qué significan PT y PI exactamente? |
+| 15 | ~~¿Qué significan PT y PI exactamente?~~ **PT = Producto Terminado; PI = Producto Intermedio** (2026-09-28) |
 | 16 | ~~¿Qué es `PC` en la hoja TIEMPOS?~~ **Se ignora por ahora** (2026-09-19) |
 | 17 | Turnos: se adoptaron los del DPP (06:00/14:00/22:00) todos los días. ¿Algún día opera distinto? |
 | 18 | ¿El vencimiento puede ser anterior a la fecha operativa? (hoy se rechaza) |
@@ -814,11 +851,11 @@ En paralelo: levantamiento de Averías, que es el siguiente en importancia segú
 
 ## Bloque 4 — En adelante
 
-**Decisión del usuario (2026-09-24): Inventario pasa antes que Averías.** Motivo: el consumo real de insumos que no se captura hoy no se puede reconstruir, y el impacto de no medirlo es mayor. Esto reemplaza el "último bloque del orden" del 2026-09-22.
+**Decisión del usuario (2026-09-28): Averías vuelve a ir primero; Inventario queda de segundo.** Reemplaza la decisión del 2026-09-24 (Inventario antes que Averías). Queda vigente el riesgo que motivó aquella: el consumo real de insumos que no se captura mientras tanto no se puede reconstruir después.
 
 ```text
-9.  Inventario (insumos primero, luego conciliación de PT contra el WMS)
-10. Averías
+9.  Averías
+10. Inventario (insumos primero, luego conciliación de PT contra el WMS)
 11. Calidad
 12. Planes de trabajo
 13. Cuaderno virtual

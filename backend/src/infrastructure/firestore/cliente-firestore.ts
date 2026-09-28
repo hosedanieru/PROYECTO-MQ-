@@ -45,6 +45,8 @@ export const COLECCION = {
   bloquesProgramacion: 'bloquesProgramacion',
   asistenciasTurno: 'asistenciasTurno',
   asignacionesLinea: 'asignacionesLinea',
+  causalesAveria: 'causalesAveria',
+  reportesAveria: 'reportesAveria',
 } as const;
 
 export class ClienteFirestore {

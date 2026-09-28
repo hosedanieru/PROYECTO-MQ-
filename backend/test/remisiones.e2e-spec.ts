@@ -26,6 +26,8 @@ import type { UnidadDeTrabajo } from '../src/domain/shared/unidad-de-trabajo.js'
 import { PrismaService } from '../src/infrastructure/database/prisma/prisma.service.js';
 import { ErrorDominioFilter } from '../src/infrastructure/http/filters/error-dominio.filter.js';
 import { AsignacionPrismaRepository } from '../src/infrastructure/persistence/prisma/asignacion.prisma.repository.js';
+import { CausalAveriaPrismaRepository } from '../src/infrastructure/persistence/prisma/causal-averia.prisma.repository.js';
+import { ReporteAveriaPrismaRepository } from '../src/infrastructure/persistence/prisma/reporte-averia.prisma.repository.js';
 import { AsistenciaPrismaRepository } from '../src/infrastructure/persistence/prisma/asistencia.prisma.repository.js';
 import { AuditoriaPrismaRepository } from '../src/infrastructure/persistence/prisma/auditoria.prisma.repository.js';
 import { GrupoPrismaRepository } from '../src/infrastructure/persistence/prisma/grupo.prisma.repository.js';
@@ -139,6 +141,8 @@ describe('atomicidad de la unidad de trabajo', () => {
           estandares: new EstandarPrismaRepository(tx),
           asistencias: new AsistenciaPrismaRepository(tx),
           asignaciones: new AsignacionPrismaRepository(tx),
+          causales: new CausalAveriaPrismaRepository(tx),
+          reportesAveria: new ReporteAveriaPrismaRepository(tx),
         }),
       ),
   };

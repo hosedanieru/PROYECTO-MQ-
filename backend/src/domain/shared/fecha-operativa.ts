@@ -94,6 +94,18 @@ export function registroActual(instante: Date = new Date()): RegistroFechado {
   };
 }
 
+/** Hora de pared en Bogotá, "HH:mm". Es la que decide el turno de un registro. */
+export function horaLocalDe(instante: Date): string {
+  const partes = new Intl.DateTimeFormat('en-GB', {
+    timeZone: ZONA_HORARIA,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instante);
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)?.value ?? '00';
+  return `${valor('hour')}:${valor('minute')}`;
+}
+
 function extraerFechaLocal(instante: Date): string {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone: ZONA_HORARIA,
