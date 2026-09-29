@@ -98,6 +98,10 @@ model Usuario {
   averiasReportadas ReporteAveria[] @relation("AveriaReportadaPor")
   averiasAnuladas   ReporteAveria[] @relation("AveriaAnuladaPor")
 
+  // Inventario
+  movimientosInventario MovimientoInventario[]
+  entradasMercancia     EntradaMercancia[]
+
   @@map("usuario")
 }
 
@@ -200,9 +204,11 @@ model Producto {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
-  remisiones Remision[]
-  bloques    BloqueProgramacion[]
-  averias    RegistroAveria[]
+  remisiones     Remision[]
+  bloques        BloqueProgramacion[]
+  averias        RegistroAveria[]
+  /// Ítem de inventario del PT (opción A: el PT se enlaza, no se duplica).
+  itemInventario ItemInventario?
 
   @@index([activo])
   @@map("producto")
@@ -214,12 +220,14 @@ model Turno {
   nombre String
   activo Boolean @default(true)
 
-  horarios     TurnoHorario[]
-  remisiones   Remision[]
-  bloques      BloqueProgramacion[]
-  asistencias  AsistenciaTurno[]
-  asignaciones AsignacionLinea[]
-  averias      ReporteAveria[]
+  horarios              TurnoHorario[]
+  remisiones            Remision[]
+  bloques               BloqueProgramacion[]
+  asistencias           AsistenciaTurno[]
+  asignaciones          AsignacionLinea[]
+  averias               ReporteAveria[]
+  movimientosInventario MovimientoInventario[]
+  entradasMercancia     EntradaMercancia[]
 
   @@map("turno")
 }
@@ -645,4 +653,106 @@ model EvidenciaAveria {
 
   @@unique([registroId, tipo])
   @@map("evidencia_averia")
+}
+
+// ============================================================
+// INVENTARIO
+// ============================================================
+
+enum TipoItemInventario {
+  INSUMO
+  PI
+  PT
+}
+
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+/// Lo que se cuenta en MQ: insumos, PI (producto intermedio) y PT.
+/// El PT no repite código ni descripción: se enlaza a `producto`
+/// (opción A, 2026-09-29), por eso `codigo` y `descripcion` van en null
+/// en el PT. `existencia` es la suma del kardex; se guarda aquí porque
+/// esta fila es la que se bloquea para que dos movimientos simultáneos
+/// no partan de la misma existencia.
+model ItemInventario {
+  id           String             @id @default(uuid())
+  tipo         TipoItemInventario
+  codigo       String?            @unique
+  descripcion  String?
+  unidadMedida String             @map("unidad_medida")
+  productoId   String?            @unique @map("producto_id")
+  producto     Producto?          @relation(fields: [productoId], references: [id])
+  existencia   Decimal            @default(0) @db.Decimal(14, 3)
+  activo       Boolean            @default(true)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  movimientos MovimientoInventario[]
+
+  @@index([tipo])
+  @@map("item_inventario")
+}
+
+/// Kardex: cada entrada, salida o ajuste con el saldo que dejó. Nunca se
+/// borra; un error se corrige con un AJUSTE con motivo. Fecha, hora y
+/// turno los pone el servidor. Sin lote (usuario, 2026-09-29).
+model MovimientoInventario {
+  id     String                   @id @default(uuid())
+  itemId String                   @map("item_id")
+  item   ItemInventario           @relation(fields: [itemId], references: [id])
+  tipo   TipoMovimientoInventario
+
+  /// Con signo: lo que sumó o restó.
+  cantidad Decimal @db.Decimal(14, 3)
+  /// Existencia después del movimiento.
+  saldo    Decimal @db.Decimal(14, 3)
+
+  fechaHoraRegistro DateTime @map("fecha_hora_registro") @db.Timestamptz(3)
+  fechaOperativa    DateTime @map("fecha_operativa") @db.Date
+  turnoId           String   @map("turno_id")
+  turno             Turno    @relation(fields: [turnoId], references: [id])
+  usuarioId         String   @map("usuario_id")
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  /// Copia del nombre al registrar.
+  usuarioNombre     String   @map("usuario_nombre")
+
+  referencia  String?
+  observacion String?
+  motivo      String?
+
+  /// Entrada de mercancía a la que pertenece (si llegó en un documento).
+  entradaId String?           @map("entrada_id")
+  entrada   EntradaMercancia? @relation(fields: [entradaId], references: [id])
+
+  @@index([itemId, fechaHoraRegistro])
+  @@index([fechaOperativa])
+  @@index([entradaId])
+  @@map("movimiento_inventario")
+}
+
+/// Lo que llega a la planta en un mismo documento (remisión de PepsiCo,
+/// guía…). Las líneas son los movimientos ENTRADA enlazados: no se
+/// duplican. Fecha, hora, turno y quién recibe los pone el servidor.
+model EntradaMercancia {
+  id          String  @id @default(uuid())
+  documento   String
+  remitente   String?
+  observacion String?
+
+  fechaHoraRegistro DateTime @map("fecha_hora_registro") @db.Timestamptz(3)
+  fechaOperativa    DateTime @map("fecha_operativa") @db.Date
+  turnoId           String   @map("turno_id")
+  turno             Turno    @relation(fields: [turnoId], references: [id])
+  usuarioId         String   @map("usuario_id")
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioNombre     String   @map("usuario_nombre")
+
+  movimientos MovimientoInventario[]
+
+  @@index([fechaOperativa])
+  @@map("entrada_mercancia")
 }

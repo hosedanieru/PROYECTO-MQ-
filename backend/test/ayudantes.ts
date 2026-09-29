@@ -16,7 +16,8 @@ export const prisma = new PrismaClient({ adapter: crearAdaptadorPostgres() });
 /** Vacía las tablas de datos (no los catálogos) en orden de dependencias. */
 export async function limpiarDatos(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE remision_estiba, remision_version, auditoria, remision, consecutivo, bloque_programacion, asistencia_turno, asignacion_linea RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE remision_estiba, remision_version, auditoria, remision, consecutivo, bloque_programacion, asistencia_turno, asignacion_linea, ' +
+      'evidencia_averia, registro_averia, reporte_averia, movimiento_inventario, entrada_mercancia, item_inventario RESTART IDENTITY CASCADE',
   );
 }
 

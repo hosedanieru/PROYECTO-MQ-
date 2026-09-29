@@ -25,6 +25,9 @@ import type { AuditoriaRepository } from '../auditoria/auditoria.repository.js';
 import type { CausalAveriaRepository } from '../averia/causal-averia.js';
 import type { ReporteAveriaRepository } from '../averia/reporte-averia.js';
 import type { GrupoRepository } from '../grupo/grupo.repository.js';
+import type { EntradaMercanciaRepository } from '../inventario/entrada-mercancia.js';
+import type { ItemInventarioRepository } from '../inventario/item-inventario.js';
+import type { MovimientoInventarioRepository } from '../inventario/movimiento-inventario.js';
 import type { AsignacionRepository } from '../mfr/asignacion-linea.js';
 import type { AsistenciaRepository } from '../mfr/asistencia-turno.js';
 import type { BloqueRepository } from '../mfr/bloque-programacion.js';
@@ -56,6 +59,10 @@ export interface ContextoTransaccional {
   // Averías
   causales: CausalAveriaRepository;
   reportesAveria: ReporteAveriaRepository;
+  // Inventario
+  itemsInventario: ItemInventarioRepository;
+  movimientosInventario: MovimientoInventarioRepository;
+  entradasMercancia: EntradaMercanciaRepository;
 }
 
 export interface UnidadDeTrabajo {

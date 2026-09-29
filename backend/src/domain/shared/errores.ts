@@ -19,3 +19,12 @@ export abstract class ErrorDominio extends Error {
     this.name = new.target.name;
   }
 }
+
+/**
+ * La hora de un registro no cae en ningún turno configurado para ese día.
+ * Compartido por los módulos que asignan el turno automáticamente
+ * (averías, inventario).
+ */
+export class SinTurnoConfiguradoError extends ErrorDominio {
+  readonly codigo = 'SIN_TURNO_CONFIGURADO';
+}

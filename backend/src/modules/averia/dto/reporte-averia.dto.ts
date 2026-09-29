@@ -96,6 +96,14 @@ export class AnularReporteAveriaDto {
   motivo!: string;
 }
 
+export class RangoIndicadorDto {
+  @Matches(FECHA, { message: 'desde: formato YYYY-MM-DD' })
+  desde!: string;
+
+  @Matches(FECHA, { message: 'hasta: formato YYYY-MM-DD' })
+  hasta!: string;
+}
+
 export class FiltroReportesAveriaDto {
   @Matches(FECHA, { message: 'desde: formato YYYY-MM-DD' })
   desde!: string;

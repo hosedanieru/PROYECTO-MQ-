@@ -15,7 +15,6 @@ import {
   CausalNoEncontradaError,
   DatosAveriaInvalidosError,
   ReporteAveriaNoEncontradoError,
-  SinTurnoParaLaHoraError,
 } from '../../domain/averia/averia.errors.js';
 import { validarFoto, type AlmacenDeEvidencias, type ArchivoEvidencia } from '../../domain/averia/almacen-evidencias.js';
 import {
@@ -33,11 +32,11 @@ import {
   type ReporteAveria,
 } from '../../domain/averia/reporte-averia.js';
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
-import { turnoDeHora, type HorarioRepository } from '../../domain/mfr/horas-turno.js';
+import type { HorarioRepository } from '../../domain/mfr/horas-turno.js';
 import { ProductoNoEncontradoError } from '../../domain/producto/producto.errors.js';
-import { horaLocalDe, registroActual } from '../../domain/shared/fecha-operativa.js';
 import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
 import type { Reloj } from '../remision/crear-remision.use-case.js';
+import { momentoOperativo } from '../shared/momento-operativo.js';
 
 const NOMBRE_FOTO: Record<TipoEvidencia, string> = {
   UNIDAD: 'Foto 1 (unidad)',
@@ -83,12 +82,7 @@ export class CrearReporteAveriaUseCase {
     );
 
     // 2. Fecha, hora y turno: automáticos (usuario, 2026-09-28).
-    const ahora = this.reloj.ahora();
-    const { fechaHoraRegistro, fechaOperativa } = registroActual(ahora);
-    const turnoId = turnoDeHora(await this.horarios.vigentesEn(fechaOperativa), fechaOperativa, horaLocalDe(ahora));
-    if (!turnoId) {
-      throw new SinTurnoParaLaHoraError('No hay un turno configurado para esta hora; revise los horarios de los turnos.');
-    }
+    const { fechaHoraRegistro, fechaOperativa, turnoId } = await momentoOperativo(this.reloj, this.horarios);
 
     // 3. Fotos al almacén; si algo falla después, se borran.
     const guardadas: string[] = [];

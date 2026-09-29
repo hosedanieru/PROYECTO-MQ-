@@ -6,7 +6,11 @@ import {
   CorregirRegistroAveriaUseCase,
   CrearReporteAveriaUseCase,
 } from '../../application/averia/reporte-averia.use-cases.js';
+import { IndicadorAveriasUseCase } from '../../application/averia/indicador-averias.use-case.js';
 import { RELOJ, type Reloj } from '../../application/remision/crear-remision.use-case.js';
+import { REPORTE_AVERIA_REPOSITORY, type ReporteAveriaRepository } from '../../domain/averia/reporte-averia.js';
+import { BLOQUE_REPOSITORY, type BloqueRepository } from '../../domain/mfr/bloque-programacion.js';
+import { PRODUCTO_REPOSITORY, type ProductoRepository } from '../../domain/producto/producto.repository.js';
 import { ALMACEN_DE_EVIDENCIAS, type AlmacenDeEvidencias } from '../../domain/averia/almacen-evidencias.js';
 import { HORARIO_REPOSITORY, type HorarioRepository } from '../../domain/mfr/horas-turno.js';
 import { UNIDAD_DE_TRABAJO, type UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
@@ -38,6 +42,11 @@ const conUow = <T>(Clase: new (uow: UnidadDeTrabajo) => T) => ({
       inject: [UNIDAD_DE_TRABAJO, HORARIO_REPOSITORY, ALMACEN_DE_EVIDENCIAS, RELOJ],
       useFactory: (uow: UnidadDeTrabajo, h: HorarioRepository, a: AlmacenDeEvidencias, reloj: Reloj) =>
         new CrearReporteAveriaUseCase(uow, h, a, reloj),
+    },
+    {
+      provide: IndicadorAveriasUseCase,
+      inject: [BLOQUE_REPOSITORY, REPORTE_AVERIA_REPOSITORY, PRODUCTO_REPOSITORY],
+      useFactory: (b: BloqueRepository, r: ReporteAveriaRepository, p: ProductoRepository) => new IndicadorAveriasUseCase(b, r, p),
     },
     {
       provide: AnularReporteAveriaUseCase,

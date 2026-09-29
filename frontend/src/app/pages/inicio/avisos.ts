@@ -16,6 +16,7 @@
  */
 
 import type { TonoBadge } from '../../../components/Badge'
+import type { IndicadorAverias } from '../../../shared/types/averia'
 import type { IndicadoresDia } from '../../../shared/types/mfr'
 import type { EstadoRemision } from '../../../shared/types/remision'
 import { porcentaje } from '../../../shared/utils/numeros'
@@ -32,11 +33,24 @@ export interface Aviso {
 interface Entrada {
   indicadores: IndicadoresDia | undefined
   porEstado: Record<EstadoRemision, number> | undefined
+  /** % de averías del día; `undefined` sin permiso o mientras carga. */
+  averias?: IndicadorAverias
   fecha: string
 }
 
-export function construirAvisos({ indicadores, porEstado, fecha }: Entrada): Aviso[] {
+export function construirAvisos({ indicadores, porEstado, averias, fecha }: Entrada): Aviso[] {
   const avisos: Aviso[] = []
+
+  // Máximo de averías del contrato (1 % del DPP): el umbral lo decide el backend.
+  if (averias?.total.excede) {
+    avisos.push({
+      clave: 'averias-sobre-limite',
+      tono: 'critico',
+      titulo: `Averías en ${porcentaje(averias.total.porcentaje, '—', 2)}`,
+      texto: `Superan el máximo del ${averias.maximoPorcentaje} % de lo programado que permite el contrato.`,
+      a: `/averias?desde=${fecha}&hasta=${fecha}`,
+    })
+  }
   const listado = (estado: EstadoRemision) => `/remisiones?desde=${fecha}&hasta=${fecha}&estado=${estado}`
 
   if (porEstado) {

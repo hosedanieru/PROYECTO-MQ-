@@ -30,8 +30,3 @@ export class ReporteAveriaNoEncontradoError extends ErrorAveria {
 export class ReporteAveriaNoModificableError extends ErrorAveria {
   readonly codigo = 'AVERIA_NO_MODIFICABLE';
 }
-
-/** La hora del reporte no cae en ningún turno configurado para ese día. */
-export class SinTurnoParaLaHoraError extends ErrorAveria {
-  readonly codigo = 'AVERIA_SIN_TURNO';
-}

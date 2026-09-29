@@ -83,6 +83,38 @@ export interface RegistroNuevoAveria {
   fotos: Record<TipoEvidencia, File>
 }
 
+/** Una medida del indicador: averiadas contra lo programado (T del DPP), en unidades. */
+export interface MedidaAverias {
+  programadoUnidades: number
+  averiadasUnidades: number
+  /** null = no hubo DPP contra el cual dividir. */
+  porcentaje: number | null
+  excede: boolean
+}
+
+export interface IndicadorAverias {
+  /** Máximo del contrato (1 %). */
+  maximoPorcentaje: number
+  total: MedidaAverias
+  porDia: Array<MedidaAverias & { fechaOperativa: string }>
+  porTurno: Array<MedidaAverias & { turnoId: string }>
+  porGrupo: Array<{ grupoId: string; averiadasUnidades: number; porcentaje: number | null }>
+  porProducto: Array<
+    MedidaAverias & {
+      productoId: string
+      codigo: string
+      descripcion: string
+      /** Estuvo programado algún día del periodo. */
+      enDpp: boolean
+      /** Unidades averiadas en días en que el producto no estaba en el DPP. */
+      unidadesFueraDelDpp: number
+    }
+  >
+  bolsasSinConvertir: number
+  productosSinUnidadesPorCaja: string[]
+  alertas: string[]
+}
+
 export interface FiltroAverias {
   desde: string
   hasta: string

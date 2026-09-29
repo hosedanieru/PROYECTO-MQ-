@@ -472,7 +472,7 @@ La pregunta 13 es la más importante: todo cuelga de Remisiones.
 
 ## D1 · Averías
 
-**Estado:** IMPLEMENTADO fases 1–3 (2026-09-28): catálogo de causales, reporte con fotos, pantallas. **Falta la fase 4:** % de averías contra lo programado en el DPP, por día y turno. Decisiones aplicadas por defecto (confirmar con el área): "Operador MQ" = grupo, turno automático por la hora, reportan coordinador y patinador, solo el administrador corrige y anula.
+**Estado:** IMPLEMENTADO (2026-09-28): catálogo de causales, reporte con fotos, pantallas e indicador. **Indicador:** máximo **1 % de lo programado (T del DPP)** por contrato con PepsiCo (usuario, 2026-09-28), sumando los días del periodo; si se pasa, alertas en `/averias` y en el panel de inicio. Por grupo: aporte de cada grupo al % sobre el mismo DPP (el efecto de cada grupo se podrá analizar cuando roten de línea). Decisiones aplicadas por defecto (confirmar con el área): "Operador MQ" = grupo, turno automático por la hora, reportan coordinador y patinador, solo el administrador corrige y anula.
 
 ### Formulario actual (entregado por el usuario, 2026-09-28)
 
@@ -541,7 +541,13 @@ La última pregunta es clave: si calidad debe aprobar antes de que el patinador 
 
 ## D3 · Inventario
 
-**Estado:** EN LEVANTAMIENTO (parcial) · **Después de Averías** (usuario, 2026-09-28; del 24 al 28 estuvo como siguiente)
+**Estado:** EN CONSTRUCCIÓN · **Fase 1 hecha (2026-09-29):** catálogo único de ítems (INSUMO, PI, PT; el PT enlazado a `producto`, opción A), kardex de movimientos (ENTRADA, SALIDA, AJUSTE con motivo), existencias sin negativos, sin lote. Regla del usuario: primero trazabilidad y control; los indicadores van al final. Las preguntas de abajo siguen abiertas y definen las fases siguientes.
+
+**Actualización 2026-09-29 (usuario):**
+- **PI = lo que llega de PepsiCo para reempaque.** ✔
+- **Entrada de mercancía** hecha: un documento con varias líneas (insumos y PI), todo o nada, cada línea en el kardex.
+- **Receta:** sí existe cuánto PI lleva cada PT. El usuario prefiere **digitarla a mano** para revisar que el funcionamiento sea óptimo. PENDIENTE confirmar el alcance: receta cargada a mano + consumo real registrado a mano, para comparar teórico vs real (la comparación es un indicador: va al final).
+- **Roles:** todo lo nuevo, solo para el administrador; se reparten al final.
 
 ### Alcance aclarado por el usuario (2026-09-22)
 

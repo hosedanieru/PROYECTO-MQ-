@@ -178,7 +178,7 @@ El tope de 100 lo impone Firestore: una transacción admite 500 escrituras y cad
 
 ## Averías
 
-Solo PT por ahora (2026-09-28). Falta el indicador (% contra el DPP). Ver ROADMAP D1.
+Solo PT por ahora (2026-09-28). Ver ROADMAP D1.
 
 | Método | Ruta | Permiso | Notas |
 |---|---|---|---|
@@ -186,6 +186,7 @@ Solo PT por ahora (2026-09-28). Falta el indicador (% contra el DPP). Ver ROADMA
 | POST | `/averias/causales` | `catalogo.editar` | `{ codigo, nombre, orden }` · 409 `CAUSAL_CODIGO_DUPLICADO` |
 | PATCH | `/averias/causales/:id` | `catalogo.editar` | parcial; `activo` para desactivar (no se eliminan) |
 | GET | `/averias?desde=&hasta=&turnoId=&grupoId=&estado=` | `averia.consultar` | fechas operativas; rango máx. 93 días; más recientes primero |
+| GET | `/averias/indicador?desde=&hasta=` | `averia.consultar` | % de averías contra el T del DPP (máx. 1 % por contrato): `total`, `porDia`, `porTurno`, `porGrupo`, `porProducto` (con `unidadesFueraDelDpp`), `alertas[]`. Rango máx. 93 días |
 | GET | `/averias/:id` | `averia.consultar` | reporte con registros y `total` |
 | GET | `/averias/:id/registros/:registroId/fotos/:tipo` | `averia.consultar` | la imagen; `tipo` = `UNIDAD` · `LOTE_FECHA` · `CONJUNTO` |
 | POST | `/averias` | `averia.reportar` | multipart (ver abajo) · 201 |
@@ -195,6 +196,28 @@ Solo PT por ahora (2026-09-28). Falta el indicador (% contra el DPP). Ver ROADMA
 **Crear (multipart):** campo `datos` con `{ grupoId, registros: [{ productoId, fechaVencimiento: 'YYYY-MM-DD', lote, causalId, cantidad, unidadMedida }] }` (1 a 30 registros; `unidadMedida` = `UNIDAD` · `DOCENA` · `SIX` · `BOLSA`) y un archivo por foto, `foto_{fila}_{TIPO}` (fila desde 0). JPG, PNG o WEBP, máx. 5 MB cada una. Fecha, hora, turno y quién reporta los pone el servidor. Si algo falla, no queda ni el reporte ni las fotos.
 
 **Respuesta:** el reporte con `fechaOperativa` (`YYYY-MM-DD`), `estado` (`REGISTRADO` · `ANULADO`), `reportadoPorNombre`, `registros[]` (con copia `productoCodigo` / `productoDescripcion` y `evidencias: [{ tipo }]`, sin rutas internas) y `total: { unidades, sinConvertir: { BOLSA? } }`.
+
+## Inventario
+
+Fase 1 (2026-09-29): catálogo único de ítems (INSUMO, PI, PT) y kardex. Ver ROADMAP D3.
+
+| Método | Ruta | Permiso | Notas |
+|---|---|---|---|
+| GET | `/inventario/items?tipo=&texto=&soloActivos=` | `inventario.consultar` | existencias; `texto` busca en código y descripción |
+| GET | `/inventario/items/:id` | `inventario.consultar` | un ítem con su existencia |
+| GET | `/inventario/items/:id/movimientos?limite=` | `inventario.consultar` | kardex, más reciente primero (100 por defecto, máx. 500) |
+| POST | `/inventario/items` | `inventario.catalogo` | INSUMO/PI: `{ tipo, codigo, descripcion, unidadMedida }` · PT: `{ tipo: 'PT', productoId, unidadMedida }` (código y descripción salen del producto) · 409 `INVENTARIO_ITEM_DUPLICADO` |
+| PATCH | `/inventario/items/:id` | `inventario.catalogo` | `codigo`, `descripcion` (no en PT), `unidadMedida`, `activo`. Tipo y producto no cambian |
+| POST | `/inventario/movimientos` | `inventario.registrar` | `{ itemId, tipo: ENTRADA \| SALIDA, cantidad > 0 (hasta 3 decimales), referencia?, observacion? }` · 409 `INVENTARIO_EXISTENCIA_INSUFICIENTE` si la salida deja negativo |
+| POST | `/inventario/ajustes` | `inventario.ajustar` | `{ itemId, cantidad (con signo, ≠ 0), motivo, observacion? }` |
+| GET | `/inventario/movimientos?desde=&hasta=&tipo=` | `inventario.consultar` | todos los movimientos del rango (máx. 93 días) |
+| POST | `/inventario/entradas` | `inventario.registrar` | entrada de mercancía: `{ documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }` (1 a 50 líneas, sin ítems repetidos, solo INSUMO y PI). Todo o nada. Responde el encabezado con `lineas[]` (código, descripción, unidad, cantidad, saldo) |
+| GET | `/inventario/entradas?desde=&hasta=` | `inventario.consultar` | encabezados del rango, más recientes primero |
+| GET | `/inventario/entradas/:id` | `inventario.consultar` | encabezado y líneas · 404 `INVENTARIO_ENTRADA_NO_ENCONTRADA` |
+
+Por ahora todos los permisos de inventario (y de averías) los tiene solo el administrador; los roles se reparten al final (usuario, 2026-09-29).
+
+Respuesta de un movimiento: `{ movimiento, item }`. El movimiento trae `cantidad` con signo, `saldo`, `fechaHoraRegistro`, `fechaOperativa`, `turnoId`, `usuarioNombre`, `referencia`, `observacion`, `motivo`. Fecha, hora, turno y usuario los pone el servidor. Dos movimientos simultáneos sobre el mismo ítem se atienden uno detrás del otro (bloqueo de fila).
 
 ## Códigos de error de dominio
 
@@ -212,6 +235,10 @@ Solo PT por ahora (2026-09-28). Falta el indicador (% contra el DPP). Ver ROADMA
 | `MFR_ASIGNACION_SIN_ASISTENCIA`, `MFR_ASIGNACION_EXCEDE_ASISTENCIA`, `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS` | 409 |
 | `CAUSAL_DATOS_INVALIDOS`, `AVERIA_DATOS_INVALIDOS` | 400 |
 | `CAUSAL_NO_ENCONTRADA`, `AVERIA_NO_ENCONTRADA` | 404 |
-| `CAUSAL_CODIGO_DUPLICADO`, `AVERIA_NO_MODIFICABLE`, `AVERIA_SIN_TURNO` | 409 |
+| `CAUSAL_CODIGO_DUPLICADO`, `AVERIA_NO_MODIFICABLE` | 409 |
+| `SIN_TURNO_CONFIGURADO` (averías, inventario: la hora no cae en ningún turno configurado) | 409 |
+| `RANGO_FECHAS_INVALIDO`, `INVENTARIO_DATOS_INVALIDOS` | 400 |
+| `INVENTARIO_ITEM_NO_ENCONTRADO`, `INVENTARIO_ENTRADA_NO_ENCONTRADA` | 404 |
+| `INVENTARIO_ITEM_DUPLICADO`, `INVENTARIO_EXISTENCIA_INSUFICIENTE` | 409 |
 
 `MFR_FALTANTE_SIN_MOTIVO` añade `faltantes[]` al cuerpo de la respuesta, para que el cliente muestre qué SKU quedaron cortos.

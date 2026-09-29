@@ -62,6 +62,15 @@ export function IconoAveria(props: Props) {
   )
 }
 
+/** Cajas apiladas: inventario. */
+export function IconoInventario(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M3 13h8v8H3zM13 13h8v8h-8zM8 3h8v8H8z" />
+    </Base>
+  )
+}
+
 /** Lista con viñetas: catálogos simples (causales). */
 export function IconoLista(props: Props) {
   return (

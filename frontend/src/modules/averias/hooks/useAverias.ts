@@ -5,6 +5,7 @@
  *   ['averias', 'causales']            catálogo de causales
  *   ['averias', 'lista', filtro]       listado
  *   ['averias', 'detalle', id]         un reporte
+ *   ['averias', 'indicador', …]        % contra el DPP (lo cambian crear, corregir y anular)
  *
  * Cada mutación invalida solo lo que toca.
  */
@@ -24,6 +25,15 @@ export function useReportesAveria(filtro: FiltroAverias) {
   return useQuery({ queryKey: ['averias', 'lista', filtro], queryFn: () => averiasApi.listar(filtro) })
 }
 
+/** % de averías contra el DPP. `habilitado` evita consultar sin permiso. */
+export function useIndicadorAverias(desde: string, hasta: string, habilitado = true) {
+  return useQuery({
+    queryKey: ['averias', 'indicador', desde, hasta],
+    queryFn: () => averiasApi.indicador(desde, hasta),
+    enabled: habilitado,
+  })
+}
+
 export function useReporteAveria(id: string) {
   return useQuery({ queryKey: ['averias', 'detalle', id], queryFn: () => averiasApi.detalle(id) })
 }
@@ -33,11 +43,14 @@ export function useCrearReporteAveria() {
   return useMutation({
     mutationFn: ({ grupoId, registros }: { grupoId: string; registros: RegistroNuevoAveria[] }) =>
       averiasApi.crear(grupoId, registros),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['averias', 'lista'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['averias', 'lista'] })
+      void qc.invalidateQueries({ queryKey: ['averias', 'indicador'] })
+    },
   })
 }
 
-/** Corregir y anular cambian el reporte: se refresca su detalle y el listado. */
+/** Corregir y anular cambian el reporte: se refresca su detalle, el listado y el indicador. */
 function useCambioReporte<A>(accion: (id: string, args: A) => ReturnType<typeof averiasApi.anular>) {
   const qc = useQueryClient()
   return useMutation({
@@ -45,6 +58,7 @@ function useCambioReporte<A>(accion: (id: string, args: A) => ReturnType<typeof 
     onSuccess: (reporte) => {
       qc.setQueryData(['averias', 'detalle', reporte.id], reporte)
       void qc.invalidateQueries({ queryKey: ['averias', 'lista'] })
+      void qc.invalidateQueries({ queryKey: ['averias', 'indicador'] })
     },
   })
 }

@@ -93,8 +93,6 @@ export interface FiltroReportesAveria {
   estado?: EstadoReporteAveria;
 }
 
-/** Tope técnico del rango del listado (mismo criterio que remisiones en Firestore). */
-export const MAXIMO_DIAS_LISTADO = 93;
 
 export interface ReporteAveriaRepository {
   crear(reporte: NuevoReporteAveria): Promise<ReporteAveria>;

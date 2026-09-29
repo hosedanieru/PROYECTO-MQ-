@@ -24,7 +24,7 @@ REMISIONES
    └── Alertas por desviación (general y por SKU)
 ```
 
-No diseñar ni implementar esos módulos sin levantamiento previo. Remisiones está cerrado y MFR implementado. Averías está en levantamiento (ver sección 11).
+No diseñar ni implementar esos módulos sin levantamiento previo. Remisiones está cerrado, MFR y Averías implementados. Inventario en construcción: fase 1 (kardex) hecha, el resto en levantamiento (ver sección 11).
 
 ### Perfil del usuario
 
@@ -341,8 +341,8 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ### Terminado
 
-- Base de datos: 22 tablas (`schema.prisma`), migraciones aplicadas
-- Seed idempotente: 19 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción, 12 causales de avería
+- Base de datos: 25 tablas (`schema.prisma`), migraciones aplicadas
+- Seed idempotente: 23 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción, 12 causales de avería
 - Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
 - Regla `fecha_operativa` con pruebas de casos borde
 - 6 casos de uso: crear + las 5 transiciones
@@ -360,15 +360,23 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 - **DPP de N días** (área, 2026-09-22: PepsiCo también lo manda semanal, y podría mandarlo mensual): no hay camino "semanal"; el sistema carga **N días** y el diario es N = 1. El día de cada bloque sale de su propia fecha y hora con el corte de las 06:00 (`fechaOperativaDeHoraLocal`), no de la pantalla. Una transacción **por día** (límite de 500 escrituras en Firestore + un turno cerrado no debe frenar la semana); la respuesta dice qué pasó con cada día: CARGADO / OMITIDO / ERROR. Falta verificar con un PDF semanal real
 - **Carga de estándares en lote** (2026-09-22): `PUT /mfr/estandares` y pantalla `/admin/pesos` para confirmar de una pasada el peso neto por caja (sin él el tablero no muestra kilos). Una sola transacción con un motivo común; lo que no se envía no se toca. `EstandarRepository.actualizarVarios` es escritura pura por la regla de Firestore (lecturas antes que escrituras)
 - **Rediseño visual del frontend** (2026-09-24): barra lateral + barra superior (`app/layout/navegacion.ts` define el menú), panel de inicio con KPIs, flujo de remisiones, líneas en vivo y avisos del día; tema claro/oscuro, textos en español/inglés, fuente Inter, animaciones con `animejs` y gráficas propias en SVG (sin librería de gráficas)
-- **Averías — fases 1 a 3 de 4** (2026-09-28), solo PT:
+- **Averías — completo** (2026-09-28), solo PT:
   - Dominio `domain/averia/`: causales (catálogo en BD, 12 sembradas, sin valor por defecto); registro (3 fotos obligatorias UNIDAD / LOTE_FECHA / CONJUNTO, cantidad entera > 0, lote obligatorio, copia congelada del producto; **sin línea**: el área la descartó el 2026-09-28 porque las cajas averiadas a veces llegan sin saber de qué línea vienen, columna eliminada en `20260928190000_averia_sin_linea`); reporte (REGISTRADO → ANULADO con motivo, nunca se borra; máx. 30 registros, límite técnico); conversión Docena = 12, Six = 6, Bolsa `PENDIENTE DE DEFINIR` (se registra pero no suma); el total se calcula, no se guarda.
   - Fecha, hora y **turno automáticos** (servidor: `registroActual` + `turnoDeHora(horaLocalDe(ahora))`); quien reporta sale del token (con copia del nombre); "Operador MQ" = grupo.
   - Fotos: puerto `AlmacenDeEvidencias` (`ALMACEN_DE_EVIDENCIAS`), hoy `AlmacenEvidenciasDisco` en `EVIDENCIAS_DIR` (por defecto `backend/evidencias/`, fuera de git), independiente de `PERSISTENCIA`. Se guardan antes de la transacción y se borran si falla. El navegador las comprime (≤1600 px, JPEG). La respuesta nunca expone rutas; la foto se pide por reporte/registro/tipo.
-  - Permisos: `averia.reportar` (coordinador, patinador), `averia.consultar` (+ consulta), `averia.corregir` (solo administrador: corregir registro sin tocar fotos, anular con motivo).
+  - Permisos: `averia.reportar`, `averia.consultar`, `averia.corregir` (corregir registro sin tocar fotos, anular con motivo). **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final).
   - Tablas `causal_averia`, `reporte_averia`, `registro_averia`, `evidencia_averia`; Firestore `causalesAveria`, `reportesAveria` (registros embebidos).
   - Pantallas: `/averias` (listado con filtros en la URL), `/averias/nuevo` (formulario para celular, cámara directa), `/averias/:id` (detalle con fotos, corregir/anular), `/admin/causales`.
-  - Falta la fase 4: % de averías contra lo programado en el DPP, por día y turno. Ver ROADMAP D1
-- 248 pruebas unitarias sin base de datos (`npm test`) + 11 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
+  - **Indicador** (`domain/averia/indicador-averias.ts`, función pura): % = unidades averiadas (reportes vigentes) ÷ (Σ T del DPP × unidades por caja), sumando los días del periodo. **Máximo 1 % por contrato con PepsiCo** (`MAXIMO_AVERIAS_PORCENTAJE`); pasarlo genera alertas (por día y por periodo) que se ven en `/averias` y en los avisos del panel de inicio. Por día, turno, grupo (aporte de cada grupo al % sobre el mismo DPP) y SKU. Todas las averías cuentan; las de un producto que no estaba en el DPP **del día de la avería** se marcan aparte. El T sale de `calcularBloque` del MFR (no se duplica)
+- **Inventario — fase 1** (2026-09-29; regla del usuario: primero trazabilidad y control, los indicadores al final):
+  - **Kardex**: cada ENTRADA, SALIDA o AJUSTE queda con quién, fecha/hora, día operativo y turno (automáticos, `application/shared/momento-operativo.ts`, compartido con Averías) y el saldo que dejó. Nunca se borra; un error se corrige con AJUSTE con motivo.
+  - **Catálogo único** de ítems INSUMO / PI / PT (**opción A**): el PT se enlaza a `producto` y NO repite código ni descripción (en la tabla van null; se leen del producto). Tipo y producto no se cambian después de crear. Sin lote (usuario: no relevante).
+  - **Sin existencia negativa** (regla del usuario). `item_inventario.existencia` se guarda (excepción consciente a "lo derivado se calcula"): es la fila que se bloquea con `SELECT … FOR UPDATE` para que dos salidas simultáneas no saquen la misma existencia (probado en `test/inventario.e2e-spec.ts`), y en Firestore sumar el kardex crecería sin límite. Cuadra con Σ movimientos.
+  - **Entrada de mercancía** (2026-09-29): lo que llega en un mismo documento = encabezado (`entrada_mercancia`: documento de soporte obligatorio, quién entrega, observación; fecha/hora/turno/quién recibe automáticos) + líneas, que son los movimientos ENTRADA con `entradaId` (no se duplican). Todo o nada. Recibe INSUMOS y PI (el PT se produce, no llega de afuera); máx. 50 líneas (límite técnico). Los ítems se bloquean en orden de id (evita deadlock). PI = lo que llega de PepsiCo para reempaque (usuario, 2026-09-29).
+  - Permisos: `inventario.consultar`, `inventario.registrar`, `inventario.ajustar`, `inventario.catalogo`. **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final; lo mismo para averías). Entradas/salidas y ajustes van por rutas distintas.
+  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/admin/inventario` (ítems).
+  - Pendiente con el área (ROADMAP D3): qué es exactamente el PI, lista de insumos con códigos y unidades, cómo entran, consumo, conteo físico, receta, de quién son los insumos, WMS con número de remisión
+- 286 pruebas unitarias sin base de datos (`npm test`) + 15 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -387,7 +395,9 @@ frontend/src/
 │   ├── averias/    api, hooks (useAverias, useUrlDeArchivo), pages (lista, nuevo, detalle),
 │   │               componentes (AgregarAveria, CampoFoto, FotoEvidencia, CorregirRegistro/AnularReporte Dialogo),
 │   │               utils (comprimir-foto, totales)
-│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage, CausalesPage
+│   ├── inventario/ api, hooks (useInventario), tonos, MovimientoDialogo,
+│   │               pages (InventarioPage, KardexPage, EntradasPage, NuevaEntradaPage, EntradaDetallePage)
+│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage, CausalesPage, ItemsInventarioPage
 ├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando,
 │                   Badge, Tarjeta, TarjetaKpi, Dato, Desplegable, Iconos, Logo, BotonTema, BotonIdioma,
 │                   graficas/ (Anillo, Barras, BarraProgreso, Dona)
@@ -458,11 +468,21 @@ PUT    /mfr/estandares/:productoId      catalogo.editar_estandares { cajasPorHor
 
 GET    /api/averias/causales        catalogo.consultar       (POST/PATCH con catalogo.editar; no se eliminan)
 GET    /api/averias?desde=&hasta=&turnoId=&grupoId=&estado=   averia.consultar  (rango máx. 93 días)
+GET    /api/averias/indicador?desde=&hasta=                   averia.consultar  % contra el DPP, máx. 1 %, con alertas
 GET    /api/averias/:id             averia.consultar
 GET    /api/averias/:id/registros/:registroId/fotos/:tipo    averia.consultar  (la imagen)
 POST   /api/averias                 averia.reportar          multipart: `datos` (JSON) + `foto_{fila}_{TIPO}`
 PATCH  /api/averias/:id/registros/:registroId               averia.corregir   (no cambia fotos)
 POST   /api/averias/:id/anular      averia.corregir          { motivo }
+
+GET    /api/inventario/items?tipo=&texto=&soloActivos=   inventario.consultar  existencias
+GET    /api/inventario/items/:id(/movimientos?limite=)   inventario.consultar  ítem / kardex
+POST   /api/inventario/items            inventario.catalogo      (PATCH /:id: código, descripción, unidad, activo)
+POST   /api/inventario/movimientos      inventario.registrar     { itemId, tipo: ENTRADA|SALIDA, cantidad, referencia?, observacion? }
+POST   /api/inventario/ajustes          inventario.ajustar       { itemId, cantidad (con signo), motivo, observacion? }
+GET    /api/inventario/movimientos?desde=&hasta=&tipo=   inventario.consultar  (rango máx. 93 días)
+POST   /api/inventario/entradas         inventario.registrar     { documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }
+GET    /api/inventario/entradas?desde=&hasta=            inventario.consultar  (/:id con sus líneas)
 
 GET    /api                             público                   comprobación de vida (healthcheck de Docker)
 ```
@@ -599,8 +619,8 @@ Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP 
 
 | Camino | Qué resuelve | Cuándo conviene |
 |---|---|---|
-| **Levantamiento de Averías (D1)** | % de averías por día / turno / grupo | Ya; en levantamiento (preguntas en la Parte D1 del ROADMAP) |
-| **Levantamiento de Inventario (D3)** | Insumos (inventario propio) + conciliación de PT contra el WMS; la receta por SKU (D9) los une | Después de Averías. Fases propuestas: insumos (catálogo + movimientos) → existencias/conteo → recetas → conciliación PT vs WMS |
+| ~~Averías (D1)~~ | **Hecho 2026-09-28** (reporte con fotos + indicador del 1 %) | Pendientes menores: equivalencia de la Bolsa; averías de PI e insumos llegan con Inventario |
+| **Inventario (D3)** | Cuánto hay de **insumos, PI y PT** (usuario, 2026-09-28). **Hecho (2026-09-29): catálogo + kardex + existencias + entrada de mercancía.** | Siguiente: **receta por PT** (cuánto PI e insumos lleva cada caja), digitada a mano para revisar que funcione (usuario, 2026-09-29; confirmar alcance). Después: conteo físico, enlace con remisiones/averías, conciliación PT vs WMS. Indicadores al final |
 | **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y `personasEsperadas` de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
 | **Migración del histórico 2026 (B6)** | ~2.195 registros del Excel | Requiere la decisión del área: migrar, descartar, o migrar marcado `HISTORICO_EXCEL` |
 | **Importación del catálogo desde el Excel** | Hoy el catálogo se carga a mano; `npm run importar:tiempos` simula y reporta diferencias | Bloqueado por qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen |

@@ -14,10 +14,18 @@ export function miles(valor: number): string {
   return new Intl.NumberFormat(localeDeFormato(), { maximumFractionDigits: 0 }).format(valor)
 }
 
-/** 95.37 → "95,4 %" en español, "95.4 %" en inglés. */
-export function porcentaje(valor: number | null, sinDato = '—'): string {
+/** Cantidades de inventario: hasta 3 decimales (kilos, metros). 1234.5 → "1.234,5". */
+export function cantidad(valor: number): string {
+  return new Intl.NumberFormat(localeDeFormato(), { maximumFractionDigits: 3 }).format(valor)
+}
+
+/**
+ * 95.37 → "95,4 %" en español, "95.4 %" en inglés. `decimales` = 2 para
+ * porcentajes chicos que se comparan contra un umbral (averías: 1 %).
+ */
+export function porcentaje(valor: number | null, sinDato = '—', decimales = 1): string {
   if (valor === null || Number.isNaN(valor)) return sinDato
-  const numero = new Intl.NumberFormat(localeDeFormato(), { maximumFractionDigits: 1 }).format(valor)
+  const numero = new Intl.NumberFormat(localeDeFormato(), { maximumFractionDigits: decimales }).format(valor)
   return `${numero} %`
 }
 

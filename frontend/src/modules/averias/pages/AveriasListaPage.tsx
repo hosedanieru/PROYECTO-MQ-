@@ -4,7 +4,8 @@
  *
  * Filtros en la URL (igual que remisiones): se pueden compartir y
  * sobreviven a recargar. Por defecto, los últimos 7 días operativos.
- * Los totales de arriba cuentan solo reportes vigentes (no anulados).
+ * Arriba, el indicador del periodo: % de averías contra el DPP, con el
+ * máximo de 1 % del contrato (solo reportes vigentes).
  */
 
 import { Link, useSearchParams } from 'react-router-dom'
@@ -19,6 +20,7 @@ import type { EstadoReporteAveria, FiltroAverias } from '../../../shared/types/a
 import { fechaCorta, fechaHora, fechaOperativaDe } from '../../../shared/utils/fechas'
 import { useSesion } from '../../auth/useSesion'
 import { useGrupos, useTurnos } from '../../catalogo/hooks/useCatalogos'
+import { IndicadorAverias } from '../components/IndicadorAverias'
 import { useReportesAveria } from '../hooks/useAverias'
 
 const DIA_MS = 24 * 60 * 60 * 1000
@@ -52,11 +54,6 @@ export function AveriasListaPage() {
 
   const nombreTurno = (id: string) => turnos.data?.find((t) => t.id === id)?.codigo ?? '—'
   const nombreGrupo = (id: string) => grupos.data?.find((g) => g.id === id)?.nombre ?? '—'
-
-  const vigentes = reportes.data?.filter((r) => r.estado === 'REGISTRADO') ?? []
-  const unidades = vigentes.reduce((s, r) => s + r.total.unidades, 0)
-  const bolsas = vigentes.reduce((s, r) => s + (r.total.sinConvertir.BOLSA ?? 0), 0)
-  const averias = vigentes.reduce((s, r) => s + r.registros.length, 0)
 
   return (
     <section className="mx-auto max-w-6xl space-y-5">
@@ -92,15 +89,12 @@ export function AveriasListaPage() {
         </div>
       </Tarjeta>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Resumen titulo="Reportes vigentes" valor={vigentes.length} />
-        <Resumen titulo="Averías registradas" valor={averias} />
-        <Resumen titulo="Unidades averiadas" valor={unidades} nota={bolsas > 0 ? `+ ${bolsas} bolsa(s) sin convertir` : undefined} />
-      </div>
+      {/* El indicador mide el periodo completo contra el DPP: no depende de los filtros de turno, grupo ni estado. */}
+      <IndicadorAverias desde={filtro.desde} hasta={filtro.hasta} />
 
       {reportes.isError && <Alerta tipo="error">{comoErrorApi(reportes.error).mensaje}</Alerta>}
 
-      <Tarjeta sinRelleno>
+      <Tarjeta titulo={`Reportes (${reportes.data?.length ?? 0})`} sinRelleno>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
@@ -146,15 +140,5 @@ export function AveriasListaPage() {
         </div>
       </Tarjeta>
     </section>
-  )
-}
-
-function Resumen({ titulo, valor, nota }: { titulo: string; valor: number; nota?: string }) {
-  return (
-    <Tarjeta>
-      <p className="text-sm text-tinta-suave">{titulo}</p>
-      <p className="cifra text-2xl font-semibold text-tinta">{valor.toLocaleString('es-CO')}</p>
-      {nota && <p className="text-xs text-alerta">{nota}</p>}
-    </Tarjeta>
   )
 }

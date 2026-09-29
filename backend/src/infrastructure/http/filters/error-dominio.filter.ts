@@ -47,7 +47,6 @@ import {
   DatosCausalInvalidosError,
   ReporteAveriaNoEncontradoError,
   ReporteAveriaNoModificableError,
-  SinTurnoParaLaHoraError,
 } from '../../../domain/averia/averia.errors.js';
 import {
   CodigoGrupoDuplicadoError,
@@ -69,7 +68,15 @@ import {
   SinProgramacionDelDiaError,
   TransicionEstadoInvalidaError,
 } from '../../../domain/remision/remision.errors.js';
-import { ErrorDominio } from '../../../domain/shared/errores.js';
+import {
+  DatosInventarioInvalidosError,
+  EntradaMercanciaNoEncontradaError,
+  ExistenciaInsuficienteError,
+  ItemInventarioDuplicadoError,
+  ItemInventarioNoEncontradoError,
+} from '../../../domain/inventario/inventario.errors.js';
+import { ErrorDominio, SinTurnoConfiguradoError } from '../../../domain/shared/errores.js';
+import { RangoFechasInvalidoError } from '../../../domain/shared/rango-fechas.js';
 import {
   CredencialesInvalidasError,
   DatosUsuarioInvalidosError,
@@ -87,6 +94,11 @@ import {
  * coincide, se responde 400.
  */
 const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = [
+  // --- Compartidos ---
+  // Configuración de turnos incompleta: no es un error del cliente.
+  [SinTurnoConfiguradoError, HttpStatus.CONFLICT],
+  [RangoFechasInvalidoError, HttpStatus.BAD_REQUEST],
+
   // --- Remisiones ---
   // Datos inválidos o incompletos → el cliente envió algo mal.
   [DatosRemisionInvalidosError, HttpStatus.BAD_REQUEST],
@@ -142,10 +154,16 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   [DatosAveriaInvalidosError, HttpStatus.BAD_REQUEST],
   [CodigoCausalDuplicadoError, HttpStatus.CONFLICT],
   [ReporteAveriaNoModificableError, HttpStatus.CONFLICT],
-  // Configuración de turnos incompleta: no es un error del cliente.
-  [SinTurnoParaLaHoraError, HttpStatus.CONFLICT],
   [CausalNoEncontradaError, HttpStatus.NOT_FOUND],
   [ReporteAveriaNoEncontradoError, HttpStatus.NOT_FOUND],
+
+  // --- Inventario ---
+  [DatosInventarioInvalidosError, HttpStatus.BAD_REQUEST],
+  [ItemInventarioDuplicadoError, HttpStatus.CONFLICT],
+  // Los datos están bien, pero la existencia actual no permite la salida.
+  [ExistenciaInsuficienteError, HttpStatus.CONFLICT],
+  [ItemInventarioNoEncontradoError, HttpStatus.NOT_FOUND],
+  [EntradaMercanciaNoEncontradaError, HttpStatus.NOT_FOUND],
 ];
 
 @Catch(ErrorDominio)

@@ -4,6 +4,7 @@ import type {
   CausalAveria,
   DatosCausal,
   FiltroAverias,
+  IndicadorAverias,
   RegistroNuevoAveria,
   ReporteAveria,
   TipoEvidencia,
@@ -20,6 +21,8 @@ export const averiasApi = {
 
   listar: (filtro: FiltroAverias) => http.get<ReporteAveria[]>('/averias', { params: filtro }).then((r) => r.data),
   detalle: (id: string) => http.get<ReporteAveria>(`/averias/${id}`).then((r) => r.data),
+  indicador: (desde: string, hasta: string) =>
+    http.get<IndicadorAverias>('/averias/indicador', { params: { desde, hasta } }).then((r) => r.data),
 
   /**
    * Multipart: `datos` lleva el JSON y cada foto va como `foto_{fila}_{TIPO}`.

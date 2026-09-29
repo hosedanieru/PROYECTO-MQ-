@@ -27,6 +27,7 @@ import { TONO_ESTADO } from '../../components/tonos-estado'
 import { useTextos } from '../../shared/idioma/useTextos'
 import { useSesion } from '../../modules/auth/useSesion'
 import { useProductos } from '../../modules/catalogo/hooks/useCatalogos'
+import { useIndicadorAverias } from '../../modules/averias/hooks/useAverias'
 import { useIndicadoresDia } from '../../modules/mfr/hooks/useMfr'
 import { useConteoPorEstado, useRemisiones } from '../../modules/remisiones/hooks/useRemisiones'
 import { REFRESCO_LENTO, REFRESCO_TABLERO } from '../../shared/refresco'
@@ -112,6 +113,7 @@ export function InicioPage() {
   )
   const dia = useIndicadoresDia(fecha, puedeMfr, REFRESCO_TABLERO)
   const productos = useProductos({}, puedeCatalogo)
+  const averiasDia = useIndicadorAverias(fecha, fecha, tienePermiso('averia.consultar'))
 
   const mfr = dia.data?.mfr
   const diferencia = conteo.total - (ayer.data?.total ?? 0)
@@ -143,6 +145,7 @@ export function InicioPage() {
   const avisos = construirAvisos({
     indicadores: dia.data,
     porEstado: puedeRemisiones ? conteo.porEstado : undefined,
+    averias: averiasDia.data,
     fecha,
   })
 

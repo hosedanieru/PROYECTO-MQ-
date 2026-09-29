@@ -15,6 +15,10 @@
  *   /averias                 listado de reportes de averías
  *   /averias/nuevo           formulario (va ANTES de /:id)
  *   /averias/:id             detalle con fotos; corregir / anular (administrador)
+ *   /inventario              existencias de insumos, PI y PT; registrar movimiento
+ *   /inventario/entradas     entradas de mercancía (listado; /nueva formulario; /:id detalle)
+ *   /inventario/:id          kardex de un ítem
+ *   /admin/inventario        ítems de inventario (el PT se enlaza a un producto)
  *
  * `RutaProtegida` envuelve al layout: si no hay sesión, ninguna ruta
  * hija se renderiza. La autorización fina (permisos) la hace el
@@ -25,6 +29,12 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { CausalesPage } from '../modules/admin/pages/CausalesPage'
 import { GruposPage } from '../modules/admin/pages/GruposPage'
+import { ItemsInventarioPage } from '../modules/admin/pages/ItemsInventarioPage'
+import { InventarioPage } from '../modules/inventario/pages/InventarioPage'
+import { EntradaDetallePage } from '../modules/inventario/pages/EntradaDetallePage'
+import { EntradasPage } from '../modules/inventario/pages/EntradasPage'
+import { KardexPage } from '../modules/inventario/pages/KardexPage'
+import { NuevaEntradaPage } from '../modules/inventario/pages/NuevaEntradaPage'
 import { AveriasListaPage } from '../modules/averias/pages/AveriasListaPage'
 import { NuevoReporteAveriaPage } from '../modules/averias/pages/NuevoReporteAveriaPage'
 import { ReporteAveriaDetallePage } from '../modules/averias/pages/ReporteAveriaDetallePage'
@@ -63,12 +73,18 @@ export const router = createBrowserRouter([
           { path: 'averias', element: <AveriasListaPage /> },
           { path: 'averias/nuevo', element: <NuevoReporteAveriaPage /> },
           { path: 'averias/:id', element: <ReporteAveriaDetallePage /> },
+          { path: 'inventario', element: <InventarioPage /> },
+          { path: 'inventario/entradas', element: <EntradasPage /> },
+          { path: 'inventario/entradas/nueva', element: <NuevaEntradaPage /> },
+          { path: 'inventario/entradas/:id', element: <EntradaDetallePage /> },
+          { path: 'inventario/:id', element: <KardexPage /> },
           { path: 'admin/usuarios', element: <UsuariosPage /> },
           { path: 'admin/productos', element: <ProductosPage /> },
           { path: 'admin/lineas', element: <LineasPage /> },
           { path: 'admin/grupos', element: <GruposPage /> },
           { path: 'admin/pesos', element: <PesosPage /> },
           { path: 'admin/causales', element: <CausalesPage /> },
+          { path: 'admin/inventario', element: <ItemsInventarioPage /> },
         ],
       },
     ],

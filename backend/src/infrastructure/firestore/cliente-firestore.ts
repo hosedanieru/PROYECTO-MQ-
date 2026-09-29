@@ -47,6 +47,9 @@ export const COLECCION = {
   asignacionesLinea: 'asignacionesLinea',
   causalesAveria: 'causalesAveria',
   reportesAveria: 'reportesAveria',
+  itemsInventario: 'itemsInventario',
+  movimientosInventario: 'movimientosInventario',
+  entradasMercancia: 'entradasMercancia',
 } as const;
 
 export class ClienteFirestore {

@@ -30,6 +30,11 @@ import { AsignacionFirestoreRepository } from '../src/infrastructure/firestore/r
 import { AsistenciaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asistencia.firestore.repository.js';
 import { CausalAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/causal-averia.firestore.repository.js';
 import { ReporteAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/reporte-averia.firestore.repository.js';
+import {
+  EntradaMercanciaFirestoreRepository,
+  ItemInventarioFirestoreRepository,
+  MovimientoInventarioFirestoreRepository,
+} from '../src/infrastructure/firestore/repositorios/inventario.firestore.repositories.js';
 import { AuditoriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/auditoria.firestore.repository.js';
 import { GrupoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/grupo.firestore.repository.js';
 import {
@@ -149,6 +154,9 @@ describe('atomicidad', () => {
           asignaciones: new AsignacionFirestoreRepository(c),
           causales: new CausalAveriaFirestoreRepository(c),
           reportesAveria: new ReporteAveriaFirestoreRepository(c),
+          itemsInventario: new ItemInventarioFirestoreRepository(c),
+          movimientosInventario: new MovimientoInventarioFirestoreRepository(c),
+          entradasMercancia: new EntradaMercanciaFirestoreRepository(c),
         });
       }),
   };

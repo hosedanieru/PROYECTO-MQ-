@@ -45,6 +45,12 @@ export const PERMISOS = [
   { codigo: 'averia.reportar', modulo: 'averia', descripcion: 'Enviar reportes de averías con sus fotos' },
   { codigo: 'averia.consultar', modulo: 'averia', descripcion: 'Consultar reportes de averías y sus fotos' },
   { codigo: 'averia.corregir', modulo: 'averia', descripcion: 'Corregir o anular un reporte de averías (administrador)' },
+
+  // Inventario
+  { codigo: 'inventario.consultar', modulo: 'inventario', descripcion: 'Ver existencias y kardex' },
+  { codigo: 'inventario.registrar', modulo: 'inventario', descripcion: 'Registrar entradas y salidas de inventario' },
+  { codigo: 'inventario.ajustar', modulo: 'inventario', descripcion: 'Registrar ajustes de inventario con motivo (administrador)' },
+  { codigo: 'inventario.catalogo', modulo: 'inventario', descripcion: 'Crear y editar ítems de inventario (administrador)' },
 ] as const;
 
 export type CodigoPermiso = (typeof PERMISOS)[number]['codigo'];
@@ -77,8 +83,8 @@ export const ROLES: ReadonlyArray<{
       'catalogo.editar',
       // MFR: el coordinador carga la programación y arma su turno.
       'mfr.consultar', 'mfr.cargar_programacion', 'mfr.configurar_turno',
-      // Averías (usuario, 2026-09-28): reporta; corregir y anular es del administrador.
-      'averia.reportar', 'averia.consultar',
+      // Averías e inventario: por ahora solo el administrador (usuario,
+      // 2026-09-29). Los roles se reparten al final; los permisos ya existen.
     ],
   },
   {
@@ -86,13 +92,14 @@ export const ROLES: ReadonlyArray<{
     nombre: 'Patinador / Auxiliar logístico',
     descripcion: 'Entrega la remisión al OPA, firma como verificador e ingresa el PT al WMS de bodega.',
     // Decisión del área (2026-09-16): la respuesta del OPA la registra solo el coordinador.
-    permisos: ['remision.consultar', 'remision.entregar', 'catalogo.consultar', 'averia.reportar', 'averia.consultar'],
+    // Averías e inventario: por ahora solo el administrador (usuario, 2026-09-29).
+    permisos: ['remision.consultar', 'remision.entregar', 'catalogo.consultar'],
   },
   {
     codigo: 'CONSULTA',
     nombre: 'Consulta',
     descripcion: 'Solo lectura. No modifica información.',
-    permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar', 'mfr.consultar', 'averia.consultar'],
+    permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar', 'mfr.consultar'],
   },
 ];
 

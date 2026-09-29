@@ -3,6 +3,7 @@
  * ==================================
  *
  *   GET   /api/averias?desde=&hasta=&turnoId=&grupoId=&estado=      averia.consultar
+ *   GET   /api/averias/indicador?desde=&hasta=                      averia.consultar (% contra el DPP, máx. 1 %)
  *   GET   /api/averias/:id                                          averia.consultar
  *   GET   /api/averias/:id/registros/:registroId/fotos/:tipo        averia.consultar (la imagen)
  *   POST  /api/averias                                              averia.reportar  (multipart)
@@ -46,6 +47,7 @@ import {
   CrearReporteAveriaUseCase,
   type RegistroNuevoAveria,
 } from '../../application/averia/reporte-averia.use-cases.js';
+import { IndicadorAveriasUseCase } from '../../application/averia/indicador-averias.use-case.js';
 import {
   ALMACEN_DE_EVIDENCIAS,
   TAMANO_MAXIMO_FOTO,
@@ -55,13 +57,13 @@ import {
 import { DatosAveriaInvalidosError, ReporteAveriaNoEncontradoError } from '../../domain/averia/averia.errors.js';
 import { TIPOS_EVIDENCIA, totalizarUnidades, type TipoEvidencia } from '../../domain/averia/registro-averia.js';
 import {
-  MAXIMO_DIAS_LISTADO,
   MAXIMO_REGISTROS_POR_REPORTE,
   REPORTE_AVERIA_REPOSITORY,
   type ReporteAveria,
   type ReporteAveriaRepository,
 } from '../../domain/averia/reporte-averia.js';
 import { fechaOperativaADate } from '../../domain/shared/fecha-operativa.js';
+import { validarRango } from '../../domain/shared/rango-fechas.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decoradores.js';
 import {
@@ -69,6 +71,7 @@ import {
   CorregirRegistroAveriaDto,
   CrearReporteAveriaDto,
   FiltroReportesAveriaDto,
+  RangoIndicadorDto,
 } from './dto/reporte-averia.dto.js';
 
 /** Lo que entrega multer; se tipa aquí para no depender de @types/multer. */
@@ -101,6 +104,7 @@ export class ReporteAveriaController {
     private readonly crearReporte: CrearReporteAveriaUseCase,
     private readonly corregirRegistro: CorregirRegistroAveriaUseCase,
     private readonly anularReporte: AnularReporteAveriaUseCase,
+    private readonly indicadorAverias: IndicadorAveriasUseCase,
     @Inject(REPORTE_AVERIA_REPOSITORY) private readonly reportes: ReporteAveriaRepository,
     @Inject(ALMACEN_DE_EVIDENCIAS) private readonly almacen: AlmacenDeEvidencias,
   ) {}
@@ -110,11 +114,7 @@ export class ReporteAveriaController {
   async listar(@Query() filtro: FiltroReportesAveriaDto) {
     const desde = fechaOperativaADate(filtro.desde);
     const hasta = fechaOperativaADate(filtro.hasta);
-    const dias = (hasta.getTime() - desde.getTime()) / 86_400_000;
-    if (dias < 0) throw new DatosAveriaInvalidosError('La fecha "desde" no puede ser posterior a "hasta".');
-    if (dias > MAXIMO_DIAS_LISTADO) {
-      throw new DatosAveriaInvalidosError(`El rango máximo del listado es de ${MAXIMO_DIAS_LISTADO} días.`);
-    }
+    validarRango(desde, hasta);
     const reportes = await this.reportes.listar({
       desde,
       hasta,
@@ -123,6 +123,13 @@ export class ReporteAveriaController {
       estado: filtro.estado,
     });
     return reportes.map(presentar);
+  }
+
+  /** % de averías contra el DPP del periodo (máximo 1 % por contrato). Va antes de `:id`. */
+  @Get('indicador')
+  @RequierePermisos('averia.consultar')
+  indicador(@Query() rango: RangoIndicadorDto) {
+    return this.indicadorAverias.ejecutar(fechaOperativaADate(rango.desde), fechaOperativaADate(rango.hasta));
   }
 
   @Get(':id')

@@ -22,6 +22,11 @@ import { AsignacionPrismaRepository } from './asignacion.prisma.repository.js';
 import { AuditoriaPrismaRepository } from './auditoria.prisma.repository.js';
 import { CausalAveriaPrismaRepository } from './causal-averia.prisma.repository.js';
 import { ReporteAveriaPrismaRepository } from './reporte-averia.prisma.repository.js';
+import {
+  EntradaMercanciaPrismaRepository,
+  ItemInventarioPrismaRepository,
+  MovimientoInventarioPrismaRepository,
+} from './inventario.prisma.repositories.js';
 import { AsistenciaPrismaRepository } from './asistencia.prisma.repository.js';
 import { GrupoPrismaRepository } from './grupo.prisma.repository.js';
 import {
@@ -63,6 +68,9 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
           asignaciones: new AsignacionPrismaRepository(tx),
           causales: new CausalAveriaPrismaRepository(tx),
           reportesAveria: new ReporteAveriaPrismaRepository(tx),
+          itemsInventario: new ItemInventarioPrismaRepository(tx),
+          movimientosInventario: new MovimientoInventarioPrismaRepository(tx),
+          entradasMercancia: new EntradaMercanciaPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

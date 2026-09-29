@@ -4,8 +4,8 @@ import {
   CausalNoEncontradaError,
   DatosAveriaInvalidosError,
   ReporteAveriaNoModificableError,
-  SinTurnoParaLaHoraError,
 } from '../../domain/averia/averia.errors.js';
+import { SinTurnoConfiguradoError } from '../../domain/shared/errores.js';
 import type { ArchivoEvidencia } from '../../domain/averia/almacen-evidencias.js';
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
 import { ProductoNoEncontradoError } from '../../domain/producto/producto.errors.js';
@@ -138,7 +138,7 @@ describe('Reporte de averías — casos de uso', () => {
 
     it('sin horarios configurados no puede decidir el turno', async () => {
       const sinHorarios = new CrearReporteAveriaUseCase(uow, new HorarioRepositorioFalso([]), almacen, reloj('2026-09-28T15:10:00-05:00'));
-      await expect(sinHorarios.ejecutar({ grupoId: 'G1', registros: [fila()], usuarioId: 'u1' })).rejects.toBeInstanceOf(SinTurnoParaLaHoraError);
+      await expect(sinHorarios.ejecutar({ grupoId: 'G1', registros: [fila()], usuarioId: 'u1' })).rejects.toBeInstanceOf(SinTurnoConfiguradoError);
     });
   });
 
