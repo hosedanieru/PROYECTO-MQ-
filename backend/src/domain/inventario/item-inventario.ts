@@ -20,6 +20,11 @@
  *
  * No se elimina: se desactiva. El tipo y el producto enlazado no se
  * cambian después de crear (el kardex depende de ellos).
+ *
+ * Un solo módulo (usuario, 2026-09-29: "productos e inventario son un
+ * solo apartado"): crear un producto crea su ítem de PT, y el PT toma
+ * código, descripción y ACTIVO de su producto. Se activa o desactiva
+ * desde el producto; así nunca quedan desincronizados.
  */
 
 import { DatosInventarioInvalidosError } from './inventario.errors.js';
@@ -81,6 +86,18 @@ export function validarDatosItem(datos: DatosItem): DatosItem {
   return { tipo: datos.tipo, codigo, descripcion, unidadMedida, productoId: null };
 }
 
+/** Lo que el PT toma de su producto. */
+export interface ProductoDelPt {
+  codigo: string;
+  descripcion: string;
+  activo: boolean;
+}
+
+/** Ítem de PT que se crea junto con su producto (un producto = un PT en el inventario). */
+export function datosItemDePt(productoId: string): DatosItem {
+  return { tipo: 'PT', codigo: null, descripcion: null, unidadMedida: UNIDAD_PT, productoId };
+}
+
 export interface FiltroItems {
   tipo?: TipoItem;
   /** Busca en código y descripción (contiene, sin distinguir mayúsculas). */
@@ -94,7 +111,12 @@ export interface ItemInventarioRepository {
   /** Código propio de INSUMO / PI. */
   buscarPorCodigo(codigo: string): Promise<ItemInventario | null>;
   buscarPorProducto(productoId: string): Promise<ItemInventario | null>;
-  crear(datos: DatosItem): Promise<ItemInventario>;
+  /**
+   * `producto`: para un PT recién creado en la misma transacción. Se pasa
+   * para que el repositorio no tenga que releerlo (en Firestore, dentro
+   * de una transacción no se puede leer después de escribir).
+   */
+  crear(datos: DatosItem, producto?: ProductoDelPt): Promise<ItemInventario>;
   actualizar(id: string, cambios: CambiosItem): Promise<ItemInventario>;
   /**
    * Lee el ítem y lo BLOQUEA hasta que termine la transacción, para que

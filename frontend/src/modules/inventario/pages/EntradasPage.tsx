@@ -41,12 +41,9 @@ export function EntradasPage() {
   }
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5">
+    <section className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link to="/inventario" className="text-sm text-marca hover:underline">← Inventario</Link>
-          <h1 className="mt-1 text-2xl font-semibold text-tinta">Entradas de mercancía</h1>
-        </div>
+        <p className="text-sm text-tinta-suave">Lo que ha llegado a la planta, por documento de soporte.</p>
         {tienePermiso('inventario.registrar') && (
           <Link to="/inventario/entradas/nueva" className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-marca-hover">
             + Nueva entrada

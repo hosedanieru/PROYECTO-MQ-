@@ -22,10 +22,10 @@ export function EntradaDetallePage() {
   const e = entrada.data
 
   return (
-    <section className="mx-auto max-w-4xl space-y-5">
+    <section className="space-y-5">
       <header>
         <Link to="/inventario/entradas" className="text-sm text-marca hover:underline">← Entradas</Link>
-        <h1 className="mt-1 text-2xl font-semibold text-tinta">Entrada · {e.documento}</h1>
+        <h2 className="mt-1 text-xl font-semibold text-tinta">Entrada · {e.documento}</h2>
       </header>
 
       <Tarjeta>

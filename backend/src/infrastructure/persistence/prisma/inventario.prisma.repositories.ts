@@ -37,7 +37,7 @@ import type { ClientePrisma } from './cliente-prisma.js';
 const TIPO_ITEM: Record<TipoItemPrisma, TipoItem> = { INSUMO: 'INSUMO', PI: 'PI', PT: 'PT' };
 const TIPO_MOV: Record<TipoMovPrisma, TipoMovimiento> = { ENTRADA: 'ENTRADA', SALIDA: 'SALIDA', AJUSTE: 'AJUSTE' };
 
-const CON_PRODUCTO = { producto: { select: { codigo: true, descripcion: true } } } satisfies Prisma.ItemInventarioInclude;
+const CON_PRODUCTO = { producto: { select: { codigo: true, descripcion: true, activo: true } } } satisfies Prisma.ItemInventarioInclude;
 type FilaItem = Prisma.ItemInventarioGetPayload<{ include: typeof CON_PRODUCTO }>;
 
 function itemADominio(f: FilaItem): ItemInventario {
@@ -50,7 +50,8 @@ function itemADominio(f: FilaItem): ItemInventario {
     unidadMedida: f.unidadMedida,
     productoId: f.productoId,
     existencia: Number(f.existencia),
-    activo: f.activo,
+    // El PT se activa y desactiva desde su producto.
+    activo: f.producto ? f.producto.activo : f.activo,
   };
 }
 
@@ -62,7 +63,6 @@ export class ItemInventarioPrismaRepository implements ItemInventarioRepository 
     const filas = await this.cliente.itemInventario.findMany({
       where: {
         ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
-        ...(filtro.soloActivos ? { activo: true } : {}),
         ...(texto
           ? {
               OR: [
@@ -76,7 +76,11 @@ export class ItemInventarioPrismaRepository implements ItemInventarioRepository 
       },
       include: CON_PRODUCTO,
     });
-    return filas.map(itemADominio).sort((a, b) => a.tipo.localeCompare(b.tipo) || a.codigo.localeCompare(b.codigo));
+    // "Activo" del PT sale del producto: se filtra después de resolverlo.
+    return filas
+      .map(itemADominio)
+      .filter((i) => !filtro.soloActivos || i.activo)
+      .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.codigo.localeCompare(b.codigo));
   }
 
   async buscarPorId(id: string): Promise<ItemInventario | null> {
@@ -94,6 +98,7 @@ export class ItemInventarioPrismaRepository implements ItemInventarioRepository 
     return f ? itemADominio(f) : null;
   }
 
+  // En PostgreSQL releer dentro de la transacción no es problema: no hace falta el producto.
   async crear(datos: DatosItem): Promise<ItemInventario> {
     const f = await this.cliente.itemInventario.create({ data: datos, include: CON_PRODUCTO });
     return itemADominio(f);

@@ -4,6 +4,10 @@
  *
  * Carga manual uno a uno (decisión del 2026-09-16). Sin "eliminar": un
  * producto referenciado por remisiones se desactiva y deja de ofrecerse.
+ *
+ * Vive dentro del módulo de Inventario (pestaña "Productos (PT)"; usuario,
+ * 2026-09-29: un solo apartado). Crear un producto crea su PT en el
+ * inventario, y desactivarlo desactiva el PT.
  */
 
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -88,6 +92,8 @@ export function ProductosPage() {
   const invalidar = () => {
     void qc.invalidateQueries({ queryKey: ['productos'] })
     void qc.invalidateQueries({ queryKey: ['mfr'] })
+    // Crear un producto crea su PT, y desactivarlo desactiva el PT: cambia el inventario.
+    void qc.invalidateQueries({ queryKey: ['inventario'] })
   }
   const guardarEstandar = useMutation({
     mutationFn: () =>
@@ -165,8 +171,8 @@ export function ProductosPage() {
 
   return (
     <section className="space-y-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-tinta">Productos</h1>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-tinta-suave">Catálogo de PT: el mismo de remisiones y del DPP. Cada producto tiene su existencia en la pestaña Existencias.</p>
         <div className="flex items-center gap-3">
           {tienePermiso('catalogo.editar_estandares') && (
             <Link to="/admin/pesos" className="text-sm text-marca hover:underline">

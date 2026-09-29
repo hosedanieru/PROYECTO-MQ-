@@ -548,6 +548,7 @@ La última pregunta es clave: si calidad debe aprobar antes de que el patinador 
 - **Entrada de mercancía** hecha: un documento con varias líneas (insumos y PI), todo o nada, cada línea en el kardex.
 - **Receta:** sí existe cuánto PI lleva cada PT. El usuario prefiere **digitarla a mano** para revisar que el funcionamiento sea óptimo. PENDIENTE confirmar el alcance: receta cargada a mano + consumo real registrado a mano, para comparar teórico vs real (la comparación es un indicador: va al final).
 - **Roles:** todo lo nuevo, solo para el administrador; se reparten al final.
+- **Productos e inventario, un solo módulo:** una sola entrada "Inventario" con pestañas (Existencias, Entradas, Productos (PT), PI e insumos). Crear un producto crea su PT; el PT toma código, descripción y estado del producto. Las tablas siguen separadas por dentro (remisiones, DPP y averías solo aceptan PT).
 
 ### Alcance aclarado por el usuario (2026-09-22)
 

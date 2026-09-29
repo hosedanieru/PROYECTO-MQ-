@@ -11,6 +11,7 @@ import type {
   FiltroItems,
   ItemInventario,
   ItemInventarioRepository,
+  ProductoDelPt,
 } from '../../domain/inventario/item-inventario.js';
 import type {
   FiltroMovimientos,
@@ -71,8 +72,8 @@ export class ItemInventarioRepositorioFalso implements ItemInventarioRepository 
     return Promise.resolve(this.items.find((x) => x.productoId === productoId) ?? null);
   }
 
-  async crear(datos: DatosItem): Promise<ItemInventario> {
-    const producto = datos.productoId ? await this.productos?.buscarPorId(datos.productoId) : null;
+  async crear(datos: DatosItem, conocido?: ProductoDelPt): Promise<ItemInventario> {
+    const producto = conocido ?? (datos.productoId ? await this.productos?.buscarPorId(datos.productoId) : null);
     const nuevo: ItemInventario = {
       id: `item-${++this.secuencia}`,
       tipo: datos.tipo,

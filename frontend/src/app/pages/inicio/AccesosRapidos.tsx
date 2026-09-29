@@ -50,10 +50,10 @@ const ACCESOS: Acceso[] = [
     Icono: IconoCalendario,
   },
   {
-    a: '/admin/productos',
-    titulo: 'Productos',
-    descripcion: 'Catálogo, empaque, cajas por hora y peso por caja.',
-    permiso: 'catalogo.editar',
+    a: '/inventario',
+    titulo: 'Inventario',
+    descripcion: 'Productos, PI e insumos: catálogo, entradas y existencias.',
+    permiso: 'inventario.consultar',
     Icono: IconoCaja,
   },
   {

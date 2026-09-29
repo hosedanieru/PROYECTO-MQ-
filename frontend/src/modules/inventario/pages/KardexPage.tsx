@@ -40,15 +40,15 @@ export function KardexPage() {
   const turno = (tid: string) => turnos.data?.find((t) => t.id === tid)?.codigo ?? '—'
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/inventario" className="text-sm text-marca hover:underline">← Inventario</Link>
-          <h1 className="mt-1 flex items-center gap-3 text-2xl font-semibold text-tinta">
+          <Link to="/inventario" className="text-sm text-marca hover:underline">← Existencias</Link>
+          <h2 className="mt-1 flex items-center gap-3 text-xl font-semibold text-tinta">
             <span className="cifra">{i.codigo}</span>
             <Badge tono={TONO_TIPO[i.tipo]}>{i.tipo}</Badge>
             {!i.activo && <Badge tono="neutro">Inactivo</Badge>}
-          </h1>
+          </h2>
           <p className="text-sm text-tinta-suave">{i.descripcion}</p>
         </div>
         {tienePermiso('inventario.registrar') && i.activo && <Boton onClick={() => setMoviendo(true)}>Registrar movimiento</Boton>}

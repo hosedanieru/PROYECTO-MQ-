@@ -12,6 +12,7 @@ import {
   UnidadDeTrabajoFalsa,
   UsuarioRepositorioFalso,
 } from '../pruebas/dobles-en-memoria.js';
+import { ItemInventarioRepositorioFalso } from '../pruebas/dobles-inventario.js';
 import {
   ActualizarProductoUseCase,
   CrearProductoUseCase,
@@ -34,17 +35,20 @@ function comando(sobrescribir: Partial<CrearProductoComando> = {}): CrearProduct
 
 describe('Productos', () => {
   let productos: ProductoRepositorioFalso;
+  let items: ItemInventarioRepositorioFalso;
   let auditoria: AuditoriaRepositorioFalso;
   let crear: CrearProductoUseCase;
   let actualizar: ActualizarProductoUseCase;
 
   beforeEach(() => {
     productos = new ProductoRepositorioFalso();
+    items = new ItemInventarioRepositorioFalso(productos);
     auditoria = new AuditoriaRepositorioFalso();
     const uow = new UnidadDeTrabajoFalsa({
       remisiones: REMISIONES_SIN_USO,
       usuarios: new UsuarioRepositorioFalso(),
       productos,
+      itemsInventario: items,
       auditoria,
     });
     crear = new CrearProductoUseCase(uow);
@@ -63,6 +67,15 @@ describe('Productos', () => {
         accion: 'CREAR',
         usuarioId: 'user-admin',
       });
+    });
+
+    it('crea también su ítem de PT en el inventario (un solo módulo), con existencia 0', async () => {
+      const creado = await crear.ejecutar(comando());
+
+      expect(items.items).toEqual([
+        expect.objectContaining({ tipo: 'PT', productoId: creado.id, codigo: '300058141', unidadMedida: 'CAJA', existencia: 0 }),
+      ]);
+      expect(auditoria.entradas.map((a) => a.entidad)).toEqual(['producto', 'item_inventario']);
     });
 
     it('recorta espacios del código y la descripción', async () => {
@@ -127,7 +140,8 @@ describe('Productos', () => {
 
       expect(actualizado.cajasPorEstiba).toBe(40);
       expect(actualizado.descripcion).toBe(creado.descripcion);
-      expect(auditoria.entradas[1]).toMatchObject({
+      // Al crear quedan dos entradas (producto y su PT); la edición es la última.
+      expect(auditoria.entradas.at(-1)).toMatchObject({
         accion: 'ACTUALIZAR',
         valorAnterior: { cajasPorEstiba: 36 },
         valorNuevo: { cajasPorEstiba: 40 },

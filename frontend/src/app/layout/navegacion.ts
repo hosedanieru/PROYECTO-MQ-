@@ -19,7 +19,6 @@ import type { ClaveTexto } from '../../shared/idioma/textos/es'
 import {
   IconoAveria,
   IconoBalanza,
-  IconoCaja,
   IconoCalendario,
   IconoInicio,
   IconoInventario,
@@ -58,19 +57,17 @@ export const NAVEGACION: SeccionNav[] = [
       { a: '/mfr', texto: 'nav.mfr', permiso: 'mfr.consultar', Icono: IconoTablero, exacta: true },
       { a: '/mfr/programacion', texto: 'nav.programacion', permiso: 'mfr.consultar', Icono: IconoCalendario },
       { a: '/averias', texto: 'nav.averias', permiso: 'averia.consultar', Icono: IconoAveria },
-      { a: '/inventario', texto: 'nav.inventario', permiso: 'inventario.consultar', Icono: IconoInventario, exacta: true },
-      { a: '/inventario/entradas', texto: 'nav.entradas', permiso: 'inventario.consultar', Icono: IconoRemision },
+      // Un solo módulo (2026-09-29): productos, PI, insumos, entradas y existencias van en pestañas adentro.
+      { a: '/inventario', texto: 'nav.inventario', permiso: 'inventario.consultar', Icono: IconoInventario },
     ],
   },
   {
     titulo: 'nav.administracion',
     enlaces: [
-      { a: '/admin/productos', texto: 'nav.productos', permiso: 'catalogo.editar', Icono: IconoCaja },
       { a: '/admin/lineas', texto: 'nav.lineas', permiso: 'catalogo.editar', Icono: IconoLinea },
       { a: '/admin/pesos', texto: 'nav.pesos', permiso: 'catalogo.editar_estandares', Icono: IconoBalanza },
       { a: '/admin/grupos', texto: 'nav.grupos', permiso: 'catalogo.editar', Icono: IconoPersonas },
       { a: '/admin/causales', texto: 'nav.causales', permiso: 'catalogo.editar', Icono: IconoLista },
-      { a: '/admin/inventario', texto: 'nav.itemsInventario', permiso: 'inventario.catalogo', Icono: IconoInventario },
       { a: '/admin/usuarios', texto: 'nav.usuarios', permiso: 'admin.usuarios', Icono: IconoUsuario },
     ],
   },

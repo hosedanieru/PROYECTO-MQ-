@@ -5,6 +5,10 @@
  * Crear y actualizar productos del catálogo. Ambos dentro de la unidad
  * de trabajo con auditoría: el catálogo es la fuente de los snapshots
  * que firman las remisiones, así que cada cambio debe quedar rastreado.
+ *
+ * Crear un producto crea también su ítem de PT en el inventario (un solo
+ * módulo, 2026-09-29). Desactivar el producto desactiva el PT: el ítem
+ * toma el "activo" del producto, no hay que sincronizar nada.
  */
 
 import {
@@ -17,6 +21,7 @@ import {
   CodigoProductoDuplicadoError,
   ProductoNoEncontradoError,
 } from '../../domain/producto/producto.errors.js';
+import { datosItemDePt } from '../../domain/inventario/item-inventario.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
 
 /** Al crear se admiten los estándares (cajas/h, peso) de una vez, sin motivo: es el valor inicial. */
@@ -30,19 +35,33 @@ export class CrearProductoUseCase {
   async ejecutar(comando: CrearProductoComando): Promise<Producto> {
     const datos = validarDatosProducto(comando);
 
-    return this.uow.ejecutar(async ({ productos, auditoria }) => {
+    return this.uow.ejecutar(async ({ productos, itemsInventario, auditoria }) => {
       const existente = await productos.buscarPorCodigo(datos.codigo);
       if (existente) {
         throw new CodigoProductoDuplicadoError(datos.codigo);
       }
 
       const creado = await productos.crear(datos);
+      // Productos e inventario son un solo módulo (usuario, 2026-09-29):
+      // todo producto nace con su ítem de PT, en la misma transacción.
+      const pt = await itemsInventario.crear(datosItemDePt(creado.id), {
+        codigo: creado.codigo,
+        descripcion: creado.descripcion,
+        activo: creado.activo,
+      });
 
       await auditoria.registrar({
         entidad: 'producto',
         entidadId: creado.id,
         accion: 'CREAR',
         valorNuevo: creado,
+        usuarioId: comando.usuarioId,
+      });
+      await auditoria.registrar({
+        entidad: 'item_inventario',
+        entidadId: pt.id,
+        accion: 'CREAR',
+        valorNuevo: pt,
         usuarioId: comando.usuarioId,
       });
 

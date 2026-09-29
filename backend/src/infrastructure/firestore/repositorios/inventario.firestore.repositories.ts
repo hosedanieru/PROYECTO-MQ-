@@ -22,6 +22,7 @@ import type {
   FiltroItems,
   ItemInventario,
   ItemInventarioRepository,
+  ProductoDelPt,
 } from '../../../domain/inventario/item-inventario.js';
 import type {
   EntradaMercancia,
@@ -36,9 +37,7 @@ import type {
 } from '../../../domain/inventario/movimiento-inventario.js';
 import { aDate, claveFecha, COLECCION, type ClienteFirestore } from '../cliente-firestore.js';
 
-type ProductoBasico = { codigo: string; descripcion: string };
-
-function itemADominio(id: string, d: DocumentData, producto: ProductoBasico | null): ItemInventario {
+function itemADominio(id: string, d: DocumentData, producto: ProductoDelPt | null): ItemInventario {
   return {
     id,
     tipo: d.tipo,
@@ -47,9 +46,12 @@ function itemADominio(id: string, d: DocumentData, producto: ProductoBasico | nu
     unidadMedida: d.unidadMedida,
     productoId: d.productoId ?? null,
     existencia: d.existencia ?? 0,
-    activo: d.activo ?? true,
+    // El PT se activa y desactiva desde su producto.
+    activo: producto ? producto.activo : (d.activo ?? true),
   };
 }
+
+const productoDelPt = (d: DocumentData): ProductoDelPt => ({ codigo: d.codigo, descripcion: d.descripcion, activo: d.activo ?? true });
 
 export class ItemInventarioFirestoreRepository implements ItemInventarioRepository {
   constructor(private readonly cliente: ClienteFirestore) {}
@@ -58,10 +60,10 @@ export class ItemInventarioFirestoreRepository implements ItemInventarioReposito
     return this.cliente.coleccion(COLECCION.itemsInventario);
   }
 
-  private async producto(productoId: string | null | undefined): Promise<ProductoBasico | null> {
+  private async producto(productoId: string | null | undefined): Promise<ProductoDelPt | null> {
     if (!productoId) return null;
     const snap = await this.cliente.obtener(this.cliente.coleccion(COLECCION.productos).doc(productoId));
-    return snap.exists ? { codigo: snap.data()!.codigo, descripcion: snap.data()!.descripcion } : null;
+    return snap.exists ? productoDelPt(snap.data()!) : null;
   }
 
   private async aDominio(snap: DocumentSnapshot): Promise<ItemInventario | null> {
@@ -75,7 +77,7 @@ export class ItemInventarioFirestoreRepository implements ItemInventarioReposito
       this.cliente.consultar(this.coleccion()),
       this.cliente.consultar(this.cliente.coleccion(COLECCION.productos)),
     ]);
-    const porId = new Map(productos.docs.map((p) => [p.id, { codigo: p.data().codigo, descripcion: p.data().descripcion }]));
+    const porId = new Map(productos.docs.map((p) => [p.id, productoDelPt(p.data())]));
     const texto = filtro.texto?.trim().toLowerCase();
     return items.docs
       .map((s) => itemADominio(s.id, s.data(), s.data().productoId ? (porId.get(s.data().productoId) ?? null) : null))
@@ -102,9 +104,10 @@ export class ItemInventarioFirestoreRepository implements ItemInventarioReposito
     return q.empty ? null : this.aDominio(q.docs[0]);
   }
 
-  async crear(datos: DatosItem): Promise<ItemInventario> {
+  async crear(datos: DatosItem, conocido?: ProductoDelPt): Promise<ItemInventario> {
     // Lectura antes de la escritura (regla de las transacciones de Firestore).
-    const producto = await this.producto(datos.productoId);
+    // Si el producto se acaba de crear en esta transacción, viene en `conocido`.
+    const producto = conocido ?? (await this.producto(datos.productoId));
     const id = this.cliente.nuevoId(COLECCION.itemsInventario);
     const documento = { ...datos, existencia: 0, activo: true };
     await this.cliente.guardar(this.coleccion().doc(id), documento);

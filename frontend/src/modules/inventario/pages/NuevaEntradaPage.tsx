@@ -82,7 +82,7 @@ export function NuevaEntradaPage() {
     <section className="mx-auto max-w-4xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold text-tinta">Entrada de mercancía</h1>
+          <h2 className="text-xl font-semibold text-tinta">Nueva entrada de mercancía</h2>
           <p className="text-sm text-tinta-suave">Lo que llega en un mismo documento: insumos y PI para reempaque.</p>
         </div>
         <Link to="/inventario/entradas" className="text-sm text-marca hover:underline">← Entradas</Link>

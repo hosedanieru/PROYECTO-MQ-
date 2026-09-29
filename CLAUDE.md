@@ -374,9 +374,10 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
   - **Sin existencia negativa** (regla del usuario). `item_inventario.existencia` se guarda (excepción consciente a "lo derivado se calcula"): es la fila que se bloquea con `SELECT … FOR UPDATE` para que dos salidas simultáneas no saquen la misma existencia (probado en `test/inventario.e2e-spec.ts`), y en Firestore sumar el kardex crecería sin límite. Cuadra con Σ movimientos.
   - **Entrada de mercancía** (2026-09-29): lo que llega en un mismo documento = encabezado (`entrada_mercancia`: documento de soporte obligatorio, quién entrega, observación; fecha/hora/turno/quién recibe automáticos) + líneas, que son los movimientos ENTRADA con `entradaId` (no se duplican). Todo o nada. Recibe INSUMOS y PI (el PT se produce, no llega de afuera); máx. 50 líneas (límite técnico). Los ítems se bloquean en orden de id (evita deadlock). PI = lo que llega de PepsiCo para reempaque (usuario, 2026-09-29).
   - Permisos: `inventario.consultar`, `inventario.registrar`, `inventario.ajustar`, `inventario.catalogo`. **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final; lo mismo para averías). Entradas/salidas y ajustes van por rutas distintas.
-  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/admin/inventario` (ítems).
+  - **Productos e inventario son UN SOLO MÓDULO** (usuario, 2026-09-29): en el menú hay una sola entrada **Inventario** con pestañas (`InventarioLayout`): Existencias · Entradas de mercancía · Productos (PT) · PI e insumos. Se fusionó lo que ve el usuario, **no las tablas**: `producto` sigue aparte porque remisiones, DPP, tope y averías solo aceptan PT. **Crear un producto crea su ítem de PT** en la misma transacción (`CrearProductoUseCase`), y el PT toma código, descripción y **activo** de su producto (se activa/desactiva desde Productos; nunca se desincronizan). Los productos existentes recibieron su PT con la migración `20260929160000_pt_de_productos_existentes` (Firestore: `seed:firestore`).
+  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/inventario/productos` (antes `/admin/productos`), `/inventario/catalogo` (PI e insumos). Las rutas viejas redirigen.
   - Pendiente con el área (ROADMAP D3): qué es exactamente el PI, lista de insumos con códigos y unidades, cómo entran, consumo, conteo físico, receta, de quién son los insumos, WMS con número de remisión
-- 286 pruebas unitarias sin base de datos (`npm test`) + 15 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
+- 287 pruebas unitarias sin base de datos (`npm test`) + 15 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -395,9 +396,10 @@ frontend/src/
 │   ├── averias/    api, hooks (useAverias, useUrlDeArchivo), pages (lista, nuevo, detalle),
 │   │               componentes (AgregarAveria, CampoFoto, FotoEvidencia, CorregirRegistro/AnularReporte Dialogo),
 │   │               utils (comprimir-foto, totales)
-│   ├── inventario/ api, hooks (useInventario), tonos, MovimientoDialogo,
-│   │               pages (InventarioPage, KardexPage, EntradasPage, NuevaEntradaPage, EntradaDetallePage)
-│   └── admin/      UsuariosPage, ProductosPage, GruposPage, LineasPage, PesosPage, CausalesPage, ItemsInventarioPage
+│   ├── inventario/ InventarioLayout (pestañas), api, hooks (useInventario), tonos, MovimientoDialogo,
+│   │               pages (InventarioPage, KardexPage, EntradasPage, NuevaEntradaPage, EntradaDetallePage,
+│   │               ProductosPage, PiInsumosPage)
+│   └── admin/      UsuariosPage, GruposPage, LineasPage, PesosPage, CausalesPage
 ├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando,
 │                   Badge, Tarjeta, TarjetaKpi, Dato, Desplegable, Iconos, Logo, BotonTema, BotonIdioma,
 │                   graficas/ (Anillo, Barras, BarraProgreso, Dona)

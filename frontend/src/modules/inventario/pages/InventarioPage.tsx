@@ -47,22 +47,14 @@ export function InventarioPage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-tinta">Inventario</h1>
-          <p className="text-sm text-tinta-suave">Existencias de insumos, PI y PT. Cada movimiento queda en el kardex con quién, cuándo y por qué.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          {tienePermiso('inventario.catalogo') && (
-            <Link to="/admin/inventario" className="text-sm text-marca hover:underline">Administrar ítems →</Link>
-          )}
-          {tienePermiso('inventario.registrar') && (
-            <Link to="/inventario/entradas/nueva" className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-marca-hover">
-              + Entrada de mercancía
-            </Link>
-          )}
-        </div>
+        <p className="text-sm text-tinta-suave">Existencias de insumos, PI y PT. Cada movimiento queda en el kardex con quién, cuándo y por qué.</p>
+        {tienePermiso('inventario.registrar') && (
+          <Link to="/inventario/entradas/nueva" className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-marca-hover">
+            + Entrada de mercancía
+          </Link>
+        )}
       </header>
 
       <Tarjeta>
@@ -118,7 +110,7 @@ export function InventarioPage() {
               {items.data?.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">
-                    {texto || tipo ? 'Ningún ítem coincide con el filtro.' : 'Todavía no hay ítems de inventario. El administrador los crea en Administración → Ítems de inventario.'}
+                    {texto || tipo ? 'Ningún ítem coincide con el filtro.' : 'Todavía no hay ítems. Los productos se crean en la pestaña Productos (PT) y los PI e insumos en PI e insumos.'}
                   </td>
                 </tr>
               )}

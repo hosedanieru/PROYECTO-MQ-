@@ -89,8 +89,8 @@ export class ActualizarItemUseCase {
         Object.entries(comando.cambios).filter(([, v]) => v !== undefined),
       ) as CambiosItem;
 
-      if (actual.tipo === 'PT' && (cambios.codigo !== undefined || cambios.descripcion !== undefined)) {
-        throw new DatosInventarioInvalidosError('El código y la descripción del PT se cambian en el catálogo de productos.');
+      if (actual.tipo === 'PT' && (cambios.codigo !== undefined || cambios.descripcion !== undefined || activo !== undefined)) {
+        throw new DatosInventarioInvalidosError('Código, descripción y estado del PT se cambian desde su producto (pestaña Productos).');
       }
       // Se revalida el ítem completo con los cambios aplicados.
       const datos = validarDatosItem({

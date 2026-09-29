@@ -93,6 +93,29 @@ async function sembrarLineas(): Promise<void> {
   console.log(`  Líneas de producción: ${LINEAS_PRODUCCION.length}`);
 }
 
+/**
+ * Productos e inventario son un solo módulo (2026-09-29): cada producto
+ * tiene su ítem de PT. Equivale a la migración
+ * `20260929160000_pt_de_productos_existentes` de PostgreSQL. Idempotente:
+ * salta los productos que ya lo tienen.
+ */
+async function sembrarPtDeProductos(): Promise<void> {
+  const [productos, items] = await Promise.all([
+    db.collection(COLECCION.productos).get(),
+    db.collection(COLECCION.itemsInventario).where('tipo', '==', 'PT').get(),
+  ]);
+  const conPt = new Set(items.docs.map((i) => i.data().productoId));
+  let creados = 0;
+  for (const p of productos.docs) {
+    if (conPt.has(p.id)) continue;
+    await db.collection(COLECCION.itemsInventario).add({
+      tipo: 'PT', codigo: null, descripcion: null, unidadMedida: 'CAJA', productoId: p.id, existencia: 0, activo: true,
+    });
+    creados += 1;
+  }
+  console.log(`  itemsInventario (PT de productos): ${creados} nuevos`);
+}
+
 async function sembrarAdministradorInicial(): Promise<void> {
   const documento = process.env.ADMIN_INICIAL_DOCUMENTO?.trim();
   const contrasena = process.env.ADMIN_INICIAL_PASSWORD;
@@ -141,6 +164,7 @@ async function main(): Promise<void> {
     if (!(await ref.get()).exists) await ref.set({ ...causal, activo: true });
   }
   console.log(`  causalesAveria: ${CAUSALES_AVERIA.length}`);
+  await sembrarPtDeProductos();
   await sembrarAdministradorInicial();
   console.log('\nListo. El catálogo de productos se carga desde el panel.');
 }
