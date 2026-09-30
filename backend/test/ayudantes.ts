@@ -17,7 +17,7 @@ export const prisma = new PrismaClient({ adapter: crearAdaptadorPostgres() });
 export async function limpiarDatos(): Promise<void> {
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE remision_estiba, remision_version, auditoria, remision, consecutivo, bloque_programacion, asistencia_turno, asignacion_linea, ' +
-      'evidencia_averia, registro_averia, reporte_averia, movimiento_inventario, entrada_mercancia, item_inventario RESTART IDENTITY CASCADE',
+      'evidencia_averia, registro_averia, reporte_averia, movimiento_inventario, entrada_mercancia, receta_componente, receta, item_inventario, pi, insumo RESTART IDENTITY CASCADE',
   );
 }
 

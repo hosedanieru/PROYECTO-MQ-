@@ -94,9 +94,13 @@ export function KardexPage() {
                   <td className="px-4 py-2 text-tinta-suave">
                     {m.entradaId ? (
                       <Link to={`/inventario/entradas/${m.entradaId}`} className="text-marca hover:underline">{m.referencia ?? 'Entrada'}</Link>
+                    ) : m.remisionId ? (
+                      // Consumo por receta al aprobar la remisión.
+                      <Link to={`/remisiones/${m.remisionId}`} className="text-marca hover:underline">{m.referencia ?? 'Remisión'}</Link>
                     ) : null}
-                    {[m.entradaId ? null : m.referencia, m.motivo && `Motivo: ${m.motivo}`, m.observacion].filter(Boolean).join(' · ') ||
-                      (m.entradaId ? null : '—')}
+                    {' '}
+                    {[m.entradaId || m.remisionId ? null : m.referencia, m.conteoTexto, m.motivo && `Motivo: ${m.motivo}`, m.observacion].filter(Boolean).join(' · ') ||
+                      (m.entradaId || m.remisionId ? null : '—')}
                   </td>
                 </tr>
               ))}

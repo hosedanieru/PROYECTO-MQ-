@@ -50,6 +50,10 @@ export const COLECCION = {
   itemsInventario: 'itemsInventario',
   movimientosInventario: 'movimientosInventario',
   entradasMercancia: 'entradasMercancia',
+  unidadesMedida: 'unidadesMedida',
+  pis: 'pis',
+  insumos: 'insumos',
+  recetas: 'recetas',
 } as const;
 
 export class ClienteFirestore {
@@ -80,6 +84,15 @@ export class ClienteFirestore {
       this.tx.set(ref, datos, { merge: fusionar });
     } else {
       await conNombrePropio(() => ref.set(datos, { merge: fusionar }));
+    }
+  }
+
+  /** Como `guardar`, pero falla si el documento ya existe (equivale a una restricción única). */
+  async crearNuevo(ref: DocumentReference, datos: DocumentData): Promise<void> {
+    if (this.tx) {
+      this.tx.create(ref, datos);
+    } else {
+      await conNombrePropio(() => ref.create(datos));
     }
   }
 

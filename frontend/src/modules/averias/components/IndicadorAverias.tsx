@@ -52,7 +52,7 @@ export function IndicadorAverias({ desde, hasta }: { desde: string; hasta: strin
       {i.alertas.map((a) => <Alerta key={a} tipo="error">{a}</Alerta>)}
       {i.productosSinUnidadesPorCaja.length > 0 && (
         <Alerta tipo="advertencia">
-          Productos del DPP sin unidades por caja (su programado no se sumó): {i.productosSinUnidadesPorCaja.join(', ')}.
+          PT del DPP sin unidades por caja (su programado no se sumó): {i.productosSinUnidadesPorCaja.join(', ')}.
         </Alerta>
       )}
 
@@ -79,7 +79,7 @@ export function IndicadorAverias({ desde, hasta }: { desde: string; hasta: strin
             </tbody>
           </table>
         </Tarjeta>
-        <Tarjeta titulo="Por producto" descripcion="Los que tuvieron averías." sinRelleno>
+        <Tarjeta titulo="Por PT" descripcion="Los que tuvieron averías." sinRelleno>
           <table className="min-w-full text-sm">
             <tbody className="divide-y divide-borde">
               {i.porProducto.filter((p) => p.averiadasUnidades > 0).map((p) => (

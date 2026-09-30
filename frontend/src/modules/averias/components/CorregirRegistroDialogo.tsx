@@ -54,7 +54,7 @@ export function CorregirRegistroDialogo({ reporteId, registro, onCerrar }: Props
   return (
     <Dialogo abierto titulo="Corregir avería" onCerrar={onCerrar}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar() }}>
-        <Select etiqueta="Producto" value={form.productoId} onChange={(e) => setForm({ ...form, productoId: e.target.value })}>
+        <Select etiqueta="PT" value={form.productoId} onChange={(e) => setForm({ ...form, productoId: e.target.value })}>
           {/* Si el producto se desactivó, se sigue mostrando el que tiene el registro. */}
           {!productos.data?.some((p) => p.id === registro.productoId) && (
             <option value={registro.productoId}>{registro.productoCodigo} · {registro.productoDescripcion}</option>

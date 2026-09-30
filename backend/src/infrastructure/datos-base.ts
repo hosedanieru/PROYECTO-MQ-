@@ -202,6 +202,18 @@ export const GRUPOS: ReadonlyArray<{ codigo: string; nombre: string; descripcion
 ];
 
 // ============================================================
+// UNIDADES DE MEDIDA (inventario)
+// ============================================================
+
+/**
+ * Unidad base en que se cuentan PI e insumos (la lista desplegable). Solo
+ * UNIDAD: las demás (ROLLO, PAQUETE…) las crea el administrador según lo
+ * que maneje el área, para no inventar nombres. Caja y estiba no van
+ * aquí: son presentaciones con su equivalencia en cada PI o insumo.
+ */
+export const UNIDADES_MEDIDA: ReadonlyArray<{ codigo: string; nombre: string }> = [{ codigo: 'UNIDAD', nombre: 'Unidad' }];
+
+// ============================================================
 // CAUSALES DE AVERÍA
 // ============================================================
 

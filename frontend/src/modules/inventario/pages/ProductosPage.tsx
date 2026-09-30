@@ -1,13 +1,18 @@
 /**
- * ADMINISTRACIÓN DE PRODUCTOS
- * ===========================
+ * CATÁLOGO DE PT
+ * ==============
  *
  * Carga manual uno a uno (decisión del 2026-09-16). Sin "eliminar": un
- * producto referenciado por remisiones se desactiva y deja de ofrecerse.
+ * PT referenciado por remisiones se desactiva y deja de ofrecerse.
+ * (Por dentro la tabla sigue llamándose `producto`.)
  *
- * Vive dentro del módulo de Inventario (pestaña "Productos (PT)"; usuario,
- * 2026-09-29: un solo apartado). Crear un producto crea su PT en el
- * inventario, y desactivarlo desactiva el PT.
+ * Vive dentro del módulo de Inventario (pestaña "PT"; usuario,
+ * 2026-09-29: un solo apartado). Crear un PT crea su existencia en el
+ * inventario, y desactivarlo la desactiva.
+ *
+ * Receta (usuario, 2026-09-29): obligatoria al crear un PT nuevo; para
+ * los que ya existían se digita con el botón "Receta" de la fila, que
+ * guarda una versión nueva cada vez.
  */
 
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,17 +23,23 @@ import { Link } from 'react-router-dom'
 import { z } from 'zod'
 
 import { Alerta } from '../../../components/Alerta'
+import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
 import { Dialogo } from '../../../components/Dialogo'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
 import { PROCESOS_PRODUCTO, type Producto } from '../../../shared/types/catalogo'
+import type { ComponenteReceta } from '../../../shared/types/inventario'
 import { useSesion } from '../../auth/useSesion'
 import { catalogoApi } from '../../catalogo/api/catalogo.api'
 import { useProductos } from '../../catalogo/hooks/useCatalogos'
 import { mfrApi } from '../../mfr/api/mfr.api'
 import { useEstandares } from '../../mfr/hooks/useMfr'
+import { EditorReceta } from '../components/EditorReceta'
+import { RecetaDialogo } from '../components/RecetaDialogo'
+import { useResumenRecetas } from '../hooks/useInventario'
+import { recetaValida } from '../receta'
 
 const opcionalEntero = z
   .string()
@@ -84,6 +95,15 @@ export function ProductosPage() {
   const [estandarDe, setEstandarDe] = useState<Producto | null>(null)
   const [formEstandar, setFormEstandar] = useState({ cajasPorHora: '', pesoNetoKg: '', motivo: '' })
   const estandarActual = estandares.data?.find((x) => x.productoId === estandarDe?.id)
+  // Receta: la del PT nuevo (obligatoria) y el diálogo de la fila.
+  const [recetaNueva, setRecetaNueva] = useState<ComponenteReceta[]>([])
+  const [recetaDe, setRecetaDe] = useState<Producto | null>(null)
+  const resumenRecetas = useResumenRecetas()
+  const recetaVigente = useMemo(() => new Map((resumenRecetas.data ?? []).map((r) => [r.productoId, r])), [resumenRecetas.data])
+  const abrirNuevo = () => {
+    setRecetaNueva([])
+    setEditando('nuevo')
+  }
 
   const abrirEstandar = (p: Producto) => {
     setFormEstandar({ cajasPorHora: p.cajasPorHora?.toString() ?? '', pesoNetoKg: p.pesoNetoKg?.toString() ?? '', motivo: '' })
@@ -148,8 +168,8 @@ export function ProductosPage() {
       const { cajasPorHora, pesoNetoKg, motivoEstandar, ...base } = d
       const datos = { ...base, proceso: base.proceso || null, subdescripcion: base.subdescripcion || null }
       if (editando === 'nuevo') {
-        // Al crear, los estándares entran de una vez (valor inicial, sin motivo).
-        return catalogoApi.crearProducto({ ...datos, cajasPorHora, pesoNetoKg })
+        // Al crear, los estándares entran de una vez (valor inicial, sin motivo) y la receta es obligatoria.
+        return catalogoApi.crearProducto({ ...datos, cajasPorHora, pesoNetoKg, receta: recetaNueva })
       }
       const actualizado = await catalogoApi.actualizarProducto(editando!.id, datos)
       // Al editar, los estándares van por su propio endpoint (auditado con motivo).
@@ -172,14 +192,14 @@ export function ProductosPage() {
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave">Catálogo de PT: el mismo de remisiones y del DPP. Cada producto tiene su existencia en la pestaña Existencias.</p>
+        <p className="text-sm text-tinta-suave">Catálogo de PT: el mismo de remisiones y del DPP. Cada PT tiene su existencia en la pestaña Existencias.</p>
         <div className="flex items-center gap-3">
           {tienePermiso('catalogo.editar_estandares') && (
             <Link to="/admin/pesos" className="text-sm text-marca hover:underline">
               Pesos por caja en lote
             </Link>
           )}
-          <Boton onClick={() => setEditando('nuevo')}>Nuevo producto</Boton>
+          <Boton onClick={abrirNuevo}>Nuevo PT</Boton>
         </div>
       </header>
 
@@ -205,13 +225,14 @@ export function ProductosPage() {
               <th className="px-4 py-2 text-right" title="Línea ideal: personas necesarias">Pers.</th>
               <th className="px-4 py-2 text-right">Cajas/h</th>
               <th className="px-4 py-2 text-right">Kg/caja</th>
+              <th className="px-4 py-2">Receta</th>
               <th className="px-4 py-2">Estado</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-borde">
             {productos.data?.length === 0 && (
-              <tr><td colSpan={11} className="px-4 py-6 text-center text-tinta-suave">Sin productos.</td></tr>
+              <tr><td colSpan={12} className="px-4 py-6 text-center text-tinta-suave">Sin PT.</td></tr>
             )}
             {productos.data?.map((p) => (
               <tr key={p.id} className={p.activo ? '' : 'text-tinta-suave'}>
@@ -224,8 +245,18 @@ export function ProductosPage() {
                 <td className="px-4 py-2 text-right">{p.personasIdeal ?? '—'}</td>
                 <td className="px-4 py-2 text-right">{p.cajasPorHora ?? '—'}</td>
                 <td className="px-4 py-2 text-right">{p.pesoNetoKg ?? '—'}</td>
+                <td className="px-4 py-2 whitespace-nowrap">
+                  {recetaVigente.has(p.id) ? (
+                    <span className="text-xs text-tinta-suave">v{recetaVigente.get(p.id)!.version} · {recetaVigente.get(p.id)!.componentes} comp.</span>
+                  ) : (
+                    resumenRecetas.data && <Badge tono="alerta">Sin receta</Badge>
+                  )}
+                </td>
                 <td className="px-4 py-2">{p.activo ? 'Activo' : 'Inactivo'}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
+                  {tienePermiso('inventario.consultar') && (
+                    <button className="mr-3 text-marca hover:underline" onClick={() => setRecetaDe(p)}>Receta</button>
+                  )}
                   {tienePermiso('catalogo.editar_estandares') && (
                     <button className="mr-3 text-tinta-suave hover:underline" onClick={() => abrirEstandar(p)}>Estándar</button>
                   )}
@@ -242,7 +273,7 @@ export function ProductosPage() {
 
       <Dialogo
         abierto={editando !== null}
-        titulo={editando === 'nuevo' ? 'Nuevo producto' : 'Editar producto'}
+        titulo={editando === 'nuevo' ? 'Nuevo PT' : 'Editar PT'}
         onCerrar={() => setEditando(null)}
       >
         <form onSubmit={(e) => void handleSubmit((d) => guardar.mutate(d))(e)} noValidate className="space-y-4">
@@ -289,13 +320,21 @@ export function ProductosPage() {
               <p className="text-xs text-tinta-suave">Al crear no hace falta motivo: es el valor inicial. Después, cambiarlos queda auditado con motivo.</p>
             )}
           </fieldset>
+          {editando === 'nuevo' && (
+            <fieldset className="space-y-3 rounded-md border border-borde p-3">
+              <legend className="px-1 text-xs font-semibold uppercase text-tinta-suave">Receta: PI e insumos que lleva (obligatoria)</legend>
+              <EditorReceta componentes={recetaNueva} onCambiar={setRecetaNueva} />
+            </fieldset>
+          )}
           {guardar.isError && <Alerta tipo="error">{comoErrorApi(guardar.error).mensaje}</Alerta>}
           <div className="flex justify-end gap-2">
             <Boton type="button" variante="secundario" onClick={() => setEditando(null)}>Cancelar</Boton>
-            <Boton type="submit" cargando={guardar.isPending}>Guardar</Boton>
+            <Boton type="submit" cargando={guardar.isPending} disabled={editando === 'nuevo' && !recetaValida(recetaNueva)}>Guardar</Boton>
           </div>
         </form>
       </Dialogo>
+
+      {recetaDe && <RecetaDialogo producto={recetaDe} onCerrar={() => setRecetaDe(null)} />}
 
       <Dialogo
         abierto={estandarDe !== null}

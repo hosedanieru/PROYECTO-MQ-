@@ -110,7 +110,7 @@ export function InventarioPage() {
               {items.data?.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">
-                    {texto || tipo ? 'Ningún ítem coincide con el filtro.' : 'Todavía no hay ítems. Los productos se crean en la pestaña Productos (PT) y los PI e insumos en PI e insumos.'}
+                    {texto || tipo ? 'Ningún ítem coincide con el filtro.' : 'Todavía no hay ítems. Los PT, PI e insumos se crean cada uno en su pestaña.'}
                   </td>
                 </tr>
               )}

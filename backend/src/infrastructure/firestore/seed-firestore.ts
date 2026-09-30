@@ -27,6 +27,7 @@ import {
   GRUPOS,
   ROLES,
   TURNOS,
+  UNIDADES_MEDIDA,
   VIGENTE_DESDE,
 } from '../datos-base.js';
 
@@ -108,9 +109,8 @@ async function sembrarPtDeProductos(): Promise<void> {
   let creados = 0;
   for (const p of productos.docs) {
     if (conPt.has(p.id)) continue;
-    await db.collection(COLECCION.itemsInventario).add({
-      tipo: 'PT', codigo: null, descripcion: null, unidadMedida: 'CAJA', productoId: p.id, existencia: 0, activo: true,
-    });
+    // Solo la referencia y la existencia: el resto se lee del producto.
+    await db.collection(COLECCION.itemsInventario).add({ tipo: 'PT', productoId: p.id, existencia: 0 });
     creados += 1;
   }
   console.log(`  itemsInventario (PT de productos): ${creados} nuevos`);
@@ -164,6 +164,12 @@ async function main(): Promise<void> {
     if (!(await ref.get()).exists) await ref.set({ ...causal, activo: true });
   }
   console.log(`  causalesAveria: ${CAUSALES_AVERIA.length}`);
+  // Unidades de medida: solo se asegura que existan (las mantiene el administrador).
+  for (const unidad of UNIDADES_MEDIDA) {
+    const existe = await db.collection(COLECCION.unidadesMedida).where('codigo', '==', unidad.codigo).limit(1).get();
+    if (existe.empty) await db.collection(COLECCION.unidadesMedida).add({ ...unidad, activo: true });
+  }
+  console.log(`  unidadesMedida: ${UNIDADES_MEDIDA.length}`);
   await sembrarPtDeProductos();
   await sembrarAdministradorInicial();
   console.log('\nListo. El catálogo de productos se carga desde el panel.');

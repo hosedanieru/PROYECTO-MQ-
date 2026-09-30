@@ -30,6 +30,7 @@ import {
   GRUPOS,
   ROLES,
   TURNOS,
+  UNIDADES_MEDIDA,
   VIGENTE_DESDE,
 } from '../src/infrastructure/datos-base.js';
 
@@ -166,6 +167,14 @@ async function sembrarCausalesAveria(): Promise<void> {
   console.log(`  Causales de avería: ${CAUSALES_AVERIA.length}`);
 }
 
+async function sembrarUnidadesMedida(): Promise<void> {
+  for (const unidad of UNIDADES_MEDIDA) {
+    // Solo se asegura que exista: la mantiene el administrador.
+    await prisma.unidadMedida.upsert({ where: { codigo: unidad.codigo }, update: {}, create: unidad });
+  }
+  console.log(`  Unidades de medida: ${UNIDADES_MEDIDA.length}`);
+}
+
 /**
  * Administrador inicial. Sin él nadie podría entrar al sistema para crear
  * a los demás usuarios.
@@ -221,6 +230,7 @@ async function main(): Promise<void> {
   await sembrarGrupos();
   await sembrarLineas();
   await sembrarCausalesAveria();
+  await sembrarUnidadesMedida();
   await sembrarAdministradorInicial();
 
   console.log('\nListo. El catálogo de productos se carga aparte.');

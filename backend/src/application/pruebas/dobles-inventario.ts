@@ -6,53 +6,138 @@
  */
 
 import type {
-  CambiosItem,
-  DatosItem,
+  EntradaMercancia,
+  EntradaMercanciaRepository,
+  NuevaEntrada,
+} from '../../domain/inventario/entrada-mercancia.js';
+import type {
+  DatosDelCatalogo,
   FiltroItems,
   ItemInventario,
   ItemInventarioRepository,
-  ProductoDelPt,
+  TipoItem,
 } from '../../domain/inventario/item-inventario.js';
+import type { DatosMaterial, Material, MaterialRepository, TipoMaterial } from '../../domain/inventario/material.js';
 import type {
   FiltroMovimientos,
   MovimientoInventario,
   MovimientoInventarioRepository,
   NuevoMovimiento,
 } from '../../domain/inventario/movimiento-inventario.js';
-import type { ProductoRepository } from '../../domain/producto/producto.repository.js';
-import type {
-  EntradaMercancia,
-  EntradaMercanciaRepository,
-  NuevaEntrada,
-} from '../../domain/inventario/entrada-mercancia.js';
+import type { NuevaRecetaPt, RecetaPt, RecetaRepository, ResumenReceta } from '../../domain/inventario/receta.js';
+import type { DatosUnidad, UnidadMedida, UnidadMedidaRepository } from '../../domain/inventario/unidad-medida.js';
 
-export class EntradaMercanciaRepositorioFalso implements EntradaMercanciaRepository {
-  readonly entradas: EntradaMercancia[] = [];
+export class RecetaRepositorioFalso implements RecetaRepository {
+  readonly recetas: RecetaPt[] = [];
 
-  crear(entrada: NuevaEntrada): Promise<EntradaMercancia> {
-    const creada = { ...entrada, id: `ent-${this.entradas.length + 1}` };
-    this.entradas.push(creada);
+  versiones(productoId: string): Promise<RecetaPt[]> {
+    return Promise.resolve(this.recetas.filter((r) => r.productoId === productoId).sort((a, b) => b.version - a.version));
+  }
+
+  async vigente(productoId: string): Promise<RecetaPt | null> {
+    return (await this.versiones(productoId))[0] ?? null;
+  }
+
+  resumenVigentes(): Promise<ResumenReceta[]> {
+    const vigentes = new Map<string, RecetaPt>();
+    for (const r of this.recetas) {
+      if ((vigentes.get(r.productoId)?.version ?? 0) < r.version) vigentes.set(r.productoId, r);
+    }
+    return Promise.resolve([...vigentes.values()].map((r) => ({ productoId: r.productoId, version: r.version, vigenteDesde: r.vigenteDesde, componentes: r.componentes.length })));
+  }
+
+  crear(receta: NuevaRecetaPt): Promise<RecetaPt> {
+    // Igual que la restricción única de la base.
+    if (this.recetas.some((r) => r.productoId === receta.productoId && r.version === receta.version)) {
+      return Promise.reject(new Error('Versión de receta repetida'));
+    }
+    const creada = { ...receta, id: `receta-${this.recetas.length + 1}` };
+    this.recetas.push(creada);
     return Promise.resolve(creada);
-  }
-
-  buscarPorId(id: string): Promise<EntradaMercancia | null> {
-    return Promise.resolve(this.entradas.find((e) => e.id === id) ?? null);
-  }
-
-  listar(desde: Date, hasta: Date): Promise<EntradaMercancia[]> {
-    return Promise.resolve(this.entradas.filter((e) => e.fechaOperativa >= desde && e.fechaOperativa <= hasta).reverse());
   }
 }
 
+export class UnidadMedidaRepositorioFalso implements UnidadMedidaRepository {
+  readonly unidades: UnidadMedida[] = [{ id: 'u-unidad', codigo: 'UNIDAD', nombre: 'Unidad', activo: true }];
+
+  listar(): Promise<UnidadMedida[]> {
+    return Promise.resolve([...this.unidades]);
+  }
+
+  buscarPorId(id: string): Promise<UnidadMedida | null> {
+    return Promise.resolve(this.unidades.find((u) => u.id === id) ?? null);
+  }
+
+  buscarPorCodigo(codigo: string): Promise<UnidadMedida | null> {
+    return Promise.resolve(this.unidades.find((u) => u.codigo === codigo) ?? null);
+  }
+
+  crear(datos: DatosUnidad): Promise<UnidadMedida> {
+    const nueva = { ...datos, id: `u-${this.unidades.length + 1}`, activo: true };
+    this.unidades.push(nueva);
+    return Promise.resolve(nueva);
+  }
+
+  actualizar(id: string, cambios: Partial<DatosUnidad> & { activo?: boolean }): Promise<UnidadMedida> {
+    const i = this.unidades.findIndex((u) => u.id === id);
+    this.unidades[i] = { ...this.unidades[i], ...cambios };
+    return Promise.resolve(this.unidades[i]);
+  }
+}
+
+export class MaterialRepositorioFalso implements MaterialRepository {
+  readonly materiales: Material[] = [];
+
+  constructor(private readonly unidades = new UnidadMedidaRepositorioFalso()) {}
+
+  listar(tipo?: TipoMaterial): Promise<Material[]> {
+    return Promise.resolve(this.materiales.filter((m) => !tipo || m.tipo === tipo));
+  }
+
+  buscarPorId(tipo: TipoMaterial, id: string): Promise<Material | null> {
+    return Promise.resolve(this.materiales.find((m) => m.tipo === tipo && m.id === id) ?? null);
+  }
+
+  buscarPorCodigo(codigo: string): Promise<Material | null> {
+    return Promise.resolve(this.materiales.find((m) => m.codigo === codigo) ?? null);
+  }
+
+  async crear(tipo: TipoMaterial, datos: DatosMaterial): Promise<Material> {
+    const unidad = await this.unidades.buscarPorId(datos.unidadBaseId);
+    const presentacion = datos.presentacionId ? await this.unidades.buscarPorId(datos.presentacionId) : null;
+    const nuevo: Material = {
+      ...datos,
+      id: `${tipo.toLowerCase()}-${this.materiales.length + 1}`,
+      tipo,
+      unidadBase: unidad?.codigo ?? '',
+      presentacion: presentacion?.codigo ?? null,
+      activo: true,
+    };
+    this.materiales.push(nuevo);
+    return nuevo;
+  }
+
+  actualizar(tipo: TipoMaterial, id: string, cambios: Partial<DatosMaterial> & { activo?: boolean }): Promise<Material> {
+    const i = this.materiales.findIndex((m) => m.tipo === tipo && m.id === id);
+    this.materiales[i] = { ...this.materiales[i], ...cambios };
+    return Promise.resolve(this.materiales[i]);
+  }
+}
+
+/**
+ * Guarda el ítem con los datos de su catálogo tal como se le entregan al
+ * crearlo. `desactivar` simula desactivar el PT, PI o insumo en su catálogo.
+ */
 export class ItemInventarioRepositorioFalso implements ItemInventarioRepository {
   readonly items: ItemInventario[] = [];
   private secuencia = 0;
 
-  /** Con los productos, el PT resuelve su código y descripción como la base real. */
-  constructor(private readonly productos?: ProductoRepository) {}
-
   agregar(item: ItemInventario): void {
     this.items.push(item);
+  }
+
+  desactivar(id: string): void {
+    this.items.find((i) => i.id === id)!.activo = false;
   }
 
   listar(filtro: FiltroItems): Promise<ItemInventario[]> {
@@ -64,34 +149,14 @@ export class ItemInventarioRepositorioFalso implements ItemInventarioRepository 
     return Promise.resolve(i ? { ...i } : null);
   }
 
-  buscarPorCodigo(codigo: string): Promise<ItemInventario | null> {
-    return Promise.resolve(this.items.find((x) => x.tipo !== 'PT' && x.codigo === codigo) ?? null);
+  buscarPorReferencia(tipo: TipoItem, referenciaId: string): Promise<ItemInventario | null> {
+    return Promise.resolve(this.items.find((x) => x.tipo === tipo && x.referenciaId === referenciaId) ?? null);
   }
 
-  buscarPorProducto(productoId: string): Promise<ItemInventario | null> {
-    return Promise.resolve(this.items.find((x) => x.productoId === productoId) ?? null);
-  }
-
-  async crear(datos: DatosItem, conocido?: ProductoDelPt): Promise<ItemInventario> {
-    const producto = conocido ?? (datos.productoId ? await this.productos?.buscarPorId(datos.productoId) : null);
-    const nuevo: ItemInventario = {
-      id: `item-${++this.secuencia}`,
-      tipo: datos.tipo,
-      codigo: producto?.codigo ?? datos.codigo ?? '',
-      descripcion: producto?.descripcion ?? datos.descripcion ?? '',
-      unidadMedida: datos.unidadMedida,
-      productoId: datos.productoId,
-      existencia: 0,
-      activo: true,
-    };
+  crear(tipo: TipoItem, referenciaId: string, catalogo: DatosDelCatalogo): Promise<ItemInventario> {
+    const nuevo: ItemInventario = { id: `item-${++this.secuencia}`, tipo, referenciaId, ...catalogo, existencia: 0 };
     this.items.push(nuevo);
-    return { ...nuevo };
-  }
-
-  actualizar(id: string, cambios: CambiosItem): Promise<ItemInventario> {
-    const i = this.items.findIndex((x) => x.id === id);
-    this.items[i] = { ...this.items[i], ...(cambios as Partial<ItemInventario>) };
-    return Promise.resolve({ ...this.items[i] });
+    return Promise.resolve({ ...nuevo });
   }
 
   bloquearParaMovimiento(id: string): Promise<ItemInventario | null> {
@@ -123,5 +188,23 @@ export class MovimientoInventarioRepositorioFalso implements MovimientoInventari
 
   listar(filtro: FiltroMovimientos): Promise<MovimientoInventario[]> {
     return Promise.resolve(this.movimientos.filter((m) => m.fechaOperativa >= filtro.desde && m.fechaOperativa <= filtro.hasta).reverse());
+  }
+}
+
+export class EntradaMercanciaRepositorioFalso implements EntradaMercanciaRepository {
+  readonly entradas: EntradaMercancia[] = [];
+
+  crear(entrada: NuevaEntrada): Promise<EntradaMercancia> {
+    const creada = { ...entrada, id: `ent-${this.entradas.length + 1}` };
+    this.entradas.push(creada);
+    return Promise.resolve(creada);
+  }
+
+  buscarPorId(id: string): Promise<EntradaMercancia | null> {
+    return Promise.resolve(this.entradas.find((e) => e.id === id) ?? null);
+  }
+
+  listar(desde: Date, hasta: Date): Promise<EntradaMercancia[]> {
+    return Promise.resolve(this.entradas.filter((e) => e.fechaOperativa >= desde && e.fechaOperativa <= hasta).reverse());
   }
 }

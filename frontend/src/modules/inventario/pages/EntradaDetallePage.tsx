@@ -56,7 +56,11 @@ export function EntradaDetallePage() {
                   <Link to={`/inventario/${l.itemId}`} className="cifra text-marca hover:underline">{l.codigo}</Link>{' '}
                   <span className="text-tinta-suave">{l.descripcion}</span>
                 </td>
-                <td className="px-5 py-2 text-right cifra font-semibold text-exito">+{cantidad(l.cantidad)} {l.unidadMedida}</td>
+                <td className="px-5 py-2 text-right">
+                  <span className="cifra font-semibold text-exito">+{cantidad(l.cantidad)} {l.unidadMedida}</span>
+                  {/* Lo que se digitó, con la equivalencia usada. */}
+                  {l.conteoTexto && <span className="block text-xs text-tinta-suave">{l.conteoTexto}</span>}
+                </td>
                 <td className="px-5 py-2 text-right cifra">{cantidad(l.saldo)}</td>
               </tr>
             ))}

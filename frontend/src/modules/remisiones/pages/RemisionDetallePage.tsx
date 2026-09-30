@@ -117,7 +117,7 @@ export function RemisionDetallePage() {
           <Dato etiqueta="Turno">{turno ? `${turno.codigo} · ${turno.nombre}` : '—'}</Dato>
           <Dato etiqueta="Grupo">{grupo?.nombre}</Dato>
           <div className="col-span-2">
-            <Dato etiqueta="Producto (como se firmó)">
+            <Dato etiqueta="PT (como se firmó)">
               <span className="cifra text-xs text-tinta-suave">{r.producto.codigo}</span>
               <br />
               {r.producto.descripcion}

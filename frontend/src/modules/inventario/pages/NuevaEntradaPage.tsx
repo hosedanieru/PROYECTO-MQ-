@@ -18,16 +18,21 @@ import { Campo } from '../../../components/Campo'
 import { Select } from '../../../components/Select'
 import { Tarjeta } from '../../../components/Tarjeta'
 import { comoErrorApi } from '../../../services/http'
-import { TIPOS_ITEM_ENTRADA, type ItemInventario } from '../../../shared/types/inventario'
+import { TIPOS_ITEM_ENTRADA, type Conteo, type ItemInventario } from '../../../shared/types/inventario'
 import { fechaCorta, fechaOperativaDe } from '../../../shared/utils/fechas'
 import { cantidad as fmt } from '../../../shared/utils/numeros'
 import { useSesion } from '../../auth/useSesion'
 import { useItemsInventario, useRegistrarEntrada } from '../hooks/useInventario'
+import { CampoConteo } from '../components/CampoConteo'
+import { CAMPOS_VACIOS, leerConteo, textoConteo, totalDeConteo, type Campos } from '../conteo'
 import { TONO_TIPO } from '../tonos'
 
+/** Lo que llega se digita como viene (rollos, cajas…); el backend lo convierte. */
 interface Linea {
   item: ItemInventario
-  cantidad: number
+  conteo: Conteo
+  /** Total en la medida, para mostrar (el que cuenta lo calcula el backend). */
+  total: number
 }
 
 export function NuevaEntradaPage() {
@@ -43,7 +48,7 @@ export function NuevaEntradaPage() {
 
   const [busqueda, setBusqueda] = useState('')
   const [itemId, setItemId] = useState('')
-  const [valor, setValor] = useState('')
+  const [campos, setCampos] = useState<Campos>(CAMPOS_VACIOS)
 
   const elegibles = useMemo(() => {
     const yaAgregados = new Set(lineas.map((l) => l.item.id))
@@ -56,14 +61,18 @@ export function NuevaEntradaPage() {
     )
   }, [items.data, lineas, busqueda])
   const elegido = items.data?.find((i) => i.id === itemId)
-  const numero = Number(valor.replace(',', '.'))
-  const cantidadValida = valor.trim() !== '' && Number.isFinite(numero) && numero > 0
+  const conteo = leerConteo(campos)
+  const total = elegido ? totalDeConteo(conteo, elegido) : null
+
+  const elegir = (id: string) => {
+    setItemId(id)
+    setCampos(CAMPOS_VACIOS)
+  }
 
   const agregar = () => {
-    if (!elegido || !cantidadValida) return
-    setLineas([...lineas, { item: elegido, cantidad: numero }])
-    setItemId('')
-    setValor('')
+    if (!elegido || total === null) return
+    setLineas([...lineas, { item: elegido, conteo, total }])
+    elegir('')
     setBusqueda('')
   }
 
@@ -73,7 +82,7 @@ export function NuevaEntradaPage() {
         documento: documento.trim(),
         remitente: remitente.trim() || undefined,
         observacion: observacion.trim() || undefined,
-        lineas: lineas.map((l) => ({ itemId: l.item.id, cantidad: l.cantidad })),
+        lineas: lineas.map((l) => ({ itemId: l.item.id, conteo: l.conteo })),
       },
       { onSuccess: (entrada) => navegar(`/inventario/entradas/${entrada.id}`, { replace: true }) },
     )
@@ -108,16 +117,23 @@ export function NuevaEntradaPage() {
 
       <Tarjeta titulo="Agregar línea">
         {items.data && items.data.filter((i) => TIPOS_ITEM_ENTRADA.includes(i.tipo)).length === 0 && (
-          <Alerta tipo="advertencia">No hay insumos ni PI creados. Primero se crean en Administración → Ítems de inventario.</Alerta>
+          <Alerta tipo="advertencia">No hay insumos ni PI creados. Primero se crean en las pestañas PI e Insumos.</Alerta>
         )}
-        <form className="grid gap-3 sm:grid-cols-[1fr_1fr_10rem_auto] sm:items-end" onSubmit={(e) => { e.preventDefault(); agregar() }}>
-          <Campo etiqueta="Buscar" placeholder="Código o descripción" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          <Select etiqueta="Ítem *" value={itemId} onChange={(e) => setItemId(e.target.value)}>
-            <option value="">— Seleccione —</option>
-            {elegibles.map((i) => <option key={i.id} value={i.id}>{i.tipo} · {i.codigo} · {i.descripcion}</option>)}
-          </Select>
-          <Campo etiqueta={`Cantidad${elegido ? ` (${elegido.unidadMedida})` : ''} *`} type="number" inputMode="decimal" min={0} step="0.001" value={valor} onChange={(e) => setValor(e.target.value)} />
-          <Boton type="submit" variante="secundario" disabled={!elegido || !cantidadValida}>+ Agregar</Boton>
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); agregar() }}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Buscar" placeholder="Código o descripción" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <Select etiqueta="Ítem *" value={itemId} onChange={(e) => elegir(e.target.value)}>
+              <option value="">— Seleccione —</option>
+              {elegibles.map((i) => <option key={i.id} value={i.id}>{i.tipo} · {i.codigo} · {i.descripcion}</option>)}
+            </Select>
+          </div>
+          {elegido && (
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              {/* Como viene: estibas, cajas, rollos… según lo que tenga definido el ítem. */}
+              <CampoConteo item={elegido} campos={campos} onCambiar={setCampos} />
+              <Boton type="submit" variante="secundario" disabled={total === null}>+ Agregar</Boton>
+            </div>
+          )}
         </form>
       </Tarjeta>
 
@@ -128,7 +144,10 @@ export function NuevaEntradaPage() {
               <tr key={l.item.id}>
                 <td className="px-5 py-2"><Badge tono={TONO_TIPO[l.item.tipo]}>{l.item.tipo}</Badge></td>
                 <td className="px-5 py-2"><span className="cifra">{l.item.codigo}</span> <span className="text-tinta-suave">{l.item.descripcion}</span></td>
-                <td className="px-5 py-2 text-right cifra font-semibold">{fmt(l.cantidad)} {l.item.unidadMedida}</td>
+                <td className="px-5 py-2 text-right">
+                  <span className="cifra font-semibold">{fmt(l.total)} {l.item.unidadMedida}</span>
+                  <span className="block text-xs text-tinta-suave">{textoConteo(l.conteo, l.item)}</span>
+                </td>
                 <td className="px-5 py-2 text-right">
                   <button type="button" className="text-critico hover:underline" onClick={() => setLineas(lineas.filter((_, j) => j !== i))}>Quitar</button>
                 </td>

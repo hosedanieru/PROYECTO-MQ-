@@ -52,7 +52,7 @@ const ACCESOS: Acceso[] = [
   {
     a: '/inventario',
     titulo: 'Inventario',
-    descripcion: 'Productos, PI e insumos: catálogo, entradas y existencias.',
+    descripcion: 'PT, PI e insumos: catálogo, entradas y existencias.',
     permiso: 'inventario.consultar',
     Icono: IconoCaja,
   },

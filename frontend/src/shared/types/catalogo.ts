@@ -1,3 +1,5 @@
+import type { ComponenteReceta } from './inventario'
+
 export interface ItemCatalogo {
   id: string
   codigo: string
@@ -54,8 +56,9 @@ export interface DatosProducto {
   subdescripcion: string | null
 }
 
-/** Al crear se pueden indicar los estándares de una vez. */
+/** Al crear se pueden indicar los estándares de una vez; la receta es obligatoria. */
 export interface DatosNuevoProducto extends DatosProducto {
   cajasPorHora?: number | null
   pesoNetoKg?: number | null
+  receta: ComponenteReceta[]
 }

@@ -225,7 +225,7 @@ export function TarjetaTurno({ turno, meta, productos, lineas }: Props) {
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-sm text-tinta">
-                      {producto?.descripcion ?? 'Producto fuera del catálogo'}
+                      {producto?.descripcion ?? 'PT fuera del catálogo'}
                     </p>
                     <p className="codigo text-xs text-tinta-suave">{producto?.codigo ?? bloque.productoId}</p>
                     <p className="mt-1.5 text-xs text-tinta-suave">

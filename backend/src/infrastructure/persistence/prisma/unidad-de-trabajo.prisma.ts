@@ -25,7 +25,10 @@ import { ReporteAveriaPrismaRepository } from './reporte-averia.prisma.repositor
 import {
   EntradaMercanciaPrismaRepository,
   ItemInventarioPrismaRepository,
+  MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  RecetaPrismaRepository,
+  UnidadMedidaPrismaRepository,
 } from './inventario.prisma.repositories.js';
 import { AsistenciaPrismaRepository } from './asistencia.prisma.repository.js';
 import { GrupoPrismaRepository } from './grupo.prisma.repository.js';
@@ -71,6 +74,9 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
           itemsInventario: new ItemInventarioPrismaRepository(tx),
           movimientosInventario: new MovimientoInventarioPrismaRepository(tx),
           entradasMercancia: new EntradaMercanciaPrismaRepository(tx),
+          materiales: new MaterialPrismaRepository(tx),
+          unidadesMedida: new UnidadMedidaPrismaRepository(tx),
+          recetas: new RecetaPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

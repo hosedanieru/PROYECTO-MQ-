@@ -69,12 +69,14 @@ import {
   TransicionEstadoInvalidaError,
 } from '../../../domain/remision/remision.errors.js';
 import {
+  CatalogoInventarioNoEncontradoError,
   DatosInventarioInvalidosError,
   EntradaMercanciaNoEncontradaError,
   ExistenciaInsuficienteError,
   ItemInventarioDuplicadoError,
   ItemInventarioNoEncontradoError,
 } from '../../../domain/inventario/inventario.errors.js';
+import { ConsumoInsuficienteError, PtSinRecetaError } from '../../../domain/inventario/consumo.js';
 import { ErrorDominio, SinTurnoConfiguradoError } from '../../../domain/shared/errores.js';
 import { RangoFechasInvalidoError } from '../../../domain/shared/rango-fechas.js';
 import {
@@ -162,8 +164,12 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   [ItemInventarioDuplicadoError, HttpStatus.CONFLICT],
   // Los datos están bien, pero la existencia actual no permite la salida.
   [ExistenciaInsuficienteError, HttpStatus.CONFLICT],
+  // Aprobar una remisión descuenta su receta: sin receta o sin existencia, se bloquea.
+  [PtSinRecetaError, HttpStatus.CONFLICT],
+  [ConsumoInsuficienteError, HttpStatus.CONFLICT],
   [ItemInventarioNoEncontradoError, HttpStatus.NOT_FOUND],
   [EntradaMercanciaNoEncontradaError, HttpStatus.NOT_FOUND],
+  [CatalogoInventarioNoEncontradoError, HttpStatus.NOT_FOUND],
 ];
 
 @Catch(ErrorDominio)

@@ -56,7 +56,7 @@ export function AgregarAveria({ onAgregar }: { onAgregar: (registro: RegistroNue
   const agregar = () => {
     const n = Number(cantidad)
     const faltan = [
-      !producto && 'producto',
+      !producto && 'PT',
       !fechaVencimiento && 'fecha de vencimiento',
       !lote.trim() && 'lote',
       !causalId && 'causal',
@@ -87,8 +87,8 @@ export function AgregarAveria({ onAgregar }: { onAgregar: (registro: RegistroNue
     <div className="space-y-4">
       <div className="space-y-2">
         <Campo etiqueta="Buscar producto (código SAP o descripción)" placeholder="300058141 o SURTIDO…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        <Select etiqueta="Producto *" value={productoId} onChange={(e) => setProductoId(e.target.value)}>
-          <option value="">— Seleccione el producto —</option>
+        <Select etiqueta="PT *" value={productoId} onChange={(e) => setProductoId(e.target.value)}>
+          <option value="">— Seleccione el PT —</option>
           {filtrados.map((p) => (
             <option key={p.id} value={p.id}>{p.codigo} · {p.descripcion}</option>
           ))}

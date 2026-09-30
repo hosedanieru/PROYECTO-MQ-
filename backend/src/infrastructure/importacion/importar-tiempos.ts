@@ -11,8 +11,8 @@
  *                                     de la descripción (solo en vacíos)
  *
  * Qué hace por cada fila válida:
- *   - Producto nuevo → lo crea con todos los datos (incluidas cajas/hora,
- *     que al crear no exigen motivo).
+ *   - Producto nuevo → NO lo crea: desde el 2026-09-29 un PT nuevo exige
+ *     su receta y la hoja no la trae. Queda en las excepciones.
  *   - Producto existente → actualiza empaque, proceso, línea ideal y
  *     subdescripción; y, si cambian, cajas/hora (y peso, si se pidió)
  *     con motivo "Importación hoja TIEMPOS" (auditado, como exige el área).
@@ -36,7 +36,7 @@ import { NestFactory } from '@nestjs/core';
 import ExcelJS from 'exceljs';
 
 import { AppModule } from '../../app.module.js';
-import { CrearProductoUseCase, ActualizarProductoUseCase } from '../../application/catalogo/producto.use-cases.js';
+import { ActualizarProductoUseCase } from '../../application/catalogo/producto.use-cases.js';
 import { ActualizarEstandarUseCase } from '../../application/mfr/catalogos-mfr.use-cases.js';
 import { ErrorDominio } from '../../domain/shared/errores.js';
 import { PRODUCTO_REPOSITORY, type Producto, type ProductoRepository } from '../../domain/producto/producto.repository.js';
@@ -138,7 +138,6 @@ async function main(): Promise<void> {
   try {
     const usuarios = app.get<UsuarioRepository>(USUARIO_REPOSITORY);
     const productos = app.get<ProductoRepository>(PRODUCTO_REPOSITORY);
-    const crear = app.get(CrearProductoUseCase);
     const actualizar = app.get(ActualizarProductoUseCase);
     const actualizarEstandar = app.get(ActualizarEstandarUseCase);
 
@@ -155,16 +154,13 @@ async function main(): Promise<void> {
           resultado.pesosSugeridos.push({ codigo: r.codigo, descripcion: r.descripcion, pesoKg: r.pesoSugeridoKg });
         }
         if (!actual) {
-          if (APLICAR) {
-            await crear.ejecutar({
-              codigo: r.codigo, descripcion: r.descripcion, proceso: r.proceso,
-              unidadesPorCaja: r.unidadesPorCaja, cajasPorEstiba: r.cajasPorEstiba,
-              personasIdeal: r.personasIdeal, subdescripcion: r.subdescripcion,
-              cajasPorHora: r.cajasPorHora, pesoNetoKg: CON_PESO ? r.pesoSugeridoKg : null,
-              usuarioId: usuario.id,
-            });
-          }
-          resultado.creados.push(r.codigo);
+          // Un PT nuevo exige su receta (usuario, 2026-09-29) y la hoja no la
+          // trae: se reporta para crearlo en Inventario → PT.
+          resultado.errores.push({
+            numeroFila: r.numeroFila,
+            codigo: r.codigo,
+            motivo: 'PT nuevo: la receta (PI e insumos) es obligatoria y la hoja no la trae. Créelo en Inventario → PT.',
+          });
           continue;
         }
 

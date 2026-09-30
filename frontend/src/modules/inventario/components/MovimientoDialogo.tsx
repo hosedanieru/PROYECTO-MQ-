@@ -22,6 +22,9 @@ import type { ItemInventario } from '../../../shared/types/inventario'
 import { cantidad as fmt } from '../../../shared/utils/numeros'
 import { useSesion } from '../../auth/useSesion'
 import { useRegistrarAjuste, useRegistrarMovimiento } from '../hooks/useInventario'
+import { CAMPOS_VACIOS, leerConteo, totalDeConteo, type Campos } from '../conteo'
+import { cantidadValida, leerCantidad, redondear } from '../receta'
+import { CampoConteo } from './CampoConteo'
 
 type Modo = 'ENTRADA' | 'SALIDA' | 'AJUSTE'
 
@@ -39,15 +42,23 @@ export function MovimientoDialogo({ item, onCerrar }: Props) {
   const ajuste = useRegistrarAjuste()
 
   const [modo, setModo] = useState<Modo>('ENTRADA')
+  // PT: cantidad en cajas. PI e insumos: como viene (rollos, cajas…), ver CampoConteo.
   const [valor, setValor] = useState('')
+  const [campos, setCampos] = useState<Campos>(CAMPOS_VACIOS)
   const [referencia, setReferencia] = useState('')
   const [observacion, setObservacion] = useState('')
   const [motivo, setMotivo] = useState('')
 
-  const numero = Number(valor.replace(',', '.'))
-  const valido = valor.trim() !== '' && Number.isFinite(numero) && numero >= 0
-  const diferencia = modo === 'AJUSTE' && valido ? Math.round((numero - item.existencia) * 1000) / 1000 : null
-  const saldoPrevisto = modo === 'ENTRADA' ? item.existencia + numero : modo === 'SALIDA' ? item.existencia - numero : numero
+  // PI e insumos admiten hasta 3 decimales (metros, kilos); el PT va en cajas enteras.
+  const soloEnteros = item.tipo === 'PT'
+  const conteo = leerConteo(campos)
+  // En el ajuste se escribe lo contado, que puede ser 0.
+  const numero = soloEnteros ? leerCantidad(valor) : (totalDeConteo(conteo, item, modo === 'AJUSTE') ?? NaN)
+  // Sin nada digitado no hay conteo (evita "contar 0" sin querer en un ajuste).
+  const digitado = soloEnteros ? valor.trim() !== '' : Object.values(campos).some((v) => v.trim() !== '')
+  const valido = digitado && (numero === 0 || cantidadValida(numero, soloEnteros))
+  const diferencia = modo === 'AJUSTE' && valido ? redondear(numero - item.existencia) : null
+  const saldoPrevisto = redondear(modo === 'ENTRADA' ? item.existencia + numero : modo === 'SALIDA' ? item.existencia - numero : numero)
   const mutacion = modo === 'AJUSTE' ? ajuste : movimiento
 
   const puedeEnviar =
@@ -57,11 +68,15 @@ export function MovimientoDialogo({ item, onCerrar }: Props) {
 
   const enviar = () => {
     const observacionFinal = observacion.trim() || undefined
+    // PI e insumos envían el conteo tal cual: el backend convierte y guarda lo digitado.
+    // En el ajuste, el conteo es lo contado y el backend calcula la diferencia.
     if (modo === 'AJUSTE') {
-      ajuste.mutate({ itemId: item.id, cantidad: diferencia!, motivo: motivo.trim(), observacion: observacionFinal }, { onSuccess: onCerrar })
+      const cuanto = soloEnteros ? { cantidad: diferencia! } : { conteo }
+      ajuste.mutate({ itemId: item.id, ...cuanto, motivo: motivo.trim(), observacion: observacionFinal }, { onSuccess: onCerrar })
     } else {
+      const cuanto = soloEnteros ? { cantidad: numero } : { conteo }
       movimiento.mutate(
-        { itemId: item.id, tipo: modo, cantidad: numero, referencia: referencia.trim() || undefined, observacion: observacionFinal },
+        { itemId: item.id, tipo: modo, ...cuanto, referencia: referencia.trim() || undefined, observacion: observacionFinal },
         { onSuccess: onCerrar },
       )
     }
@@ -82,7 +97,7 @@ export function MovimientoDialogo({ item, onCerrar }: Props) {
             <button
               key={m}
               type="button"
-              onClick={() => { setModo(m); setValor('') }}
+              onClick={() => { setModo(m); setValor(''); setCampos(CAMPOS_VACIOS) }}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${modo === m ? 'border-marca bg-marca-claro text-marca-texto' : 'border-borde text-tinta-suave'}`}
             >
               {TITULO[m]}
@@ -90,15 +105,22 @@ export function MovimientoDialogo({ item, onCerrar }: Props) {
           ))}
         </div>
 
-        <Campo
-          etiqueta={modo === 'AJUSTE' ? `Existencia física contada (${item.unidadMedida}) *` : `Cantidad (${item.unidadMedida}) *`}
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step="0.001"
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-        />
+        {soloEnteros ? (
+          <Campo
+            etiqueta={modo === 'AJUSTE' ? `Existencia física contada (${item.unidadMedida}) *` : `Cantidad (${item.unidadMedida}) *`}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        ) : (
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-tinta">{modo === 'AJUSTE' ? 'Existencia física contada (como está) *' : 'Cantidad (como viene) *'}</p>
+            <CampoConteo item={item} campos={campos} onCambiar={setCampos} permitirCero={modo === 'AJUSTE'} />
+          </div>
+        )}
 
         {valido && modo !== 'AJUSTE' && numero > 0 && (
           saldoPrevisto < 0

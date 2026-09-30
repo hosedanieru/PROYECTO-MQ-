@@ -6,7 +6,7 @@
  *   1. MFR contra el DPP de PepsiCo: total y por SKU, con semáforo (meta 95 %).
  *   2. Turnos: cumplimiento, producción, personal y programación.
  *   3. Kilos hora por hora, con las mismas filas del DPP.
- *   4. Kilos de meta por familia de producto.
+ *   4. Kilos de meta por familia de PT.
  *
  * REGLA DE VOCABULARIO (2026-09-23): el nombre va en español y la sigla
  * del DPP (T, Mx, E, "Target Kilograms"…) queda al lado, en pequeño.
@@ -148,14 +148,14 @@ export function TableroMfrPage() {
                 {num(dia.data.mfr.producidoSinProgramar.reduce((s, p) => s + p.cajas, 0))}
               </span>
               <p className="mt-1 text-sm text-tinta-suave">
-                cajas de {dia.data.mfr.producidoSinProgramar.length} productos que no venían en el DPP
+                cajas de {dia.data.mfr.producidoSinProgramar.length} PT que no venían en el DPP
               </p>
             </Tarjeta>
 
             <Tarjeta titulo="Pedidos de emergencia">
               <span className="cifra text-4xl font-bold text-tinta">{num(dia.data.mfr.extraoficialesCajas)}</span>
               <p className="mt-1 text-sm text-tinta-suave">
-                cajas en {dia.data.mfr.extraoficiales.length} productos
+                cajas en {dia.data.mfr.extraoficiales.length} PT
               </p>
               <p className="mt-1 text-xs text-tinta-suave">
                 Remisiones extraoficiales: no cuentan para el cumplimiento.
@@ -164,7 +164,7 @@ export function TableroMfrPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-tinta">Cumplimiento por producto</h2>
+            <h2 className="text-lg font-semibold text-tinta">Cumplimiento por PT</h2>
             <p className="text-sm text-tinta-suave">
               Cada SKU frente a lo que el DPP programó para él en todo el día.
             </p>
@@ -173,7 +173,7 @@ export function TableroMfrPage() {
             <table className="min-w-full text-sm">
               <thead className="border-b border-borde text-left text-xs font-semibold uppercase tracking-wide text-tinta-suave">
                 <tr>
-                  <th className="px-4 py-2">Producto</th>
+                  <th className="px-4 py-2">PT</th>
                   <th className="px-4 py-2 text-right">Cajas programadas</th>
                   <th className="px-4 py-2 text-right">Cajas producidas</th>
                   <th className="px-4 py-2 text-right">Faltan</th>
@@ -314,7 +314,7 @@ export function TableroMfrPage() {
           {dia.data.familias.length > 0 && (
             <>
               <div>
-                <h2 className="text-lg font-semibold text-tinta">Kilos de meta por familia de producto</h2>
+                <h2 className="text-lg font-semibold text-tinta">Kilos de meta por familia de PT</h2>
                 <p className="text-sm text-tinta-suave">
                   Agrupa los SKU por su familia (surtido, multipack, reempaque…). En el DPP de
                   PepsiCo esta tabla se llama <em>Flavor Breakdown</em>.

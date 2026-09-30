@@ -101,6 +101,7 @@ model Usuario {
   // Inventario
   movimientosInventario MovimientoInventario[]
   entradasMercancia     EntradaMercancia[]
+  recetasCreadas        Receta[]
 
   @@map("usuario")
 }
@@ -209,6 +210,8 @@ model Producto {
   averias        RegistroAveria[]
   /// Ítem de inventario del PT (opción A: el PT se enlaza, no se duplica).
   itemInventario ItemInventario?
+  /// Versiones de su receta (la vigente es la de número más alto).
+  recetas        Receta[]
 
   @@index([activo])
   @@map("producto")
@@ -347,6 +350,8 @@ model Remision {
 
   estibas   RemisionEstiba[]
   versiones RemisionVersion[]
+  /// PI e insumos que descontó al aprobarse (cajas × receta vigente).
+  consumos  MovimientoInventario[]
 
   @@unique([anio, numero])
   @@index([fechaOperativa, turnoId])
@@ -671,30 +676,132 @@ enum TipoMovimientoInventario {
   AJUSTE
 }
 
-/// Lo que se cuenta en MQ: insumos, PI (producto intermedio) y PT.
-/// El PT no repite código ni descripción: se enlaza a `producto`
-/// (opción A, 2026-09-29), por eso `codigo` y `descripcion` van en null
-/// en el PT. `existencia` es la suma del kardex; se guarda aquí porque
-/// esta fila es la que se bloquea para que dos movimientos simultáneos
-/// no partan de la misma existencia.
-model ItemInventario {
-  id           String             @id @default(uuid())
-  tipo         TipoItemInventario
-  codigo       String?            @unique
-  descripcion  String?
-  unidadMedida String             @map("unidad_medida")
-  productoId   String?            @unique @map("producto_id")
-  producto     Producto?          @relation(fields: [productoId], references: [id])
-  existencia   Decimal            @default(0) @db.Decimal(14, 3)
-  activo       Boolean            @default(true)
+/// Medidas y presentaciones (UNIDAD, METRO, ROLLO…). Catálogo
+/// administrable: es la lista desplegable (usuario, 2026-09-29).
+model UnidadMedida {
+  id     String  @id @default(uuid())
+  codigo String  @unique
+  nombre String
+  activo Boolean @default(true)
+
+  pis                Pi[]     @relation("PiUnidadBase")
+  insumos            Insumo[] @relation("InsumoUnidadBase")
+  pisPresentacion    Pi[]     @relation("PiPresentacion")
+  insumosPresentacion Insumo[] @relation("InsumoPresentacion")
+
+  @@map("unidad_medida")
+}
+
+/// PI: producto intermedio, lo que llega de PepsiCo para reempaque.
+/// La existencia se lleva en su medida (`unidad_base`, con decimales);
+/// `presentacion` + `contenido_presentacion` dicen cómo viene (ROLLO de
+/// 50 METRO). Escalones hacia arriba: estiba → caja → presentación.
+model Pi {
+  id                    String        @id @default(uuid())
+  codigo                String        @unique
+  descripcion           String
+  unidadBaseId          String        @map("unidad_base_id")
+  unidadBase            UnidadMedida  @relation("PiUnidadBase", fields: [unidadBaseId], references: [id])
+  presentacionId        String?       @map("presentacion_id")
+  presentacion          UnidadMedida? @relation("PiPresentacion", fields: [presentacionId], references: [id], onDelete: Restrict)
+  contenidoPresentacion Decimal?      @map("contenido_presentacion") @db.Decimal(14, 3)
+  unidadesPorCaja       Int?          @map("unidades_por_caja")
+  cajasPorEstiba        Int?          @map("cajas_por_estiba")
+  activo                Boolean       @default(true)
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
-  movimientos MovimientoInventario[]
+  itemInventario ItemInventario?
+
+  @@map("pi")
+}
+
+/// Insumo: cajas, cintas, bolsas… lo que se consume para armar el PT.
+/// Misma forma que el PI; tabla propia porque son cosas distintas
+/// (usuario, 2026-09-29: "una tabla por cada tipo").
+model Insumo {
+  id                    String        @id @default(uuid())
+  codigo                String        @unique
+  descripcion           String
+  unidadBaseId          String        @map("unidad_base_id")
+  unidadBase            UnidadMedida  @relation("InsumoUnidadBase", fields: [unidadBaseId], references: [id])
+  presentacionId        String?       @map("presentacion_id")
+  presentacion          UnidadMedida? @relation("InsumoPresentacion", fields: [presentacionId], references: [id], onDelete: Restrict)
+  contenidoPresentacion Decimal?      @map("contenido_presentacion") @db.Decimal(14, 3)
+  unidadesPorCaja       Int?          @map("unidades_por_caja")
+  cajasPorEstiba        Int?          @map("cajas_por_estiba")
+  activo                Boolean       @default(true)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  itemInventario ItemInventario?
+
+  @@map("insumo")
+}
+
+/// Existencia de UN PT, PI o insumo: apunta exactamente a uno de los tres
+/// (restricción CHECK en la migración). Código, descripción, unidad y
+/// "activo" se leen del catálogo correspondiente; aquí solo va la
+/// existencia, en la medida del ítem con hasta 3 decimales (el PT, en
+/// cajas enteras). Es la fila que se bloquea para que dos movimientos
+/// simultáneos no partan de la misma existencia.
+model ItemInventario {
+  id         String             @id @default(uuid())
+  tipo       TipoItemInventario
+  productoId String?            @unique @map("producto_id")
+  producto   Producto?          @relation(fields: [productoId], references: [id])
+  piId       String?            @unique @map("pi_id")
+  pi         Pi?                @relation(fields: [piId], references: [id])
+  insumoId   String?            @unique @map("insumo_id")
+  insumo     Insumo?            @relation(fields: [insumoId], references: [id])
+  existencia Decimal            @default(0) @db.Decimal(14, 3)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  movimientos         MovimientoInventario[]
+  /// Recetas de PT en las que este PI o insumo es componente.
+  componentesDeReceta RecetaComponente[]
 
   @@index([tipo])
   @@map("item_inventario")
+}
+
+/// Receta (lista de materiales) de un PT. VERSIONADA (usuario,
+/// 2026-09-29): cada guardado crea una fila nueva; nunca se edita encima.
+/// La vigente es la de `version` más alta. Así el consumo teórico de una
+/// remisión pasada se calcula con la receta que regía entonces.
+model Receta {
+  id              String   @id @default(uuid())
+  productoId      String   @map("producto_id")
+  producto        Producto @relation(fields: [productoId], references: [id])
+  version         Int
+  vigenteDesde    DateTime @map("vigente_desde") @db.Timestamptz(3)
+  creadaPorId     String   @map("creada_por_id")
+  creadaPor       Usuario  @relation(fields: [creadaPorId], references: [id])
+  /// Copia del nombre al guardar.
+  creadaPorNombre String   @map("creada_por_nombre")
+
+  componentes RecetaComponente[]
+
+  @@unique([productoId, version])
+  @@map("receta")
+}
+
+/// Un PI o insumo de la receta: `cantidad` que gasta UNA caja de PT, en
+/// la medida del componente, con hasta 3 decimales. Ej.: 12 UNIDAD; 1,8 METRO.
+model RecetaComponente {
+  id       String         @id @default(uuid())
+  recetaId String         @map("receta_id")
+  receta   Receta         @relation(fields: [recetaId], references: [id])
+  itemId   String         @map("item_id")
+  item     ItemInventario @relation(fields: [itemId], references: [id])
+  cantidad Decimal        @db.Decimal(14, 3)
+
+  @@unique([recetaId, itemId])
+  @@map("receta_componente")
 }
 
 /// Kardex: cada entrada, salida o ajuste con el saldo que dejó. Nunca se
@@ -706,7 +813,7 @@ model MovimientoInventario {
   item   ItemInventario           @relation(fields: [itemId], references: [id])
   tipo   TipoMovimientoInventario
 
-  /// Con signo: lo que sumó o restó.
+  /// Con signo, en la unidad base: lo que sumó o restó.
   cantidad Decimal @db.Decimal(14, 3)
   /// Existencia después del movimiento.
   saldo    Decimal @db.Decimal(14, 3)
@@ -723,14 +830,22 @@ model MovimientoInventario {
   referencia  String?
   observacion String?
   motivo      String?
+  /// Lo que se digitó si fue un conteo mixto: "10 ROLLO (1 ROLLO = 50 METRO)".
+  /// Copia: si luego cambia la equivalencia, el movimiento sigue diciendo con cuál se calculó.
+  conteoTexto String? @map("conteo_texto")
 
   /// Entrada de mercancía a la que pertenece (si llegó en un documento).
   entradaId String?           @map("entrada_id")
   entrada   EntradaMercancia? @relation(fields: [entradaId], references: [id])
 
+  /// Remisión cuya aprobación descontó este consumo (receta del PT).
+  remisionId String?   @map("remision_id")
+  remision   Remision? @relation(fields: [remisionId], references: [id], onDelete: Restrict)
+
   @@index([itemId, fechaHoraRegistro])
   @@index([fechaOperativa])
   @@index([entradaId])
+  @@index([remisionId])
   @@map("movimiento_inventario")
 }
 

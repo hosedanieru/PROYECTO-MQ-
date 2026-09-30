@@ -44,6 +44,14 @@ firebase emulators:start
 | `bloquesProgramacion` | generado | fechaOperativa, fechaOperativaTexto, lineaId, turnoId, productoId, horaInicio, horaFin, cajasPorHora, eficienciaPorcentaje, loop, personasAsignadas, origen, creadoPorId, fechaCreacion, cerradoEn, cerradoPorId |
 | `asistenciasTurno` | `{fecha}_{turnoId}_{grupoId}` | fechaOperativa, fechaOperativaTexto, turnoId, grupoId, personasLlegaron, observacion, registradaPorId, fechaRegistro |
 | `asignacionesLinea` | `{fecha}_{turnoId}_{lineaId}_{grupoId}` | fechaOperativa, fechaOperativaTexto, turnoId, lineaId, grupoId, personas, registradaPorId, fechaRegistro |
+| `causalesAveria` | generado | catálogo de causales de avería |
+| `reportesAveria` | generado | encabezado del reporte con sus **registros[]** embebidos (y las evidencias de cada uno, sin rutas públicas) |
+| `unidadesMedida` | generado | codigo, nombre, activo |
+| `pis` / `insumos` | generado | codigo, descripcion, unidadBaseId, presentacionId, contenidoPresentacion, unidadesPorCaja, cajasPorEstiba, activo |
+| `itemsInventario` | generado | tipo (`PT`/`PI`/`INSUMO`), **una** referencia (`productoId` / `piId` / `insumoId`), existencia. El resto se lee del catálogo |
+| `movimientosInventario` | generado | kardex (tipo, cantidad con signo, saldo, fecha operativa, turno, usuario, entradaId, remisionId, conteoTexto…) |
+| `recetas` | `{productoId}_v{version}` (se crea con `create`, que falla si ya existe) | productoId, version, vigenteDesde, creadaPorId, creadaPorNombre, **componentes[]** `{ itemId, cantidad }` (cantidad por caja, decimal) |
+| `entradasMercancia` | generado | encabezado de la entrada de mercancía; sus líneas son los movimientos con su entradaId |
 
 Colecciones sin uso (diseño anterior; se pueden borrar desde la consola): `programaciones`, `configTurnos` (desde 2026-09-18) y `proveedores` (renombrada a `grupos` el 2026-09-21; los 4 documentos ya están copiados).
 

@@ -27,6 +27,9 @@ import type { ReporteAveriaRepository } from '../averia/reporte-averia.js';
 import type { GrupoRepository } from '../grupo/grupo.repository.js';
 import type { EntradaMercanciaRepository } from '../inventario/entrada-mercancia.js';
 import type { ItemInventarioRepository } from '../inventario/item-inventario.js';
+import type { MaterialRepository } from '../inventario/material.js';
+import type { RecetaRepository } from '../inventario/receta.js';
+import type { UnidadMedidaRepository } from '../inventario/unidad-medida.js';
 import type { MovimientoInventarioRepository } from '../inventario/movimiento-inventario.js';
 import type { AsignacionRepository } from '../mfr/asignacion-linea.js';
 import type { AsistenciaRepository } from '../mfr/asistencia-turno.js';
@@ -63,6 +66,9 @@ export interface ContextoTransaccional {
   itemsInventario: ItemInventarioRepository;
   movimientosInventario: MovimientoInventarioRepository;
   entradasMercancia: EntradaMercanciaRepository;
+  materiales: MaterialRepository;
+  unidadesMedida: UnidadMedidaRepository;
+  recetas: RecetaRepository;
 }
 
 export interface UnidadDeTrabajo {

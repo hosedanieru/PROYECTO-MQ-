@@ -64,7 +64,7 @@ Antes "proveedores" (renombrados el 2026-09-21). Quien pone el personal del turn
 | POST | `/remisiones` | `remision.crear` | ver cuerpo abajo → 201 |
 | PATCH | `/remisiones/:id` | `remision.editar` | parcial; 409 `REMISION_NO_EDITABLE` si no está en BORRADOR/EN_RECTIFICACION |
 | POST | `/remisiones/:id/entregar` | `remision.entregar` | sin cuerpo |
-| POST | `/remisiones/:id/aprobar` | `remision.registrar_aprobacion` | `{ opaNombre, opaCargo? }`; vuelve a verificar el tope del DPP antes de aprobar |
+| POST | `/remisiones/:id/aprobar` | `remision.registrar_aprobacion` | `{ opaNombre, opaCargo? }`; vuelve a verificar el tope del DPP y **descuenta cajas × receta vigente** del inventario en la misma transacción (también las extraoficiales). 409 `INVENTARIO_PT_SIN_RECETA` · 409 `INVENTARIO_CONSUMO_INSUFICIENTE` (dice qué falta) |
 | POST | `/remisiones/:id/rechazar` | `remision.registrar_aprobacion` | `{ motivo }` (5–500) |
 | POST | `/remisiones/:id/rectificar` | `remision.rectificar` | sin cuerpo; versión +1, mismo consecutivo |
 | POST | `/remisiones/:id/validar` | `remision.validar` | `{ conciliadoCon }` |
@@ -199,17 +199,26 @@ Solo PT por ahora (2026-09-28). Ver ROADMAP D1.
 
 ## Inventario
 
-Fase 1 (2026-09-29): catálogo único de ítems (INSUMO, PI, PT) y kardex. Ver ROADMAP D3.
+Una tabla por tipo (2026-09-29): PT (`producto`, se crea con `POST /productos`, que exige `receta: [{ itemId, cantidad }]` con al menos un PI o insumo y crea su versión 1 en la misma transacción), PI e insumo, cada uno con su catálogo. Los ítems de inventario son el eje de existencias: se crean solos al crear el PT, PI o insumo, y leen código, descripción, unidad y activo de su catálogo. Cantidades de PI e insumos con **hasta 3 decimales** en su medida (METRO, UNIDAD…); el PT en cajas enteras. Aprobar una remisión (`POST /remisiones/:id/aprobar`) descuenta cajas × receta vigente en la misma transacción; 409 `INVENTARIO_PT_SIN_RECETA` o `INVENTARIO_CONSUMO_INSUFICIENTE` (lista lo que falta). Los movimientos traen `remisionId` cuando son consumo.
+
+**Conteo mixto** (fase B): en lugar de `cantidad`, entradas de mercancía (`lineas[].conteo`), movimientos y ajustes aceptan `conteo: { estibas, cajas, presentaciones, medida }` —lo que llega o se contó tal como viene, por ejemplo 10 rollos— y el backend lo convierte a la medida del ítem con sus equivalencias (400 si usa un escalón que el ítem no tiene). En el ajuste, `conteo` es lo contado físicamente y el ajuste es la diferencia con la existencia. Solo PI e insumos; el PT va en cajas. El movimiento guarda `conteoTexto` ("10 ROLLO (1 ROLLO = 50 METRO)"). Ver ROADMAP D3.
 
 | Método | Ruta | Permiso | Notas |
 |---|---|---|---|
-| GET | `/inventario/items?tipo=&texto=&soloActivos=` | `inventario.consultar` | existencias; `texto` busca en código y descripción |
+| GET | `/inventario/unidades` | `inventario.consultar` | unidades de medida (lista desplegable) |
+| POST | `/inventario/unidades` | `inventario.catalogo` | `{ codigo (A-Z, 0-9, _ -; máx. 20), nombre }` |
+| PATCH | `/inventario/unidades/:id` | `inventario.catalogo` | `codigo`, `nombre`, `activo` |
+| GET | `/inventario/catalogo/pi` · `/inventario/catalogo/insumos` | `inventario.consultar` | catálogo con `unidadBase` (código) y equivalencias; otro tipo → 400 |
+| POST | `/inventario/catalogo/pi` · `/insumos` | `inventario.catalogo` | `{ codigo, descripcion, unidadBaseId (la medida), presentacionId?, contenidoPresentacion? (van juntos; decimal > 0), unidadesPorCaja?, cajasPorEstiba? }` (enteros > 0; estibas exige unidades por caja). Crea también su ítem · 409 `INVENTARIO_ITEM_DUPLICADO` si el código ya existe como PI o insumo · 404 `INVENTARIO_CATALOGO_NO_ENCONTRADO` si la unidad no existe o está inactiva |
+| PATCH | `/inventario/catalogo/pi/:id` · `/insumos/:id` | `inventario.catalogo` | mismos campos + `activo` |
+| GET | `/inventario/recetas` | `inventario.consultar` | versión vigente de cada PT que tiene receta: `[{ productoId, version, vigenteDesde, componentes (cuántos) }]`. Un PT ausente = "sin receta" |
+| GET | `/inventario/recetas/:productoId` | `inventario.consultar` | `{ vigente, versiones[] }` (más reciente primero); cada componente trae `itemId, cantidad` + `tipo, codigo, descripcion, unidadMedida, activo, existencia` de su ítem |
+| PUT | `/inventario/recetas/:productoId` | `inventario.catalogo` | `{ componentes: [{ itemId, cantidad }] }` (1 a 30; `cantidad` = lo que gasta UNA caja, > 0 con hasta 3 decimales; sin repetidos; solo ítems PI o INSUMO activos). Crea la **versión siguiente**; nunca edita encima · 404 si el PT o un ítem no existe · 400 `INVENTARIO_DATOS_INVALIDOS` |
+| GET | `/inventario/items?tipo=&texto=&soloActivos=` | `inventario.consultar` | existencias; `texto` busca en código y descripción. Cada ítem trae `referenciaId` (id en su catálogo) |
 | GET | `/inventario/items/:id` | `inventario.consultar` | un ítem con su existencia |
 | GET | `/inventario/items/:id/movimientos?limite=` | `inventario.consultar` | kardex, más reciente primero (100 por defecto, máx. 500) |
-| POST | `/inventario/items` | `inventario.catalogo` | INSUMO/PI: `{ tipo, codigo, descripcion, unidadMedida }` · PT: `{ tipo: 'PT', productoId, unidadMedida }` (código y descripción salen del producto) · 409 `INVENTARIO_ITEM_DUPLICADO` |
-| PATCH | `/inventario/items/:id` | `inventario.catalogo` | `codigo`, `descripcion` (no en PT), `unidadMedida`, `activo`. Tipo y producto no cambian |
-| POST | `/inventario/movimientos` | `inventario.registrar` | `{ itemId, tipo: ENTRADA \| SALIDA, cantidad > 0 (hasta 3 decimales), referencia?, observacion? }` · 409 `INVENTARIO_EXISTENCIA_INSUFICIENTE` si la salida deja negativo |
-| POST | `/inventario/ajustes` | `inventario.ajustar` | `{ itemId, cantidad (con signo, ≠ 0), motivo, observacion? }` |
+| POST | `/inventario/movimientos` | `inventario.registrar` | `{ itemId, tipo: ENTRADA \| SALIDA, cantidad (> 0, hasta 3 decimales; PT entero), referencia?, observacion? }` · 409 `INVENTARIO_EXISTENCIA_INSUFICIENTE` si la salida deja negativo |
+| POST | `/inventario/ajustes` | `inventario.ajustar` | `{ itemId, cantidad (con signo, ≠ 0, hasta 3 decimales), motivo, observacion? }` |
 | GET | `/inventario/movimientos?desde=&hasta=&tipo=` | `inventario.consultar` | todos los movimientos del rango (máx. 93 días) |
 | POST | `/inventario/entradas` | `inventario.registrar` | entrada de mercancía: `{ documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }` (1 a 50 líneas, sin ítems repetidos, solo INSUMO y PI). Todo o nada. Responde el encabezado con `lineas[]` (código, descripción, unidad, cantidad, saldo) |
 | GET | `/inventario/entradas?desde=&hasta=` | `inventario.consultar` | encabezados del rango, más recientes primero |

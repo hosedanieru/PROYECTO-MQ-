@@ -33,7 +33,7 @@ export function UltimasRemisiones({ remisiones }: { remisiones: Remision[] }) {
           <tr className="border-b border-borde text-left text-xs font-semibold uppercase tracking-wide text-tinta-suave">
             <th className="px-5 py-2.5 font-semibold">Hora</th>
             <th className="px-5 py-2.5 font-semibold">Consecutivo</th>
-            <th className="px-5 py-2.5 font-semibold">Producto</th>
+            <th className="px-5 py-2.5 font-semibold">PT</th>
             <th className="px-5 py-2.5 text-right font-semibold">Cajas</th>
             <th className="px-5 py-2.5 font-semibold">Estado</th>
           </tr>

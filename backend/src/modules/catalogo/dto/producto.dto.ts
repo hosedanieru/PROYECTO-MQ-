@@ -1,4 +1,7 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsBoolean,
   IsIn,
   IsInt,
@@ -10,12 +13,15 @@ import {
   Min,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
+import { MAXIMO_COMPONENTES_RECETA } from '../../../domain/inventario/receta.js';
 import {
   PROCESOS_PRODUCTO,
   type ProcesoProducto,
 } from '../../../domain/producto/producto.repository.js';
+import { ComponenteRecetaDto } from '../../inventario/dto/inventario.dto.js';
 
 /**
  * `ValidateIf` permite enviar `null` explícito para "borrar" un valor
@@ -68,6 +74,13 @@ export class CrearProductoDto {
   @IsNumber()
   @IsPositive()
   pesoNetoKg?: number | null;
+
+  /** Obligatoria en un PT nuevo (usuario, 2026-09-29): los PI e insumos que lleva. */
+  @ValidateNested({ each: true })
+  @Type(() => ComponenteRecetaDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAXIMO_COMPONENTES_RECETA)
+  receta!: ComponenteRecetaDto[];
 }
 
 export class ActualizarProductoDto {

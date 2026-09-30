@@ -12,12 +12,20 @@ import {
   UnidadDeTrabajoFalsa,
   UsuarioRepositorioFalso,
 } from '../pruebas/dobles-en-memoria.js';
-import { ItemInventarioRepositorioFalso } from '../pruebas/dobles-inventario.js';
+import { DatosInventarioInvalidosError, ItemInventarioNoEncontradoError } from '../../domain/inventario/inventario.errors.js';
+import type { ItemInventario } from '../../domain/inventario/item-inventario.js';
+import { ItemInventarioRepositorioFalso, RecetaRepositorioFalso } from '../pruebas/dobles-inventario.js';
 import {
   ActualizarProductoUseCase,
   CrearProductoUseCase,
   type CrearProductoComando,
 } from './producto.use-cases.js';
+
+const AHORA = new Date('2026-09-29T15:00:00Z');
+
+const PI: ItemInventario = {
+  id: 'item-pi', tipo: 'PI', referenciaId: 'pi-1', codigo: 'PI-1', descripcion: 'BOLSA PAPA 25 G', unidadMedida: 'UNIDAD', activo: true, equivalencias: null, existencia: 0,
+};
 
 function comando(sobrescribir: Partial<CrearProductoComando> = {}): CrearProductoComando {
   return {
@@ -28,6 +36,7 @@ function comando(sobrescribir: Partial<CrearProductoComando> = {}): CrearProduct
     cajasPorEstiba: 36,
     personasIdeal: 13,
     subdescripcion: 'surtido',
+    receta: [{ itemId: PI.id, cantidad: 12 }],
     usuarioId: 'user-admin',
     ...sobrescribir,
   };
@@ -36,22 +45,26 @@ function comando(sobrescribir: Partial<CrearProductoComando> = {}): CrearProduct
 describe('Productos', () => {
   let productos: ProductoRepositorioFalso;
   let items: ItemInventarioRepositorioFalso;
+  let recetas: RecetaRepositorioFalso;
   let auditoria: AuditoriaRepositorioFalso;
   let crear: CrearProductoUseCase;
   let actualizar: ActualizarProductoUseCase;
 
   beforeEach(() => {
     productos = new ProductoRepositorioFalso();
-    items = new ItemInventarioRepositorioFalso(productos);
+    items = new ItemInventarioRepositorioFalso();
+    items.agregar({ ...PI });
+    recetas = new RecetaRepositorioFalso();
     auditoria = new AuditoriaRepositorioFalso();
     const uow = new UnidadDeTrabajoFalsa({
       remisiones: REMISIONES_SIN_USO,
       usuarios: new UsuarioRepositorioFalso(),
       productos,
       itemsInventario: items,
+      recetas,
       auditoria,
     });
-    crear = new CrearProductoUseCase(uow);
+    crear = new CrearProductoUseCase(uow, { ahora: () => AHORA });
     actualizar = new ActualizarProductoUseCase(uow);
   });
 
@@ -72,10 +85,42 @@ describe('Productos', () => {
     it('crea también su ítem de PT en el inventario (un solo módulo), con existencia 0', async () => {
       const creado = await crear.ejecutar(comando());
 
-      expect(items.items).toEqual([
-        expect.objectContaining({ tipo: 'PT', productoId: creado.id, codigo: '300058141', unidadMedida: 'CAJA', existencia: 0 }),
+      expect(items.items.filter((i) => i.tipo === 'PT')).toEqual([
+        expect.objectContaining({ tipo: 'PT', referenciaId: creado.id, codigo: '300058141', unidadMedida: 'CAJA', existencia: 0 }),
       ]);
-      expect(auditoria.entradas.map((a) => a.entidad)).toEqual(['producto', 'item_inventario']);
+      expect(auditoria.entradas.map((a) => a.entidad)).toEqual(['producto', 'item_inventario', 'receta']);
+    });
+
+    it('crea la versión 1 de su receta en la misma operación', async () => {
+      const creado = await crear.ejecutar(comando());
+
+      expect(recetas.recetas).toEqual([
+        expect.objectContaining({
+          productoId: creado.id,
+          version: 1,
+          vigenteDesde: AHORA,
+          creadaPorId: 'user-admin',
+          componentes: [{ itemId: PI.id, cantidad: 12 }],
+        }),
+      ]);
+    });
+
+    it('la receta es obligatoria: sin componentes no crea nada', async () => {
+      await expect(crear.ejecutar(comando({ receta: [] }))).rejects.toThrow(DatosInventarioInvalidosError);
+
+      expect(productos.items).toHaveLength(0);
+      expect(items.items.filter((i) => i.tipo === 'PT')).toHaveLength(0);
+      expect(auditoria.entradas).toHaveLength(0);
+    });
+
+    it('rechaza componentes que no existen, inactivos o que son PT, sin crear nada', async () => {
+      items.agregar({ ...PI, id: 'item-pt', tipo: 'PT', codigo: 'PT-1' });
+      items.agregar({ ...PI, id: 'item-inactivo', codigo: 'PI-2', activo: false });
+
+      await expect(crear.ejecutar(comando({ receta: [{ itemId: 'no-existe', cantidad: 1 }] }))).rejects.toThrow(ItemInventarioNoEncontradoError);
+      await expect(crear.ejecutar(comando({ receta: [{ itemId: 'item-pt', cantidad: 1 }] }))).rejects.toThrow(/solo lleva PI e insumos/);
+      await expect(crear.ejecutar(comando({ receta: [{ itemId: 'item-inactivo', cantidad: 1 }] }))).rejects.toThrow(/inactivo/);
+      expect(productos.items).toHaveLength(0);
     });
 
     it('recorta espacios del código y la descripción', async () => {
@@ -140,7 +185,7 @@ describe('Productos', () => {
 
       expect(actualizado.cajasPorEstiba).toBe(40);
       expect(actualizado.descripcion).toBe(creado.descripcion);
-      // Al crear quedan dos entradas (producto y su PT); la edición es la última.
+      // Al crear quedan tres entradas (producto, su PT y su receta); la edición es la última.
       expect(auditoria.entradas.at(-1)).toMatchObject({
         accion: 'ACTUALIZAR',
         valorAnterior: { cajasPorEstiba: 36 },

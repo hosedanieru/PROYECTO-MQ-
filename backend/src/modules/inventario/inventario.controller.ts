@@ -5,25 +5,24 @@
  *   GET   /api/inventario/items?tipo=&texto=&soloActivos=     inventario.consultar  existencias
  *   GET   /api/inventario/items/:id                           inventario.consultar
  *   GET   /api/inventario/items/:id/movimientos?limite=       inventario.consultar  kardex (más reciente primero)
- *   POST  /api/inventario/items                               inventario.catalogo
- *   PATCH /api/inventario/items/:id                           inventario.catalogo
- *   POST  /api/inventario/movimientos                         inventario.registrar  entrada / salida
+ *   POST  /api/inventario/movimientos                        inventario.registrar  entrada / salida
  *   POST  /api/inventario/ajustes                             inventario.ajustar    ajuste con motivo
  *   GET   /api/inventario/movimientos?desde=&hasta=&tipo=     inventario.consultar  todos los movimientos del rango
  *   POST  /api/inventario/entradas                            inventario.registrar  entrada de mercancía (varias líneas)
  *   GET   /api/inventario/entradas?desde=&hasta=              inventario.consultar
  *   GET   /api/inventario/entradas/:id                        inventario.consultar  encabezado + líneas
  *
+ * Los ítems no se crean aquí: nacen con su PT, PI o insumo (ver
+ * catalogo-inventario.controller.ts y el catálogo de productos).
+ *
  * Entradas/salidas y ajustes van por rutas distintas para que el permiso
  * se verifique en la ruta: el patinador no puede "colar" un ajuste.
  * Fecha, hora, turno y quién registra los pone el servidor.
  */
 
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Query } from '@nestjs/common';
 
 import {
-  ActualizarItemUseCase,
-  CrearItemUseCase,
   RegistrarEntradaMercanciaUseCase,
   RegistrarMovimientoUseCase,
 } from '../../application/inventario/inventario.use-cases.js';
@@ -44,8 +43,6 @@ import { validarRango } from '../../domain/shared/rango-fechas.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decoradores.js';
 import {
-  ActualizarItemDto,
-  CrearItemDto,
   FiltroItemsDto,
   FiltroMovimientosDto,
   KardexDto,
@@ -63,8 +60,6 @@ const presentarEntrada = <T extends EntradaMercancia>(e: T) => ({ ...e, fechaOpe
 @Controller('inventario')
 export class InventarioController {
   constructor(
-    private readonly crearItem: CrearItemUseCase,
-    private readonly actualizarItem: ActualizarItemUseCase,
     private readonly registrarMovimiento: RegistrarMovimientoUseCase,
     private readonly registrarEntrada: RegistrarEntradaMercanciaUseCase,
     @Inject(ITEM_INVENTARIO_REPOSITORY) private readonly items: ItemInventarioRepository,
@@ -93,26 +88,6 @@ export class InventarioController {
     return movimientos.map(presentarMovimiento);
   }
 
-  @Post('items')
-  @HttpCode(HttpStatus.CREATED)
-  @RequierePermisos('inventario.catalogo')
-  crear(@Body() dto: CrearItemDto, @UsuarioActual() actual: Usuario) {
-    return this.crearItem.ejecutar({
-      tipo: dto.tipo,
-      codigo: dto.codigo ?? null,
-      descripcion: dto.descripcion ?? null,
-      unidadMedida: dto.unidadMedida,
-      productoId: dto.productoId ?? null,
-      usuarioId: actual.id,
-    });
-  }
-
-  @Patch('items/:id')
-  @RequierePermisos('inventario.catalogo')
-  actualizar(@Param('id') id: string, @Body() dto: ActualizarItemDto, @UsuarioActual() actual: Usuario) {
-    return this.actualizarItem.ejecutar({ itemId: id, cambios: dto, usuarioId: actual.id });
-  }
-
   @Post('movimientos')
   @HttpCode(HttpStatus.CREATED)
   @RequierePermisos('inventario.registrar')
@@ -120,7 +95,9 @@ export class InventarioController {
     const r = await this.registrarMovimiento.ejecutar({
       itemId: dto.itemId,
       tipo: dto.tipo,
-      cantidad: dto.cantidad,
+      // Con conteo, la cantidad la calcula el caso de uso.
+      cantidad: dto.cantidad ?? 0,
+      conteo: dto.conteo ?? null,
       referencia: dto.referencia ?? null,
       observacion: dto.observacion ?? null,
       motivo: null,
@@ -136,7 +113,8 @@ export class InventarioController {
     const r = await this.registrarMovimiento.ejecutar({
       itemId: dto.itemId,
       tipo: 'AJUSTE',
-      cantidad: dto.cantidad,
+      cantidad: dto.cantidad ?? 0,
+      conteo: dto.conteo ?? null,
       referencia: null,
       observacion: dto.observacion ?? null,
       motivo: dto.motivo,
@@ -186,6 +164,7 @@ export class InventarioController {
           unidadMedida: item?.unidadMedida ?? '',
           cantidad: m.cantidad,
           saldo: m.saldo,
+          conteoTexto: m.conteoTexto,
         };
       }),
     );

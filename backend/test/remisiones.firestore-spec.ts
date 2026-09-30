@@ -28,12 +28,16 @@ import { ClienteFirestore, COLECCION } from '../src/infrastructure/firestore/cli
 import { FirestoreService } from '../src/infrastructure/firestore/firestore.service.js';
 import { AsignacionFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asistencia.firestore.repository.js';
+import { CatalogoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/catalogo.firestore.repository.js';
 import { CausalAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/causal-averia.firestore.repository.js';
 import { ReporteAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/reporte-averia.firestore.repository.js';
 import {
   EntradaMercanciaFirestoreRepository,
   ItemInventarioFirestoreRepository,
+  MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  RecetaFirestoreRepository,
+  UnidadMedidaFirestoreRepository,
 } from '../src/infrastructure/firestore/repositorios/inventario.firestore.repositories.js';
 import { AuditoriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/auditoria.firestore.repository.js';
 import { GrupoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/grupo.firestore.repository.js';
@@ -157,6 +161,9 @@ describe('atomicidad', () => {
           itemsInventario: new ItemInventarioFirestoreRepository(c),
           movimientosInventario: new MovimientoInventarioFirestoreRepository(c),
           entradasMercancia: new EntradaMercanciaFirestoreRepository(c),
+          materiales: new MaterialFirestoreRepository(c),
+          unidadesMedida: new UnidadMedidaFirestoreRepository(c),
+          recetas: new RecetaFirestoreRepository(c),
         });
       }),
   };
@@ -193,7 +200,16 @@ describe('flujo completo', () => {
     const entregar = new EntregarRemisionUseCase(uow, RELOJ_FIJO);
     const rechazar = new RechazarRemisionUseCase(uow, RELOJ_FIJO);
     const rectificar = new RectificarRemisionUseCase(uow, RELOJ_FIJO);
-    const aprobar = new AprobarRemisionUseCase(uow, RELOJ_FIJO);
+    const aprobar = new AprobarRemisionUseCase(uow, RELOJ_FIJO, new CatalogoFirestoreRepository(cliente));
+
+    // Aprobar descuenta la receta del PT (obligatoria): 1,8 m de cinta por caja.
+    await servicio.db.collection(COLECCION.unidadesMedida).doc('METRO').set({ codigo: 'METRO', nombre: 'Metro', activo: true });
+    await servicio.db.collection(COLECCION.insumos).doc('cinta').set({ codigo: 'CINTA-48', descripcion: 'Cinta 48 mm', unidadBaseId: 'METRO', activo: true });
+    await servicio.db.collection(COLECCION.itemsInventario).doc('item-cinta').set({ tipo: 'INSUMO', insumoId: 'cinta', existencia: 500 });
+    await new RecetaFirestoreRepository(cliente).crear({
+      productoId, version: 1, vigenteDesde: new Date(), creadaPorId: ADMIN_ID, creadaPorNombre: 'Admin de pruebas',
+      componentes: [{ itemId: 'item-cinta', cantidad: 1.8 }],
+    });
     const validar = new ValidarRemisionUseCase(uow, RELOJ_FIJO);
 
     const r = await crear.ejecutar(comando());
@@ -207,6 +223,10 @@ describe('flujo completo', () => {
     expect(editada.aObjeto().cantidadCajas).toBe(34);
     await entregar.ejecutar({ remisionId: r.id, entregadaPorId: ADMIN_ID });
     await aprobar.ejecutar({ remisionId: r.id, opaNombre: 'Carlos', opaCargo: 'Facturador', registradaPorId: ADMIN_ID });
+    // 34 cajas × 1,8 m = 61,2 m: quedan 438,8 m, con la salida enlazada a la remisión.
+    expect((await servicio.db.collection(COLECCION.itemsInventario).doc('item-cinta').get()).data()?.existencia).toBe(438.8);
+    const consumo = await servicio.db.collection(COLECCION.movimientosInventario).where('remisionId', '==', r.id).get();
+    expect(consumo.docs.map((d) => d.data())).toEqual([expect.objectContaining({ tipo: 'SALIDA', cantidad: -61.2, saldo: 438.8 })]);
     const validada = await validar.ejecutar({ remisionId: r.id, validadaPorId: ADMIN_ID, concilidadoCon: 'María' });
     expect(validada.estado).toBe('VALIDADA');
 

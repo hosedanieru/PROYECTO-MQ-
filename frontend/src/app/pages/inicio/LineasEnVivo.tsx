@@ -96,7 +96,7 @@ export function LineasEnVivo({ dia, productos, esHoy, fecha }: Props) {
 
             <p className="mt-1.5 truncate text-xs text-tinta-suave">
               {enCurso
-                ? `Corriendo ahora: ${producto?.codigo ?? '—'} · ${producto?.descripcion ?? 'producto sin catálogo'}`
+                ? `Corriendo ahora: ${producto?.codigo ?? '—'} · ${producto?.descripcion ?? 'PT sin catálogo'}`
                 : `${linea.horasProgramadas} h programadas en el día`}
             </p>
 

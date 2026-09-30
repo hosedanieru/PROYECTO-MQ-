@@ -341,7 +341,7 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ### Terminado
 
-- Base de datos: 25 tablas (`schema.prisma`), migraciones aplicadas
+- Base de datos: 30 tablas (`schema.prisma`), migraciones aplicadas
 - Seed idempotente: 23 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción, 12 causales de avería
 - Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
 - Regla `fecha_operativa` con pruebas de casos borde
@@ -370,14 +370,21 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
   - **Indicador** (`domain/averia/indicador-averias.ts`, función pura): % = unidades averiadas (reportes vigentes) ÷ (Σ T del DPP × unidades por caja), sumando los días del periodo. **Máximo 1 % por contrato con PepsiCo** (`MAXIMO_AVERIAS_PORCENTAJE`); pasarlo genera alertas (por día y por periodo) que se ven en `/averias` y en los avisos del panel de inicio. Por día, turno, grupo (aporte de cada grupo al % sobre el mismo DPP) y SKU. Todas las averías cuentan; las de un producto que no estaba en el DPP **del día de la avería** se marcan aparte. El T sale de `calcularBloque` del MFR (no se duplica)
 - **Inventario — fase 1** (2026-09-29; regla del usuario: primero trazabilidad y control, los indicadores al final):
   - **Kardex**: cada ENTRADA, SALIDA o AJUSTE queda con quién, fecha/hora, día operativo y turno (automáticos, `application/shared/momento-operativo.ts`, compartido con Averías) y el saldo que dejó. Nunca se borra; un error se corrige con AJUSTE con motivo.
-  - **Catálogo único** de ítems INSUMO / PI / PT (**opción A**): el PT se enlaza a `producto` y NO repite código ni descripción (en la tabla van null; se leen del producto). Tipo y producto no se cambian después de crear. Sin lote (usuario: no relevante).
+  - **Una tabla por tipo** (usuario, 2026-09-29; migración `20260929180000_pi_insumo_unidades`): `producto` (el PT; **en pantalla se llama "PT"**, por dentro la tabla y el código siguen diciendo `producto`), `pi` e `insumo`. Cada uno tiene su catálogo; `item_inventario` es solo el **eje de existencias**: apunta a exactamente uno de los tres (`producto_id` / `pi_id` / `insumo_id`, CHECK `item_inventario_una_referencia`) y guarda la existencia. Código, descripción, unidad y activo se leen del catálogo (no se duplican). El código es único entre PI e insumo. Crear un PT, PI o insumo crea su ítem en la misma transacción. Sin lote (usuario: no relevante).
+  - **Unidades de medida** (`unidad_medida`): lista desplegable que mantiene el administrador (sembrada: `UNIDAD`). PI e insumo tienen su **medida** (`unidadBase`: en qué se lleva la existencia y en qué se descuenta, ej. METRO), una **presentación opcional con su contenido** (`presentacion` + `contenidoPresentacion`: ROLLO con 50 METRO; van juntas, CHECK en la base) y escalones enteros opcionales **estiba → caja → presentación** (`cajasPorEstiba`, `unidadesPorCaja` = presentaciones por caja, o medidas si no hay presentación). El PT se cuenta en `CAJA`.
+  - **Decimales** (usuario, 2026-09-29, revierte "todo en enteros" del mismo día: un rollo no se gasta por caja y varía por producto): existencias, cantidades y saldos de PI e insumos con **hasta 3 decimales** (`Decimal(14,3)`; regla única en `domain/inventario/cantidad.ts`, que también redondea las sumas para quitar el ruido de coma flotante). El **PT sigue en cajas enteras**. Migración `20260929210000_inventario_decimales`.
   - **Sin existencia negativa** (regla del usuario). `item_inventario.existencia` se guarda (excepción consciente a "lo derivado se calcula"): es la fila que se bloquea con `SELECT … FOR UPDATE` para que dos salidas simultáneas no saquen la misma existencia (probado en `test/inventario.e2e-spec.ts`), y en Firestore sumar el kardex crecería sin límite. Cuadra con Σ movimientos.
   - **Entrada de mercancía** (2026-09-29): lo que llega en un mismo documento = encabezado (`entrada_mercancia`: documento de soporte obligatorio, quién entrega, observación; fecha/hora/turno/quién recibe automáticos) + líneas, que son los movimientos ENTRADA con `entradaId` (no se duplican). Todo o nada. Recibe INSUMOS y PI (el PT se produce, no llega de afuera); máx. 50 líneas (límite técnico). Los ítems se bloquean en orden de id (evita deadlock). PI = lo que llega de PepsiCo para reempaque (usuario, 2026-09-29).
   - Permisos: `inventario.consultar`, `inventario.registrar`, `inventario.ajustar`, `inventario.catalogo`. **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final; lo mismo para averías). Entradas/salidas y ajustes van por rutas distintas.
-  - **Productos e inventario son UN SOLO MÓDULO** (usuario, 2026-09-29): en el menú hay una sola entrada **Inventario** con pestañas (`InventarioLayout`): Existencias · Entradas de mercancía · Productos (PT) · PI e insumos. Se fusionó lo que ve el usuario, **no las tablas**: `producto` sigue aparte porque remisiones, DPP, tope y averías solo aceptan PT. **Crear un producto crea su ítem de PT** en la misma transacción (`CrearProductoUseCase`), y el PT toma código, descripción y **activo** de su producto (se activa/desactiva desde Productos; nunca se desincronizan). Los productos existentes recibieron su PT con la migración `20260929160000_pt_de_productos_existentes` (Firestore: `seed:firestore`).
-  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/inventario/productos` (antes `/admin/productos`), `/inventario/catalogo` (PI e insumos). Las rutas viejas redirigen.
-  - Pendiente con el área (ROADMAP D3): qué es exactamente el PI, lista de insumos con códigos y unidades, cómo entran, consumo, conteo físico, receta, de quién son los insumos, WMS con número de remisión
-- 287 pruebas unitarias sin base de datos (`npm test`) + 15 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
+  - **Productos e inventario son UN SOLO MÓDULO** (usuario, 2026-09-29): en el menú hay una sola entrada **Inventario** con pestañas (`InventarioLayout`): Existencias · Entradas de mercancía · PT · PI · Insumos · Unidades. Se fusionó lo que ve el usuario, **no las tablas**: `producto` sigue aparte porque remisiones, DPP, tope y averías solo aceptan PT. **Crear un producto crea su ítem de PT** en la misma transacción (`CrearProductoUseCase`), y el PT toma código, descripción y **activo** de su producto (se activa/desactiva desde Productos; nunca se desincronizan). Los productos existentes recibieron su PT con la migración `20260929160000_pt_de_productos_existentes` (Firestore: `seed:firestore`).
+  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/inventario/pt` (antes `/admin/productos`), `/inventario/pi`, `/inventario/insumos`, `/inventario/unidades`. Las rutas viejas redirigen.
+  - **Fases acordadas** (usuario, 2026-09-29): A) tablas por tipo + unidades + "PT" en pantalla — **hecha**; B) conteo mixto — **hecha** (ver abajo); C) receta por PT — **hecha**; D) alertas: PT sin receta, componente inactivo, agotado, no alcanza para el DPP.
+  - **Receta del PT** (fase C, 2026-09-29; migración `20260929194000_receta_pt`, tablas `receta` + `receta_componente`, Firestore `recetas/{productoId}_v{n}` con componentes embebidos): lista de PI e insumos existentes y activos, cada uno con la **cantidad exacta que gasta UNA caja**, en la medida del componente y con decimales ("1,8 METRO por caja"; se quitó "por N cajas"). Decisiones del usuario: **versionada** (cada guardado crea la versión siguiente con fecha y autor, nunca edita encima; la vigente es la de número más alto; motivo: el consumo teórico de una remisión pasada usa la receta que regía), **botón "Receta" aparte** en la lista de PT, y **obligatoria para PT nuevos** (`CrearProductoUseCase` crea la versión 1 en la misma transacción). Los PT que ya existían quedan "Sin receta" hasta digitarla. El componente apunta al **ítem de inventario** (para leer existencia en las alertas); la receta guarda solo referencia + equivalencia y el caso de uso completa código/descripción. Unicidad de versión: `@@unique(productoId, version)` en Postgres; id determinista + `crearNuevo` (create que falla si existe) en Firestore. Consecuencia: `npm run importar:tiempos` ya **no crea** PT nuevos (la hoja no trae receta): los reporta como excepción.
+  - **Consumo al aprobar la remisión** (usuario, 2026-09-29; migración `20260929220000_consumo_por_remision`): `AprobarRemisionUseCase` descuenta **cajas × receta vigente** en la MISMA transacción que la aprobación (o quedan los dos, o ninguno). Una SALIDA por componente en el kardex con `remisionId`, referencia "Remisión AAAA-NNNN" y la versión de receta en la observación; también las **extraoficiales**. **Se bloquea la aprobación (409)** si el PT no tiene receta (`INVENTARIO_PT_SIN_RECETA`) o si algún componente no alcanza (`INVENTARIO_CONSUMO_INSUFICIENTE`, lista todos los faltantes): se mantiene "sin existencia negativa". Reglas puras en `domain/inventario/consumo.ts`; lecturas (`prepararConsumo`, en el paso `antes`) y escrituras (`registrarConsumo`, en `despues`) separadas en `application/inventario/consumo-remision.ts` por la regla de Firestore. El turno del movimiento sale de `momentoOperativo` (por eso Aprobar recibe `HORARIO_REPOSITORY`). **Consecuencia operativa elegida por el usuario: ningún PT sin receta se puede aprobar.**
+  - **Conteo mixto (fase B, 2026-09-29; migración `20260929230000_conteo_mixto`)**: PI e insumos se digitan **como vienen** —estibas + cajas + presentaciones (rollos) + medida suelta— y el backend convierte a la medida con las equivalencias del ítem (`domain/inventario/conteo.ts`: 1 estiba = cajasPorEstiba cajas; 1 caja = unidadesPorCaja presentaciones; 1 presentación = contenidoPresentacion medidas). Escalones en enteros, lo suelto con 3 decimales; solo se usa un escalón definido. Aplica a entradas de mercancía (`lineas[].conteo`), entradas/salidas (`conteo`) y **ajustes** (el conteo es lo CONTADO físicamente; el ajuste = contado − existencia). El kardex guarda `conteo_texto` ("10 ROLLO (1 ROLLO = 50 METRO)"; en ajustes "Conteo físico: …") como copia de lo digitado y la equivalencia usada. `ItemInventario.equivalencias` (null en el PT, que sigue en cajas y no admite conteo). Pantalla: `CampoConteo` muestra solo los campos del ítem y el total en vivo (espejo en `modules/inventario/conteo.ts`).
+  - `PENDIENTE DE DEFINIR` con el equipo: **reúso** de bolsas de PT averiadas (solo administrador cuando se implemente); equivalencia de la Bolsa (depende del PT al que pertenece).
+  - Pendiente con el área (ROADMAP D3): conteo físico, de quién son los insumos, WMS con número de remisión
+- 324 pruebas unitarias sin base de datos (`npm test`) + 18 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
 - Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
 - Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
 
@@ -396,9 +403,10 @@ frontend/src/
 │   ├── averias/    api, hooks (useAverias, useUrlDeArchivo), pages (lista, nuevo, detalle),
 │   │               componentes (AgregarAveria, CampoFoto, FotoEvidencia, CorregirRegistro/AnularReporte Dialogo),
 │   │               utils (comprimir-foto, totales)
-│   ├── inventario/ InventarioLayout (pestañas), api, hooks (useInventario), tonos, MovimientoDialogo,
+│   ├── inventario/ InventarioLayout (pestañas), api, hooks (useInventario), tonos, equivalencias, receta, MovimientoDialogo,
+│   │               EditorReceta, RecetaDialogo,
 │   │               pages (InventarioPage, KardexPage, EntradasPage, NuevaEntradaPage, EntradaDetallePage,
-│   │               ProductosPage, PiInsumosPage)
+│   │               ProductosPage [PT], MaterialesPage [PI / insumos], UnidadesPage)
 │   └── admin/      UsuariosPage, GruposPage, LineasPage, PesosPage, CausalesPage
 ├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando,
 │                   Badge, Tarjeta, TarjetaKpi, Dato, Desplegable, Iconos, Logo, BotonTema, BotonIdioma,
@@ -434,7 +442,7 @@ PATCH  /api/productos/:id               catalogo.editar  (datos, activo; NO est�
 POST   /api/remisiones                  remision.crear
 PATCH  /api/remisiones/:id              remision.editar  (solo BORRADOR / EN_RECTIFICACION → 409 si no)
 POST   /api/remisiones/:id/entregar     remision.entregar
-POST   /api/remisiones/:id/aprobar      remision.registrar_aprobacion
+POST   /api/remisiones/:id/aprobar      remision.registrar_aprobacion   descuenta cajas × receta; 409 sin receta o sin existencia
 POST   /api/remisiones/:id/rechazar     remision.registrar_aprobacion
 POST   /api/remisiones/:id/rectificar   remision.rectificar
 POST   /api/remisiones/:id/validar      remision.validar
@@ -479,11 +487,19 @@ POST   /api/averias/:id/anular      averia.corregir          { motivo }
 
 GET    /api/inventario/items?tipo=&texto=&soloActivos=   inventario.consultar  existencias
 GET    /api/inventario/items/:id(/movimientos?limite=)   inventario.consultar  ítem / kardex
-POST   /api/inventario/items            inventario.catalogo      (PATCH /:id: código, descripción, unidad, activo)
-POST   /api/inventario/movimientos      inventario.registrar     { itemId, tipo: ENTRADA|SALIDA, cantidad, referencia?, observacion? }
-POST   /api/inventario/ajustes          inventario.ajustar       { itemId, cantidad (con signo), motivo, observacion? }
+GET    /api/inventario/unidades         inventario.consultar     (POST, PATCH /:id con inventario.catalogo: codigo, nombre, activo)
+GET    /api/inventario/catalogo/pi|insumos   inventario.consultar  (POST, PATCH /:id con inventario.catalogo:
+                                        codigo, descripcion, unidadBaseId, presentacionId?, contenidoPresentacion?,
+                                        unidadesPorCaja?, cajasPorEstiba?, activo)
+                                        (el PT se crea en POST /api/productos, con `receta` obligatoria; ya no hay POST/PATCH /inventario/items)
+GET    /api/inventario/recetas          inventario.consultar     versión vigente de cada PT con receta (resumen)
+GET    /api/inventario/recetas/:productoId   inventario.consultar  { vigente, versiones[] } con datos de cada componente
+PUT    /api/inventario/recetas/:productoId   inventario.catalogo   { componentes: [{ itemId, cantidad (por caja, decimal) }] } → versión nueva
+POST   /api/inventario/movimientos      inventario.registrar     { itemId, tipo: ENTRADA|SALIDA, cantidad (hasta 3 decimales; PT entero) | conteo, referencia?, observacion? }
+POST   /api/inventario/ajustes          inventario.ajustar       { itemId, cantidad (con signo) | conteo (lo contado), motivo, observacion? }
+                                        conteo = { estibas, cajas, presentaciones, medida } (enteros salvo medida); solo PI e insumos
 GET    /api/inventario/movimientos?desde=&hasta=&tipo=   inventario.consultar  (rango máx. 93 días)
-POST   /api/inventario/entradas         inventario.registrar     { documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }
+POST   /api/inventario/entradas         inventario.registrar     { documento, remitente?, observacion?, lineas: [{ itemId, cantidad | conteo }] }
 GET    /api/inventario/entradas?desde=&hasta=            inventario.consultar  (/:id con sus líneas)
 
 GET    /api                             público                   comprobación de vida (healthcheck de Docker)
@@ -622,7 +638,7 @@ Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP 
 | Camino | Qué resuelve | Cuándo conviene |
 |---|---|---|
 | ~~Averías (D1)~~ | **Hecho 2026-09-28** (reporte con fotos + indicador del 1 %) | Pendientes menores: equivalencia de la Bolsa; averías de PI e insumos llegan con Inventario |
-| **Inventario (D3)** | Cuánto hay de **insumos, PI y PT** (usuario, 2026-09-28). **Hecho (2026-09-29): catálogo + kardex + existencias + entrada de mercancía.** | Siguiente: **receta por PT** (cuánto PI e insumos lleva cada caja), digitada a mano para revisar que funcione (usuario, 2026-09-29; confirmar alcance). Después: conteo físico, enlace con remisiones/averías, conciliación PT vs WMS. Indicadores al final |
+| **Inventario (D3)** | Cuánto hay de **insumos, PI y PT** (usuario, 2026-09-28). **Hecho (2026-09-29): catálogo por tipo + unidades + kardex + existencias + entrada de mercancía + receta versionada del PT.** | Siguiente: fase B (conteo en estibas + cajas + unidades) y fase D (alertas: sin receta, componente inactivo, agotado, no alcanza para el DPP). Después: conteo físico, enlace con remisiones/averías, conciliación PT vs WMS. Indicadores al final |
 | **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y `personasEsperadas` de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
 | **Migración del histórico 2026 (B6)** | ~2.195 registros del Excel | Requiere la decisión del área: migrar, descartar, o migrar marcado `HISTORICO_EXCEL` |
 | **Importación del catálogo desde el Excel** | Hoy el catálogo se carga a mano; `npm run importar:tiempos` simula y reporta diferencias | Bloqueado por qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen |

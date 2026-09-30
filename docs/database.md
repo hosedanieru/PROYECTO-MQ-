@@ -45,13 +45,36 @@ Convención: modelos en PascalCase, campos en camelCase, tablas y columnas en sn
 | `asistencia_turno` | Personas que llegaron de cada grupo, por fecha operativa y turno. Única por `(fecha, turno, grupo)`. |
 | `asignacion_linea` | Qué grupo trabaja en qué línea y con cuántas personas, por fecha operativa y turno. Única por `(fecha, turno, línea, grupo)`. |
 
+### Averías
+
+| Tabla | Qué guarda |
+|---|---|
+| `causal_averia` | Lista desplegable de causales (12 sembradas). Se desactivan, no se borran. |
+| `reporte_averia` | Encabezado: fecha operativa, turno y hora automáticos, grupo, quién reporta (con copia del nombre), estado `REGISTRADO`/`ANULADO` con motivo. |
+| `registro_averia` | Una avería del reporte: PT (con copia de código y descripción), vencimiento, lote, causal, cantidad entera y unidad (`UNIDAD`/`DOCENA`/`SIX`/`BOLSA`). Sin línea. |
+| `evidencia_averia` | Las 3 fotos de cada registro (`UNIDAD`, `LOTE_FECHA`, `CONJUNTO`): solo la ruta interna; el archivo vive en `EVIDENCIAS_DIR`. |
+
+### Inventario
+
+Una tabla por tipo (2026-09-29): el PT es `producto` (en pantalla se llama "PT"), y aparte `pi` e `insumo`. Cantidades de PI e insumos en `DECIMAL(14,3)` en su medida (METRO, UNIDAD…); el PT en cajas enteras (lo exige el dominio).
+
+| Tabla | Qué guarda |
+|---|---|
+| `unidad_medida` | Lista desplegable de unidades base (sembrada: `UNIDAD`). Código único. |
+| `pi` / `insumo` | Catálogo de cada tipo: código (único también entre las dos tablas, lo controla el caso de uso), descripción, unidad base (la medida), `presentacion_id` + `contenido_presentacion` (ROLLO con 50 METRO; juntos o ninguno, CHECK `*_presentacion_completa`), escalones opcionales `unidades_por_caja` y `cajas_por_estiba`, activo. |
+| `item_inventario` | Eje de existencias: apunta a **exactamente uno** de `producto_id` / `pi_id` / `insumo_id` (CHECK `item_inventario_una_referencia`, cada uno único) y guarda `existencia`. Código, descripción, unidad y activo se leen del catálogo. Se bloquea con `SELECT … FOR UPDATE` en cada movimiento. |
+| `movimiento_inventario` | Kardex: `ENTRADA`/`SALIDA`/`AJUSTE`, cantidad con signo, saldo que dejó, fecha operativa, turno, usuario, referencia, motivo (obligatorio en ajustes), `entrada_id` si viene de una entrada de mercancía, `remision_id` si es el consumo por receta al aprobar esa remisión, `conteo_texto` con lo digitado si fue un conteo mixto ("10 ROLLO (1 ROLLO = 50 METRO)"). Nunca se borra. |
+| `receta` | Una **versión** de la receta de un PT: `version` (única por PT, > 0), `vigente_desde`, quién la creó (con copia del nombre). Nunca se edita: guardar crea la siguiente; la vigente es la de número más alto. |
+| `receta_componente` | Un PI o insumo de esa versión: `item_id` (su ítem de inventario, único por receta), `cantidad` que gasta UNA caja de PT, en la medida del componente (`DECIMAL(14,3)` > 0, CHECK `receta_componente_cantidad_positiva`). |
+| `entrada_mercancia` | Encabezado de lo que llega en un documento (documento de soporte, quién entrega, observación, quién recibe). Sus líneas son los movimientos con su `entrada_id`. |
+
 ### Seguridad
 
 | Tabla | Qué guarda |
 |---|---|
 | `usuario` | Documento único, nombre, correo opcional, `password_hash` (bcrypt), activo, rol. |
 | `rol` | ADMINISTRADOR, COORDINADOR_MQ, PATINADOR, CONSULTA. |
-| `permiso` | 16 permisos con módulo (`remision.*`, `catalogo.*`, `admin.*`, `mfr.*`). |
+| `permiso` | 23 permisos con módulo (`remision.*`, `catalogo.*`, `admin.*`, `mfr.*`, `averia.*`, `inventario.*`). |
 | `rol_permiso` | Relación N:N. El seed la reemplaza en cada corrida: el seed es la fuente de verdad. |
 
 ## Reglas que viven en la base o cerca de ella

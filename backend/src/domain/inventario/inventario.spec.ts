@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { DatosInventarioInvalidosError, ExistenciaInsuficienteError } from './inventario.errors.js';
-import { validarDatosItem } from './item-inventario.js';
+import { validarDatosMaterial, type DatosMaterial } from './material.js';
 import { aplicarMovimiento, type DatosMovimiento } from './movimiento-inventario.js';
+import { validarDatosUnidad } from './unidad-medida.js';
 
 const mov = (cambios: Partial<DatosMovimiento>): DatosMovimiento => ({
   tipo: 'ENTRADA',
@@ -13,37 +14,65 @@ const mov = (cambios: Partial<DatosMovimiento>): DatosMovimiento => ({
   ...cambios,
 });
 
-describe('validarDatosItem', () => {
-  it('insumo: normaliza código y unidad a mayúsculas', () => {
-    expect(
-      validarDatosItem({ tipo: 'INSUMO', codigo: ' caja-12x ', descripcion: ' Caja corrugada ', unidadMedida: 'unidad', productoId: null }),
-    ).toEqual({ tipo: 'INSUMO', codigo: 'CAJA-12X', descripcion: 'Caja corrugada', unidadMedida: 'UNIDAD', productoId: null });
+const material = (cambios: Partial<DatosMaterial> = {}): DatosMaterial => ({
+  codigo: 'BOLSA-25G',
+  descripcion: 'Bolsa papa 25 g',
+  unidadBaseId: 'u-unidad',
+  presentacionId: null,
+  contenidoPresentacion: null,
+  unidadesPorCaja: 1000,
+  cajasPorEstiba: 40,
+  ...cambios,
+});
+
+describe('validarDatosMaterial (PI e insumos)', () => {
+  it('normaliza el código y recorta la descripción', () => {
+    expect(validarDatosMaterial(material({ codigo: ' bolsa-25g ', descripcion: ' Bolsa papa 25 g ' }))).toMatchObject({
+      codigo: 'BOLSA-25G',
+      descripcion: 'Bolsa papa 25 g',
+    });
   });
 
-  it('PT: exige el producto y no guarda código ni descripción propios', () => {
-    expect(validarDatosItem({ tipo: 'PT', codigo: 'X', descripcion: 'Y', unidadMedida: 'CAJA', productoId: 'p1' })).toEqual({
-      tipo: 'PT',
-      codigo: null,
-      descripcion: null,
-      unidadMedida: 'CAJA',
-      productoId: 'p1',
+  it('caja y estiba son opcionales', () => {
+    expect(validarDatosMaterial(material({ unidadesPorCaja: null, cajasPorEstiba: null }))).toMatchObject({ unidadesPorCaja: null, cajasPorEstiba: null });
+  });
+
+  it('estiba → caja → unidad: sin unidades por caja no hay estiba', () => {
+    expect(() => validarDatosMaterial(material({ unidadesPorCaja: null, cajasPorEstiba: 40 }))).toThrow(/unidades por caja/);
+  });
+
+  it('cinta: medida METRO con presentación ROLLO de 50 m (el contenido admite decimales)', () => {
+    expect(validarDatosMaterial(material({ unidadBaseId: 'u-metro', presentacionId: 'u-rollo', contenidoPresentacion: 50 }))).toMatchObject({
+      presentacionId: 'u-rollo',
+      contenidoPresentacion: 50,
     });
-    expect(() => validarDatosItem({ tipo: 'PT', codigo: null, descripcion: null, unidadMedida: 'CAJA', productoId: null })).toThrow(
-      /enlazarse a un producto/,
-    );
+    expect(validarDatosMaterial(material({ unidadBaseId: 'u-metro', presentacionId: 'u-rollo', contenidoPresentacion: 45.5 })).contenidoPresentacion).toBe(45.5);
   });
 
   it.each([
-    ['tipo desconocido', { tipo: 'OTRO' as 'PI' }],
     ['sin código', { codigo: '' }],
     ['código con espacios', { codigo: 'CAJA 12' }],
     ['sin descripción', { descripcion: ' ' }],
-    ['sin unidad', { unidadMedida: '' }],
-    ['insumo con producto', { productoId: 'p1' }],
+    ['sin unidad base', { unidadBaseId: '' }],
+    ['unidades por caja en cero', { unidadesPorCaja: 0 }],
+    ['cajas por estiba con decimales', { cajasPorEstiba: 2.5 }],
+    ['presentación sin contenido', { presentacionId: 'u-rollo' }],
+    ['contenido sin presentación', { contenidoPresentacion: 50 }],
+    ['presentación igual a la medida', { presentacionId: 'u-unidad', contenidoPresentacion: 5 }],
+    ['contenido con 4 decimales', { presentacionId: 'u-rollo', contenidoPresentacion: 1.2345 }],
   ])('rechaza: %s', (_, cambios) => {
-    expect(() =>
-      validarDatosItem({ tipo: 'PI', codigo: 'PI-1', descripcion: 'Bolsa individual', unidadMedida: 'UNIDAD', productoId: null, ...cambios }),
-    ).toThrow(DatosInventarioInvalidosError);
+    expect(() => validarDatosMaterial(material(cambios))).toThrow(DatosInventarioInvalidosError);
+  });
+});
+
+describe('validarDatosUnidad', () => {
+  it('normaliza el código a mayúsculas', () => {
+    expect(validarDatosUnidad({ codigo: ' rollo ', nombre: ' Rollo ' })).toEqual({ codigo: 'ROLLO', nombre: 'Rollo' });
+  });
+
+  it('rechaza código con espacios o nombre vacío', () => {
+    expect(() => validarDatosUnidad({ codigo: 'DOS PALABRAS', nombre: 'x' })).toThrow(DatosInventarioInvalidosError);
+    expect(() => validarDatosUnidad({ codigo: 'ROLLO', nombre: ' ' })).toThrow(DatosInventarioInvalidosError);
   });
 });
 
@@ -68,10 +97,16 @@ describe('aplicarMovimiento', () => {
     expect(() => aplicarMovimiento(10, mov({ tipo: 'AJUSTE', cantidad: -11, motivo: 'x' }), 'CAJA')).toThrow(ExistenciaInsuficienteError);
   });
 
-  it('decimales: hasta 3, y el saldo no acumula errores de coma flotante', () => {
-    expect(aplicarMovimiento(0.1, mov({ cantidad: 0.2 }), 'KG').saldo).toBe(0.3);
-    expect(aplicarMovimiento(10, mov({ tipo: 'SALIDA', cantidad: 2.125 }), 'KG').saldo).toBe(7.875);
-    expect(() => aplicarMovimiento(10, mov({ cantidad: 1.2345 }), 'KG')).toThrow(/3 decimales/);
+  it('PI e insumos: hasta 3 decimales, sin ruido de redondeo en el saldo', () => {
+    expect(aplicarMovimiento(10, mov({ tipo: 'SALIDA', cantidad: 2.5 }), 'METRO').saldo).toBe(7.5);
+    // 0,1 + 0,2 en JavaScript da 0,30000000000000004: el saldo sale limpio.
+    expect(aplicarMovimiento(0.1, mov({ cantidad: 0.2 }), 'METRO').saldo).toBe(0.3);
+    expect(() => aplicarMovimiento(10, mov({ cantidad: 1.2345 }), 'METRO')).toThrow(/3 decimales/);
+  });
+
+  it('el PT se mueve en cajas enteras', () => {
+    expect(() => aplicarMovimiento(10, mov({ cantidad: 2.5 }), 'CAJA', true)).toThrow(/cajas enteras/);
+    expect(aplicarMovimiento(10, mov({ cantidad: 2 }), 'CAJA', true).saldo).toBe(12);
   });
 
   it.each([

@@ -13,7 +13,7 @@
  * guarda. Lo que se envía es exactamente lo que quedó escrito.
  *
  * Todo el lote va en una transacción con un motivo común, que queda en
- * la auditoría de cada producto.
+ * la auditoría de cada PT.
  */
 
 import { useMemo, useState } from 'react'
@@ -167,7 +167,7 @@ export function PesosPage() {
             {filas.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">
-                  {soloSinPeso ? 'Todos los productos tienen peso.' : 'Sin productos.'}
+                  {soloSinPeso ? 'Todos los PT tienen peso.' : 'Sin PT.'}
                 </td>
               </tr>
             )}
@@ -194,7 +194,7 @@ export function PesosPage() {
       {puedeEditar && (
         <div className="space-y-3 rounded-lg bg-base p-4 shadow-sm">
           <Campo
-            etiqueta="Motivo del cambio (obligatorio, queda en la auditoría de cada producto)"
+            etiqueta="Motivo del cambio (obligatorio, queda en la auditoría de cada PT)"
             placeholder="Ej.: pesos confirmados contra el DPP del 16/09"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
@@ -202,7 +202,7 @@ export function PesosPage() {
           {hayInvalidos && <Alerta tipo="error">Hay pesos escritos que no son un número mayor que cero.</Alerta>}
           {excedeTope && (
             <Alerta tipo="error">
-              Un lote admite máximo {MAXIMO_POR_LOTE} productos y lleva {cambios.length}. Aplique por partes.
+              Un lote admite máximo {MAXIMO_POR_LOTE} PT y lleva {cambios.length}. Aplique por partes.
             </Alerta>
           )}
           {aplicar.isError && <Alerta tipo="error">{comoErrorApi(aplicar.error).mensaje}</Alerta>}

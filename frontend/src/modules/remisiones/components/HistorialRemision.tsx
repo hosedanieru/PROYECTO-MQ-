@@ -27,7 +27,7 @@ const ETIQUETA_ACCION: Record<EntradaAuditoria['accion'], string> = {
 
 /** Campos que se muestran del snapshot de una versión. */
 const CAMPOS_VERSION: Array<[string, string]> = [
-  ['codigoSnapshot', 'Producto'],
+  ['codigoSnapshot', 'PT'],
   ['cantidadCajas', 'Cajas'],
   ['cantidadUnidades', 'Unidades'],
   ['estibasCompletas', 'Estibas'],

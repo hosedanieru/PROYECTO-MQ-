@@ -17,8 +17,9 @@
  *   /inventario              UN SOLO MÓDULO (pestañas, `InventarioLayout`):
  *     (índice)               existencias de insumos, PI y PT; registrar movimiento
  *     /entradas              entradas de mercancía (listado; /nueva formulario; /:id detalle)
- *     /productos             catálogo de productos = PT (antes /admin/productos)
- *     /catalogo              PI e insumos (antes /admin/inventario)
+ *     /pt                    catálogo de PT (tabla `producto`; antes /admin/productos)
+ *     /pi, /insumos          catálogo de PI y de insumos (una tabla cada uno)
+ *     /unidades              unidades de medida (lista desplegable)
  *     /:id                   kardex de un ítem
  *
  * `RutaProtegida` envuelve al layout: si no hay sesión, ninguna ruta
@@ -36,7 +37,8 @@ import { EntradasPage } from '../modules/inventario/pages/EntradasPage'
 import { InventarioLayout } from '../modules/inventario/InventarioLayout'
 import { KardexPage } from '../modules/inventario/pages/KardexPage'
 import { NuevaEntradaPage } from '../modules/inventario/pages/NuevaEntradaPage'
-import { PiInsumosPage } from '../modules/inventario/pages/PiInsumosPage'
+import { MaterialesPage } from '../modules/inventario/pages/MaterialesPage'
+import { UnidadesPage } from '../modules/inventario/pages/UnidadesPage'
 import { AveriasListaPage } from '../modules/averias/pages/AveriasListaPage'
 import { NuevoReporteAveriaPage } from '../modules/averias/pages/NuevoReporteAveriaPage'
 import { ReporteAveriaDetallePage } from '../modules/averias/pages/ReporteAveriaDetallePage'
@@ -84,14 +86,20 @@ export const router = createBrowserRouter([
               { path: 'entradas', element: <EntradasPage /> },
               { path: 'entradas/nueva', element: <NuevaEntradaPage /> },
               { path: 'entradas/:id', element: <EntradaDetallePage /> },
-              { path: 'productos', element: <ProductosPage /> },
-              { path: 'catalogo', element: <PiInsumosPage /> },
+              // Una tabla por tipo, una pestaña por tipo (usuario, 2026-09-29).
+              { path: 'pt', element: <ProductosPage /> },
+              { path: 'pi', element: <MaterialesPage tipo="PI" /> },
+              { path: 'insumos', element: <MaterialesPage tipo="INSUMO" /> },
+              { path: 'unidades', element: <UnidadesPage /> },
+              // Rutas anteriores dentro del módulo.
+              { path: 'productos', element: <Navigate to="/inventario/pt" replace /> },
+              { path: 'catalogo', element: <Navigate to="/inventario/pi" replace /> },
               { path: ':id', element: <KardexPage /> },
             ],
           },
           // Rutas anteriores: productos e ítems ahora viven dentro de Inventario.
-          { path: 'admin/productos', element: <Navigate to="/inventario/productos" replace /> },
-          { path: 'admin/inventario', element: <Navigate to="/inventario/catalogo" replace /> },
+          { path: 'admin/productos', element: <Navigate to="/inventario/pt" replace /> },
+          { path: 'admin/inventario', element: <Navigate to="/inventario/pi" replace /> },
           { path: 'admin/usuarios', element: <UsuariosPage /> },
           { path: 'admin/lineas', element: <LineasPage /> },
           { path: 'admin/grupos', element: <GruposPage /> },

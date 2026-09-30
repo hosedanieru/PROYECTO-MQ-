@@ -2,11 +2,10 @@
  * CASOS DE USO: INVENTARIO
  * ========================
  *
- *   CrearItemUseCase            el administrador da de alta un insumo, PI o PT
- *   ActualizarItemUseCase       corrige código, descripción, unidad; desactiva
- *   RegistrarMovimientoUseCase  entrada, salida o ajuste, con su saldo
+ *   RegistrarMovimientoUseCase        entrada, salida o ajuste, con su saldo
  *   RegistrarEntradaMercanciaUseCase  lo que llega en un documento: varias líneas, todo o nada
  *
+ * El catálogo (PT, PI, insumos, unidades) está en `catalogo-inventario.use-cases.ts`.
  * Todo con auditoría dentro de la misma transacción.
  */
 
@@ -16,118 +15,41 @@ import {
   type DatosEntrada,
   type EntradaMercancia,
 } from '../../domain/inventario/entrada-mercancia.js';
-import {
-  DatosInventarioInvalidosError,
-  ItemInventarioDuplicadoError,
-  ItemInventarioNoEncontradoError,
-} from '../../domain/inventario/inventario.errors.js';
-import {
-  validarDatosItem,
-  type CambiosItem,
-  type DatosItem,
-  type ItemInventario,
-} from '../../domain/inventario/item-inventario.js';
+import { redondear } from '../../domain/inventario/cantidad.js';
+import { convertirConteo, type Conteo } from '../../domain/inventario/conteo.js';
+import { DatosInventarioInvalidosError, ItemInventarioNoEncontradoError } from '../../domain/inventario/inventario.errors.js';
+import type { ItemInventario } from '../../domain/inventario/item-inventario.js';
 import {
   aplicarMovimiento,
   type DatosMovimiento,
   type MovimientoInventario,
 } from '../../domain/inventario/movimiento-inventario.js';
 import type { HorarioRepository } from '../../domain/mfr/horas-turno.js';
-import { ProductoNoEncontradoError } from '../../domain/producto/producto.errors.js';
-import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
 import type { Reloj } from '../remision/crear-remision.use-case.js';
 import { momentoOperativo } from '../shared/momento-operativo.js';
 
-export interface CrearItemComando extends DatosItem {
-  usuarioId: string;
-}
-
-export class CrearItemUseCase {
-  constructor(private readonly uow: UnidadDeTrabajo) {}
-
-  async ejecutar(comando: CrearItemComando): Promise<ItemInventario> {
-    const datos = validarDatosItem(comando);
-    return this.uow.ejecutar(async ({ itemsInventario, productos, auditoria }) => {
-      if (datos.tipo === 'PT') {
-        const producto = await productos.buscarPorId(datos.productoId!);
-        if (!producto || !producto.activo) {
-          throw new ProductoNoEncontradoError('El producto no existe o está inactivo.');
-        }
-        if (await itemsInventario.buscarPorProducto(producto.id)) {
-          throw new ItemInventarioDuplicadoError(`El producto ${producto.codigo} ya tiene su ítem de inventario.`);
-        }
-      } else if (await itemsInventario.buscarPorCodigo(datos.codigo!)) {
-        throw new ItemInventarioDuplicadoError(`Ya existe un ítem de inventario con el código "${datos.codigo}".`);
-      }
-
-      const creado = await itemsInventario.crear(datos);
-      await auditoria.registrar({
-        entidad: 'item_inventario',
-        entidadId: creado.id,
-        accion: 'CREAR',
-        valorNuevo: creado,
-        usuarioId: comando.usuarioId,
-      });
-      return creado;
-    });
-  }
-}
-
-export interface ActualizarItemComando {
-  itemId: string;
-  cambios: CambiosItem;
-  usuarioId: string;
-}
-
-export class ActualizarItemUseCase {
-  constructor(private readonly uow: UnidadDeTrabajo) {}
-
-  async ejecutar(comando: ActualizarItemComando): Promise<ItemInventario> {
-    return this.uow.ejecutar(async ({ itemsInventario, auditoria }) => {
-      const actual = await buscarItem(itemsInventario, comando.itemId);
-      const { activo, ...cambios } = Object.fromEntries(
-        Object.entries(comando.cambios).filter(([, v]) => v !== undefined),
-      ) as CambiosItem;
-
-      if (actual.tipo === 'PT' && (cambios.codigo !== undefined || cambios.descripcion !== undefined || activo !== undefined)) {
-        throw new DatosInventarioInvalidosError('Código, descripción y estado del PT se cambian desde su producto (pestaña Productos).');
-      }
-      // Se revalida el ítem completo con los cambios aplicados.
-      const datos = validarDatosItem({
-        tipo: actual.tipo,
-        productoId: actual.productoId,
-        codigo: cambios.codigo ?? actual.codigo,
-        descripcion: cambios.descripcion ?? actual.descripcion,
-        unidadMedida: cambios.unidadMedida ?? actual.unidadMedida,
-      });
-      if (datos.codigo && datos.codigo !== actual.codigo) {
-        const otro = await itemsInventario.buscarPorCodigo(datos.codigo);
-        if (otro && otro.id !== actual.id) {
-          throw new ItemInventarioDuplicadoError(`Ya existe un ítem de inventario con el código "${datos.codigo}".`);
-        }
-      }
-
-      const actualizado = await itemsInventario.actualizar(actual.id, {
-        ...(datos.tipo !== 'PT' ? { codigo: datos.codigo!, descripcion: datos.descripcion! } : {}),
-        unidadMedida: datos.unidadMedida,
-        ...(activo !== undefined ? { activo } : {}),
-      });
-      await auditoria.registrar({
-        entidad: 'item_inventario',
-        entidadId: actual.id,
-        accion: 'ACTUALIZAR',
-        valorAnterior: actual,
-        valorNuevo: actualizado,
-        usuarioId: comando.usuarioId,
-      });
-      return actualizado;
-    });
-  }
-}
-
 export interface RegistrarMovimientoComando extends DatosMovimiento {
   itemId: string;
+  /**
+   * Conteo mixto en lugar de `cantidad` (PI e insumos). En ENTRADA/SALIDA es
+   * lo que entra o sale; en AJUSTE es lo que se CONTÓ físicamente, y el
+   * ajuste es la diferencia con la existencia.
+   */
+  conteo?: Conteo | null;
   usuarioId: string;
+}
+
+/** Resuelve el conteo del comando a la cantidad del movimiento, con el texto de lo digitado. */
+function resolverConteo(comando: RegistrarMovimientoComando, item: ItemInventario): { datos: DatosMovimiento; conteoTexto: string | null } {
+  if (!comando.conteo) return { datos: comando, conteoTexto: null };
+  if (item.tipo === 'PT') throw new DatosInventarioInvalidosError('El PT se mueve en cajas: use la cantidad.');
+  const ajuste = comando.tipo === 'AJUSTE';
+  const { total, texto } = convertirConteo(comando.conteo, item.equivalencias, item.unidadMedida, ajuste);
+  return {
+    datos: { ...comando, cantidad: ajuste ? redondear(total - item.existencia) : total },
+    conteoTexto: ajuste ? `Conteo físico: ${texto}` : texto,
+  };
 }
 
 export class RegistrarMovimientoUseCase {
@@ -149,7 +71,9 @@ export class RegistrarMovimientoUseCase {
         throw new ItemInventarioNoEncontradoError('El ítem de inventario no existe o está inactivo.');
       }
 
-      const calculado = aplicarMovimiento(item.existencia, comando, item.unidadMedida);
+      const { datos, conteoTexto } = resolverConteo(comando, item);
+      // El PT se mueve en cajas enteras; PI e insumos admiten decimales.
+      const calculado = aplicarMovimiento(item.existencia, datos, item.unidadMedida, item.tipo === 'PT');
       const movimiento = await movimientosInventario.crear({
         itemId: item.id,
         tipo: calculado.datos.tipo,
@@ -162,6 +86,8 @@ export class RegistrarMovimientoUseCase {
         observacion: calculado.datos.observacion,
         motivo: calculado.datos.motivo,
         entradaId: null,
+        remisionId: null,
+        conteoTexto,
       });
       await itemsInventario.fijarExistencia(item.id, calculado.saldo);
       await auditoria.registrar({
@@ -190,6 +116,8 @@ export interface LineaEntradaRegistrada {
   unidadMedida: string;
   cantidad: number;
   saldo: number;
+  /** Lo que se digitó, si llegó como conteo ("10 ROLLO (1 ROLLO = 50 METRO)"). */
+  conteoTexto: string | null;
 }
 
 export class RegistrarEntradaMercanciaUseCase {
@@ -221,12 +149,20 @@ export class RegistrarEntradaMercanciaUseCase {
         if (!TIPOS_ITEM_ENTRADA.includes(item.tipo)) {
           throw new DatosInventarioInvalidosError(`Línea ${i + 1}: ${item.codigo} es ${item.tipo}; la entrada de mercancía recibe insumos y PI.`);
         }
+        // Lo que llega se puede digitar como viene (rollos, cajas…): se convierte a la medida.
+        let conteo: { total: number; texto: string } | null = null;
+        try {
+          conteo = l.conteo ? convertirConteo(l.conteo, item.equivalencias, item.unidadMedida) : null;
+        } catch (error) {
+          if (error instanceof DatosInventarioInvalidosError) throw new DatosInventarioInvalidosError(`Línea ${i + 1} (${item.codigo}): ${error.message}`);
+          throw error;
+        }
         const calculo = aplicarMovimiento(
           item.existencia,
-          { tipo: 'ENTRADA', cantidad: l.cantidad, referencia: datos.documento, observacion: null, motivo: null },
+          { tipo: 'ENTRADA', cantidad: conteo?.total ?? l.cantidad!, referencia: datos.documento, observacion: null, motivo: null },
           item.unidadMedida,
         );
-        return { item, calculo };
+        return { item, calculo, conteoTexto: conteo?.texto ?? null };
       });
 
       // 2. Escrituras: encabezado, un movimiento por línea y existencias.
@@ -239,7 +175,7 @@ export class RegistrarEntradaMercanciaUseCase {
         usuarioNombre: usuario?.nombre ?? comando.usuarioId,
       });
       const lineas: LineaEntradaRegistrada[] = [];
-      for (const { item, calculo } of calculadas) {
+      for (const { item, calculo, conteoTexto } of calculadas) {
         const movimiento = await movimientosInventario.crear({
           itemId: item.id,
           tipo: 'ENTRADA',
@@ -252,6 +188,8 @@ export class RegistrarEntradaMercanciaUseCase {
           observacion: null,
           motivo: null,
           entradaId: entrada.id,
+          remisionId: null,
+          conteoTexto,
         });
         await itemsInventario.fijarExistencia(item.id, calculo.saldo);
         lineas.push({
@@ -262,6 +200,7 @@ export class RegistrarEntradaMercanciaUseCase {
           unidadMedida: item.unidadMedida,
           cantidad: calculo.cantidad,
           saldo: calculo.saldo,
+          conteoTexto,
         });
       }
       await auditoria.registrar({
@@ -276,8 +215,3 @@ export class RegistrarEntradaMercanciaUseCase {
   }
 }
 
-async function buscarItem(repo: ContextoTransaccional['itemsInventario'], id: string): Promise<ItemInventario> {
-  const item = await repo.buscarPorId(id);
-  if (!item) throw new ItemInventarioNoEncontradoError(`No existe el ítem de inventario "${id}".`);
-  return item;
-}

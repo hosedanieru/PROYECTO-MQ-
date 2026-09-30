@@ -56,6 +56,7 @@ import {
   RectificarRemisionUseCase,
   ValidarRemisionUseCase,
 } from '../../application/remision/flujo-remision.use-cases.js';
+import { HORARIO_REPOSITORY, type HorarioRepository } from '../../domain/mfr/horas-turno.js';
 import {
   PRODUCTO_REPOSITORY,
   type ProductoRepository,
@@ -74,7 +75,6 @@ import { RemisionController } from './remision.controller.js';
  */
 const casosUsoFlujo = [
   EntregarRemisionUseCase,
-  AprobarRemisionUseCase,
   RechazarRemisionUseCase,
   RectificarRemisionUseCase,
   ValidarRemisionUseCase,
@@ -128,6 +128,13 @@ const casosUsoFlujo = [
         new EditarRemisionUseCase(uow, productos),
     },
     ...casosUsoFlujo,
+    {
+      // Aprobar también descuenta PI e insumos: necesita el turno del momento.
+      provide: AprobarRemisionUseCase,
+      inject: [UNIDAD_DE_TRABAJO, RELOJ, HORARIO_REPOSITORY],
+      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj, horarios: HorarioRepository) =>
+        new AprobarRemisionUseCase(uow, reloj, horarios),
+    },
   ],
 })
 export class RemisionModule {}

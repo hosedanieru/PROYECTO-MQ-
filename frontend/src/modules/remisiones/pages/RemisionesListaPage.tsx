@@ -222,7 +222,7 @@ export function RemisionesListaPage() {
               <th className="px-4 py-2">Fecha op.</th>
               <th className="px-4 py-2">Turno</th>
               <th className="px-4 py-2">Grupo</th>
-              <th className="px-4 py-2">Producto</th>
+              <th className="px-4 py-2">PT</th>
               <th className="px-4 py-2 text-right">Cajas</th>
               <th className="px-4 py-2 text-right">Unidades</th>
               <th className="px-4 py-2">Estibas</th>

@@ -21,6 +21,9 @@ import { CAUSAL_AVERIA_REPOSITORY } from '../../domain/averia/causal-averia.js';
 import { REPORTE_AVERIA_REPOSITORY } from '../../domain/averia/reporte-averia.js';
 import { ENTRADA_MERCANCIA_REPOSITORY } from '../../domain/inventario/entrada-mercancia.js';
 import { ITEM_INVENTARIO_REPOSITORY } from '../../domain/inventario/item-inventario.js';
+import { MATERIAL_REPOSITORY } from '../../domain/inventario/material.js';
+import { RECETA_REPOSITORY } from '../../domain/inventario/receta.js';
+import { UNIDAD_MEDIDA_REPOSITORY } from '../../domain/inventario/unidad-medida.js';
 import { MOVIMIENTO_INVENTARIO_REPOSITORY } from '../../domain/inventario/movimiento-inventario.js';
 import { CATALOGO_REPOSITORY } from '../../domain/catalogo/catalogo.repository.js';
 import { GRUPO_REPOSITORY } from '../../domain/grupo/grupo.repository.js';
@@ -45,7 +48,10 @@ import { ReporteAveriaFirestoreRepository } from '../firestore/repositorios/repo
 import {
   EntradaMercanciaFirestoreRepository,
   ItemInventarioFirestoreRepository,
+  MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  RecetaFirestoreRepository,
+  UnidadMedidaFirestoreRepository,
 } from '../firestore/repositorios/inventario.firestore.repositories.js';
 import { AsignacionFirestoreRepository } from '../firestore/repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from '../firestore/repositorios/asistencia.firestore.repository.js';
@@ -68,7 +74,10 @@ import { ReporteAveriaPrismaRepository } from './prisma/reporte-averia.prisma.re
 import {
   EntradaMercanciaPrismaRepository,
   ItemInventarioPrismaRepository,
+  MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  RecetaPrismaRepository,
+  UnidadMedidaPrismaRepository,
 } from './prisma/inventario.prisma.repositories.js';
 import { AsignacionPrismaRepository } from './prisma/asignacion.prisma.repository.js';
 import { AsistenciaPrismaRepository } from './prisma/asistencia.prisma.repository.js';
@@ -114,6 +123,9 @@ const TOKENS = [
   ITEM_INVENTARIO_REPOSITORY,
   MOVIMIENTO_INVENTARIO_REPOSITORY,
   ENTRADA_MERCANCIA_REPOSITORY,
+  MATERIAL_REPOSITORY,
+  UNIDAD_MEDIDA_REPOSITORY,
+  RECETA_REPOSITORY,
 ];
 
 // ---------- PostgreSQL ----------
@@ -143,6 +155,9 @@ const REGISTROS_POSTGRES: Provider[] = [
   conPrisma(ITEM_INVENTARIO_REPOSITORY, ItemInventarioPrismaRepository),
   conPrisma(MOVIMIENTO_INVENTARIO_REPOSITORY, MovimientoInventarioPrismaRepository),
   conPrisma(ENTRADA_MERCANCIA_REPOSITORY, EntradaMercanciaPrismaRepository),
+  conPrisma(MATERIAL_REPOSITORY, MaterialPrismaRepository),
+  conPrisma(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaPrismaRepository),
+  conPrisma(RECETA_REPOSITORY, RecetaPrismaRepository),
 ];
 
 // ---------- Firestore ----------
@@ -173,6 +188,9 @@ const REGISTROS_FIRESTORE: Provider[] = [
   conFirestore(ITEM_INVENTARIO_REPOSITORY, ItemInventarioFirestoreRepository),
   conFirestore(MOVIMIENTO_INVENTARIO_REPOSITORY, MovimientoInventarioFirestoreRepository),
   conFirestore(ENTRADA_MERCANCIA_REPOSITORY, EntradaMercanciaFirestoreRepository),
+  conFirestore(MATERIAL_REPOSITORY, MaterialFirestoreRepository),
+  conFirestore(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaFirestoreRepository),
+  conFirestore(RECETA_REPOSITORY, RecetaFirestoreRepository),
 ];
 
 const tipo = tipoPersistencia();

@@ -20,9 +20,10 @@
  * Fecha, hora, turno y quién recibe los pone el servidor.
  */
 
+import { DECIMALES_CANTIDAD, esCantidadPositiva } from './cantidad.js';
+import type { Conteo } from './conteo.js';
 import { DatosInventarioInvalidosError } from './inventario.errors.js';
 import type { TipoItem } from './item-inventario.js';
-import { DECIMALES_CANTIDAD } from './movimiento-inventario.js';
 
 export const TIPOS_ITEM_ENTRADA: readonly TipoItem[] = ['INSUMO', 'PI'];
 
@@ -32,9 +33,15 @@ export const TIPOS_ITEM_ENTRADA: readonly TipoItem[] = ['INSUMO', 'PI'];
  */
 export const MAXIMO_LINEAS_ENTRADA = 50;
 
+/**
+ * Una de dos: `cantidad` directa en la medida del ítem, o `conteo` como
+ * viene (rollos, cajas, estibas), que el caso de uso convierte con las
+ * equivalencias del ítem (ver conteo.ts).
+ */
 export interface LineaEntrada {
   itemId: string;
-  cantidad: number;
+  cantidad?: number | null;
+  conteo?: Conteo | null;
 }
 
 export interface DatosEntrada {
@@ -83,12 +90,20 @@ export function validarEntrada(datos: DatosEntrada): DatosEntrada {
     exigir(!!l.itemId?.trim(), `Línea ${n}: falta el ítem.`);
     exigir(!vistos.has(l.itemId), `Línea ${n}: el ítem está repetido; sume las cantidades en una sola línea.`);
     vistos.add(l.itemId);
-    exigir(Number.isFinite(l.cantidad) && l.cantidad > 0, `Línea ${n}: la cantidad debe ser mayor que cero.`);
-    const redondeada = Math.round(l.cantidad * 10 ** DECIMALES_CANTIDAD) / 10 ** DECIMALES_CANTIDAD;
-    exigir(redondeada === l.cantidad, `Línea ${n}: la cantidad admite máximo ${DECIMALES_CANTIDAD} decimales.`);
+    exigir((l.cantidad ?? null) === null || (l.conteo ?? null) === null, `Línea ${n}: envíe la cantidad o el conteo, no los dos.`);
+    // El conteo se valida al convertirlo (necesita las equivalencias del ítem).
+    exigir(
+      (l.conteo ?? null) !== null || esCantidadPositiva(l.cantidad),
+      `Línea ${n}: la cantidad debe ser mayor que cero, con máximo ${DECIMALES_CANTIDAD} decimales.`,
+    );
   }
 
-  return { documento, remitente, observacion, lineas: lineas.map((l) => ({ itemId: l.itemId.trim(), cantidad: l.cantidad })) };
+  return {
+    documento,
+    remitente,
+    observacion,
+    lineas: lineas.map((l) => ({ itemId: l.itemId.trim(), cantidad: l.cantidad ?? null, conteo: l.conteo ?? null })),
+  };
 }
 
 export interface EntradaMercanciaRepository {

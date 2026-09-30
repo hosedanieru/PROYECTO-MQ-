@@ -9,6 +9,9 @@
  * Crear un producto crea también su ítem de PT en el inventario (un solo
  * módulo, 2026-09-29). Desactivar el producto desactiva el PT: el ítem
  * toma el "activo" del producto, no hay que sincronizar nada.
+ *
+ * La receta es OBLIGATORIA para un PT nuevo (usuario, 2026-09-29): se
+ * crea su versión 1 en la misma transacción, o no se crea nada.
  */
 
 import {
@@ -21,33 +24,55 @@ import {
   CodigoProductoDuplicadoError,
   ProductoNoEncontradoError,
 } from '../../domain/producto/producto.errors.js';
-import { datosItemDePt } from '../../domain/inventario/item-inventario.js';
+import { UNIDAD_PT } from '../../domain/inventario/item-inventario.js';
+import type { ComponenteReceta } from '../../domain/inventario/receta.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import { prepararReceta } from '../inventario/receta.use-cases.js';
+import type { Reloj } from '../remision/crear-remision.use-case.js';
 
 /** Al crear se admiten los estándares (cajas/h, peso) de una vez, sin motivo: es el valor inicial. */
 export interface CrearProductoComando extends DatosNuevoProducto {
+  /** PI e insumos que lleva el PT (al menos uno). */
+  receta: ComponenteReceta[];
   usuarioId: string;
 }
 
 export class CrearProductoUseCase {
-  constructor(private readonly uow: UnidadDeTrabajo) {}
+  constructor(
+    private readonly uow: UnidadDeTrabajo,
+    private readonly reloj: Reloj,
+  ) {}
 
   async ejecutar(comando: CrearProductoComando): Promise<Producto> {
-    const datos = validarDatosProducto(comando);
+    const { receta: componentes, usuarioId, ...resto } = comando;
+    const datos = validarDatosProducto(resto);
 
-    return this.uow.ejecutar(async ({ productos, itemsInventario, auditoria }) => {
+    return this.uow.ejecutar(async (ctx) => {
+      const { productos, itemsInventario, recetas, auditoria } = ctx;
+      // Lecturas primero (regla de Firestore).
       const existente = await productos.buscarPorCodigo(datos.codigo);
       if (existente) {
         throw new CodigoProductoDuplicadoError(datos.codigo);
       }
+      const preparada = await prepararReceta(ctx, componentes, usuarioId);
 
       const creado = await productos.crear(datos);
       // Productos e inventario son un solo módulo (usuario, 2026-09-29):
       // todo producto nace con su ítem de PT, en la misma transacción.
-      const pt = await itemsInventario.crear(datosItemDePt(creado.id), {
+      const pt = await itemsInventario.crear('PT', creado.id, {
         codigo: creado.codigo,
         descripcion: creado.descripcion,
+        unidadMedida: UNIDAD_PT,
         activo: creado.activo,
+        equivalencias: null, // el PT va en cajas
+      });
+      const receta = await recetas.crear({
+        productoId: creado.id,
+        version: 1,
+        vigenteDesde: this.reloj.ahora(),
+        creadaPorId: usuarioId,
+        creadaPorNombre: preparada.usuarioNombre,
+        componentes: preparada.componentes,
       });
 
       await auditoria.registrar({
@@ -55,14 +80,21 @@ export class CrearProductoUseCase {
         entidadId: creado.id,
         accion: 'CREAR',
         valorNuevo: creado,
-        usuarioId: comando.usuarioId,
+        usuarioId,
       });
       await auditoria.registrar({
         entidad: 'item_inventario',
         entidadId: pt.id,
         accion: 'CREAR',
         valorNuevo: pt,
-        usuarioId: comando.usuarioId,
+        usuarioId,
+      });
+      await auditoria.registrar({
+        entidad: 'receta',
+        entidadId: receta.id,
+        accion: 'CREAR',
+        valorNuevo: receta,
+        usuarioId,
       });
 
       return creado;

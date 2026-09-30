@@ -251,7 +251,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
     <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-6 rounded-lg bg-base p-6 shadow-sm">
       {productos.data?.length === 0 && (
         <Alerta tipo="info">
-          El catálogo de productos está vacío. Un administrador debe crear productos antes de
+          El catálogo de PT está vacío. Un administrador debe crear PT antes de
           registrar remisiones.
         </Alerta>
       )}
@@ -284,7 +284,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
           <input type="checkbox" className="mt-0.5" {...register('extraoficial')} />
           <span>
             Remisión <strong>extraoficial</strong>: PepsiCo la pidió por fuera del schedule. Al marcarla se habilita el catálogo
-            completo de productos; no cuenta para el MFR ni para el tope de lo programado del día, y queda auditada con su motivo.
+            completo de PT; no cuenta para el MFR ni para el tope de lo programado del día, y queda auditada con su motivo.
           </span>
         </label>
         {extraoficial && (
@@ -299,11 +299,11 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
 
       <fieldset className="space-y-4">
         <legend className="mb-2 text-sm font-semibold text-tinta">
-          Producto {extraoficial ? '(catálogo completo)' : `(solo lo programado en el DPP del ${fechaOperativa})`}
+          PT {extraoficial ? '(catálogo completo)' : `(solo lo programado en el DPP del ${fechaOperativa})`}
         </legend>
         {!extraoficial && dia.data && !hayDpp && (
           <Alerta tipo="error">
-            El {fechaOperativa} no tiene programación (DPP) cargada: no hay productos para remisionar salvo como pedido de emergencia.
+            El {fechaOperativa} no tiene programación (DPP) cargada: no hay PT para remisionar salvo como pedido de emergencia.
           </Alerta>
         )}
         <Campo
@@ -312,7 +312,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
           onChange={(e) => setBusquedaProducto(e.target.value)}
           placeholder="300058141 o LONCHERA"
         />
-        <Select etiqueta="Producto" error={errors.productoId?.message} {...register('productoId')}>
+        <Select etiqueta="PT" error={errors.productoId?.message} {...register('productoId')}>
           <option value="">{dia.isLoading && !extraoficial ? 'Cargando el DPP…' : 'Seleccione…'}</option>
           {productosFiltrados.map((p) => (
             <option key={p.id} value={p.id}>{etiquetaProducto(p)}</option>
@@ -333,7 +333,7 @@ export function RemisionForm({ fechaOperativa, inicial, textoEnviar, enviando, e
             </p>
           ) : (
             <Alerta tipo="error">
-              Este producto no está en el DPP del {fechaOperativa}. Solo se puede remisionar como pedido de emergencia.
+              Este PT no está en el DPP del {fechaOperativa}. Solo se puede remisionar como pedido de emergencia.
             </Alerta>
           )
         )}

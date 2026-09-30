@@ -15,16 +15,16 @@
  * el sistema dice que hay 100, no deja sacar 120: así se ve al momento
  * que algo no se registró, en vez de descubrirlo días después.
  *
- * Sin lote (usuario, 2026-09-29: no tiene relevancia).
+ * Sin lote (usuario, 2026-09-29: no tiene relevancia). Cantidades en la
+ * unidad base, con hasta 3 decimales (ver cantidad.ts); el PT en cajas
+ * enteras.
  */
 
+import { DECIMALES_CANTIDAD, redondear, tieneDecimalesValidos } from './cantidad.js';
 import { DatosInventarioInvalidosError, ExistenciaInsuficienteError } from './inventario.errors.js';
 
 export const TIPOS_MOVIMIENTO = ['ENTRADA', 'SALIDA', 'AJUSTE'] as const;
 export type TipoMovimiento = (typeof TIPOS_MOVIMIENTO)[number];
-
-/** Admite cantidades con hasta 3 decimales (kilos, metros); el PT va en cajas enteras. */
-export const DECIMALES_CANTIDAD = 3;
 
 export interface DatosMovimiento {
   tipo: TipoMovimiento;
@@ -56,11 +56,13 @@ export interface MovimientoInventario {
   motivo: string | null;
   /** Entrada de mercancía a la que pertenece (si llegó en un documento). */
   entradaId: string | null;
+  /** Remisión cuya aprobación descontó este consumo (receta del PT). */
+  remisionId: string | null;
+  /** Lo que se digitó si fue un conteo mixto: "10 ROLLO (1 ROLLO = 50 METRO)". */
+  conteoTexto: string | null;
 }
 
 export type NuevoMovimiento = Omit<MovimientoInventario, 'id'>;
-
-const redondear = (n: number) => Math.round(n * 10 ** DECIMALES_CANTIDAD) / 10 ** DECIMALES_CANTIDAD;
 
 function textoOpcional(valor: string | null | undefined, maximo: number, nombre: string): string | null {
   const t = valor?.trim() || null;
@@ -77,16 +79,20 @@ export interface MovimientoCalculado {
 
 /**
  * Valida el movimiento y calcula lo que deja. `unidad` solo se usa en el
- * mensaje de error ("hay 12 CAJA…").
+ * mensaje de error ("hay 12 CAJA…"). `soloEnteros`: el PT se mueve en
+ * cajas enteras; PI e insumos admiten decimales.
  */
-export function aplicarMovimiento(existencia: number, datos: DatosMovimiento, unidad: string): MovimientoCalculado {
+export function aplicarMovimiento(existencia: number, datos: DatosMovimiento, unidad: string, soloEnteros = false): MovimientoCalculado {
   const exigir = (condicion: boolean, mensaje: string): void => {
     if (!condicion) throw new DatosInventarioInvalidosError(mensaje);
   };
 
   exigir(TIPOS_MOVIMIENTO.includes(datos.tipo), `El tipo de movimiento debe ser uno de: ${TIPOS_MOVIMIENTO.join(', ')}.`);
-  exigir(Number.isFinite(datos.cantidad), 'La cantidad debe ser un número.');
-  exigir(redondear(datos.cantidad) === datos.cantidad, `La cantidad admite máximo ${DECIMALES_CANTIDAD} decimales.`);
+  if (soloEnteros) {
+    exigir(Number.isInteger(datos.cantidad), 'El PT se mueve en cajas enteras.');
+  } else {
+    exigir(tieneDecimalesValidos(datos.cantidad), `La cantidad admite máximo ${DECIMALES_CANTIDAD} decimales.`);
+  }
 
   const motivo = textoOpcional(datos.motivo, 500, 'El motivo');
   if (datos.tipo === 'AJUSTE') {

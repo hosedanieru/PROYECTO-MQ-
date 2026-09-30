@@ -52,7 +52,10 @@ import { CausalRepositorioFalso, ReporteAveriaRepositorioFalso } from './dobles-
 import {
   EntradaMercanciaRepositorioFalso,
   ItemInventarioRepositorioFalso,
+  MaterialRepositorioFalso,
   MovimientoInventarioRepositorioFalso,
+  RecetaRepositorioFalso,
+  UnidadMedidaRepositorioFalso,
 } from './dobles-inventario.js';
 
 export class AuditoriaRepositorioFalso implements AuditoriaRepository {
@@ -225,6 +228,9 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
       itemsInventario: new ItemInventarioRepositorioFalso(),
       movimientosInventario: new MovimientoInventarioRepositorioFalso(),
       entradasMercancia: new EntradaMercanciaRepositorioFalso(),
+      materiales: new MaterialRepositorioFalso(),
+      unidadesMedida: new UnidadMedidaRepositorioFalso(),
+      recetas: new RecetaRepositorioFalso(),
       ...parcial,
     };
   }

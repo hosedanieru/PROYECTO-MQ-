@@ -7,70 +7,145 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
+  NotEquals,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
+import { DECIMALES_CANTIDAD } from '../../../domain/inventario/cantidad.js';
 import { MAXIMO_LINEAS_ENTRADA } from '../../../domain/inventario/entrada-mercancia.js';
 import { TIPOS_ITEM, type TipoItem } from '../../../domain/inventario/item-inventario.js';
-import { DECIMALES_CANTIDAD } from '../../../domain/inventario/movimiento-inventario.js';
+import { MAXIMO_COMPONENTES_RECETA } from '../../../domain/inventario/receta.js';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-export class CrearItemDto {
-  @IsIn(TIPOS_ITEM)
-  tipo!: TipoItem;
+// ---------- Unidades de medida ----------
 
-  /** INSUMO / PI. En PT se omite: sale del producto. */
-  @ValidateIf((o: CrearItemDto) => o.tipo !== 'PT')
-  @IsString()
-  @MaxLength(40)
-  codigo?: string;
-
-  @ValidateIf((o: CrearItemDto) => o.tipo !== 'PT')
-  @IsString()
-  @MaxLength(200)
-  descripcion?: string;
-
+export class CrearUnidadDto {
   @IsString()
   @MinLength(1)
   @MaxLength(20)
-  unidadMedida!: string;
+  codigo!: string;
 
-  /** Solo PT. */
-  @ValidateIf((o: CrearItemDto) => o.tipo === 'PT')
   @IsString()
   @MinLength(1)
-  productoId?: string;
+  @MaxLength(40)
+  nombre!: string;
 }
 
-export class ActualizarItemDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  codigo?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  descripcion?: string;
-
+export class ActualizarUnidadDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(20)
-  unidadMedida?: string;
+  codigo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  nombre?: string;
 
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
 }
+
+// ---------- PI e insumos ----------
+
+/** `null` = no se maneja esa presentación (caja o estiba). */
+export class CrearMaterialDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  codigo!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  descripcion!: string;
+
+  /** La medida en que se lleva y se descuenta (METRO, UNIDAD…). */
+  @IsString()
+  @MinLength(1)
+  unidadBaseId!: string;
+
+  /** Cómo viene empacado (ROLLO…); va con `contenidoPresentacion`. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MinLength(1)
+  presentacionId?: string | null;
+
+  /** Cuánto de la medida trae la presentación (50 metros por rollo). */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
+  @IsPositive()
+  contenidoPresentacion?: number | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(1)
+  unidadesPorCaja?: number | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(1)
+  cajasPorEstiba?: number | null;
+}
+
+export class ActualizarMaterialDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  codigo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  descripcion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  unidadBaseId?: string;
+
+  /** `null` quita la presentación; omitirlo la deja como está. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MinLength(1)
+  presentacionId?: string | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
+  @IsPositive()
+  contenidoPresentacion?: number | null;
+
+  /** `null` quita el escalón; omitirlo lo deja como está. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(1)
+  unidadesPorCaja?: number | null;
+
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(1)
+  cajasPorEstiba?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+}
+
+// ---------- Existencias ----------
 
 export class FiltroItemsDto {
   @IsOptional()
@@ -88,7 +163,39 @@ export class FiltroItemsDto {
   soloActivos?: boolean;
 }
 
-/** Entrada o salida (coordinador, patinador). */
+// ---------- Conteo mixto (fase B) ----------
+
+/**
+ * Lo que se digita como viene: "2 estibas + 5 cajas + 3 rollos + 12,5 metros".
+ * Se envían los cuatro (0 en lo que no se usa); el dominio convierte a la
+ * medida del ítem con sus equivalencias.
+ */
+export class ConteoDto {
+  @IsInt()
+  @Min(0)
+  estibas!: number;
+
+  @IsInt()
+  @Min(0)
+  cajas!: number;
+
+  /** Rollos, bolsas… según la presentación del ítem. */
+  @IsInt()
+  @Min(0)
+  presentaciones!: number;
+
+  /** Medida suelta (metros, unidades), con decimales. */
+  @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
+  @Min(0)
+  medida!: number;
+}
+
+/** `cantidad` es obligatoria salvo que llegue `conteo`. */
+const sinConteo = (o: { conteo?: unknown }) => o.conteo === undefined || o.conteo === null;
+
+// ---------- Movimientos ----------
+
+/** Entrada o salida, en la medida del ítem (hasta 3 decimales; el PT en cajas enteras, lo exige el dominio). */
 export class RegistrarMovimientoDto {
   @IsString()
   @MinLength(1)
@@ -97,9 +204,16 @@ export class RegistrarMovimientoDto {
   @IsIn(['ENTRADA', 'SALIDA'])
   tipo!: 'ENTRADA' | 'SALIDA';
 
-  /** Positiva; hasta 3 decimales (la regla completa está en el dominio). */
+  @ValidateIf(sinConteo)
   @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
-  cantidad!: number;
+  @IsPositive()
+  cantidad?: number;
+
+  /** En lugar de `cantidad`: como viene (rollos, cajas…). Solo PI e insumos. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConteoDto)
+  conteo?: ConteoDto;
 
   @IsOptional()
   @IsString()
@@ -119,8 +233,16 @@ export class RegistrarAjusteDto {
   itemId!: string;
 
   /** + suma, − resta. */
+  @ValidateIf(sinConteo)
   @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
-  cantidad!: number;
+  @NotEquals(0)
+  cantidad?: number;
+
+  /** En lugar de `cantidad`: lo que se CONTÓ físicamente; el ajuste es la diferencia con la existencia. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConteoDto)
+  conteo?: ConteoDto;
 
   @IsString()
   @MinLength(1)
@@ -138,8 +260,16 @@ export class LineaEntradaDto {
   @MinLength(1)
   itemId!: string;
 
+  @ValidateIf(sinConteo)
   @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
-  cantidad!: number;
+  @IsPositive()
+  cantidad?: number;
+
+  /** En lugar de `cantidad`: como llega (10 rollos, 2 cajas…). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConteoDto)
+  conteo?: ConteoDto;
 }
 
 /** Entrada de mercancía: un documento con varias líneas (reglas completas en el dominio). */
@@ -164,6 +294,27 @@ export class RegistrarEntradaDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(MAXIMO_LINEAS_ENTRADA)
   lineas!: LineaEntradaDto[];
+}
+
+// ---------- Receta del PT ----------
+
+/** Cuánto gasta UNA caja de PT del PI o insumo, en su medida (1,8 metros; 12 unidades). */
+export class ComponenteRecetaDto {
+  @IsString()
+  @MinLength(1)
+  itemId!: string;
+
+  @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
+  @IsPositive()
+  cantidad!: number;
+}
+
+export class GuardarRecetaDto {
+  @ValidateNested({ each: true })
+  @Type(() => ComponenteRecetaDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAXIMO_COMPONENTES_RECETA)
+  componentes!: ComponenteRecetaDto[];
 }
 
 export class RangoFechasDto {

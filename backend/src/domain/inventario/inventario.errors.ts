@@ -10,6 +10,11 @@ export class ItemInventarioNoEncontradoError extends ErrorInventario {
   readonly codigo = 'INVENTARIO_ITEM_NO_ENCONTRADO';
 }
 
+/** PI, insumo o unidad de medida que no existe. */
+export class CatalogoInventarioNoEncontradoError extends ErrorInventario {
+  readonly codigo = 'INVENTARIO_CATALOGO_NO_ENCONTRADO';
+}
+
 export class EntradaMercanciaNoEncontradaError extends ErrorInventario {
   readonly codigo = 'INVENTARIO_ENTRADA_NO_ENCONTRADA';
 }

@@ -22,6 +22,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CrearRemisionUseCase } from '../src/application/remision/crear-remision.use-case.js';
 import { AppModule } from '../src/app.module.js';
 import type { AuditoriaRepository } from '../src/domain/auditoria/auditoria.repository.js';
+import { HORARIO_REPOSITORY, type DiaSemana, type HorarioRepository } from '../src/domain/mfr/horas-turno.js';
 import type { UnidadDeTrabajo } from '../src/domain/shared/unidad-de-trabajo.js';
 import { PrismaService } from '../src/infrastructure/database/prisma/prisma.service.js';
 import { ErrorDominioFilter } from '../src/infrastructure/http/filters/error-dominio.filter.js';
@@ -31,7 +32,10 @@ import { ReporteAveriaPrismaRepository } from '../src/infrastructure/persistence
 import {
   EntradaMercanciaPrismaRepository,
   ItemInventarioPrismaRepository,
+  MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  RecetaPrismaRepository,
+  UnidadMedidaPrismaRepository,
 } from '../src/infrastructure/persistence/prisma/inventario.prisma.repositories.js';
 import { AsistenciaPrismaRepository } from '../src/infrastructure/persistence/prisma/asistencia.prisma.repository.js';
 import { AuditoriaPrismaRepository } from '../src/infrastructure/persistence/prisma/auditoria.prisma.repository.js';
@@ -151,6 +155,9 @@ describe('atomicidad de la unidad de trabajo', () => {
           itemsInventario: new ItemInventarioPrismaRepository(tx),
           movimientosInventario: new MovimientoInventarioPrismaRepository(tx),
           entradasMercancia: new EntradaMercanciaPrismaRepository(tx),
+          materiales: new MaterialPrismaRepository(tx),
+          unidadesMedida: new UnidadMedidaPrismaRepository(tx),
+          recetas: new RecetaPrismaRepository(tx),
         }),
       ),
   };
@@ -253,7 +260,16 @@ describe('flujo completo por HTTP', () => {
   let token: string;
 
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Aprobar registra el consumo con su turno: un solo turno que cubre todo
+    // el día, para que la prueba no dependa de la hora en que corre.
+    const DIAS: DiaSemana[] = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+    const todoElDia: HorarioRepository = {
+      vigentesEn: () =>
+        Promise.resolve(DIAS.map((diaSemana) => ({ turnoId: base.turnoId, diaSemana, horaInicio: '06:00', horaFin: '05:59', cruzaMedianoche: true }))),
+    };
+    const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(HORARIO_REPOSITORY).useValue(todoElDia)
+      .compile();
     app = modulo.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
@@ -318,10 +334,32 @@ describe('flujo completo por HTTP', () => {
     expect(editada.body).toMatchObject({ cantidadCajas: 34, descripcionEstibas: '34 cajas' });
 
     await request(servidor).post(`/api/remisiones/${id}/entregar`).set(auth()).expect(200);
+
+    // Aprobar descuenta la receta del PT: sin receta, se bloquea.
+    const sinReceta = await request(servidor).post(`/api/remisiones/${id}/aprobar`).set(auth()).send({ opaNombre: 'Carlos' }).expect(409);
+    expect(sinReceta.body.codigo).toBe('INVENTARIO_PT_SIN_RECETA');
+
+    // Receta: 2,5 unidades de un insumo por caja (34 cajas → 85).
+    const unidad = await prisma.unidadMedida.findUniqueOrThrow({ where: { codigo: 'UNIDAD' } });
+    await request(servidor).post('/api/inventario/catalogo/insumos').set(auth())
+      .send({ codigo: 'ETIQUETA-E2E', descripcion: 'Etiqueta', unidadBaseId: unidad.id }).expect(201);
+    const [etiqueta] = (await request(servidor).get('/api/inventario/items?tipo=INSUMO').set(auth()).expect(200)).body;
+    await request(servidor).put(`/api/inventario/recetas/${base.productoId}`).set(auth())
+      .send({ componentes: [{ itemId: etiqueta.id, cantidad: 2.5 }] }).expect(200);
+
+    // Con receta pero sin existencia: también se bloquea, diciendo qué falta.
+    const sinExistencia = await request(servidor).post(`/api/remisiones/${id}/aprobar`).set(auth()).send({ opaNombre: 'Carlos' }).expect(409);
+    expect(sinExistencia.body).toMatchObject({ codigo: 'INVENTARIO_CONSUMO_INSUFICIENTE', mensaje: expect.stringContaining('ETIQUETA-E2E (hay 0 UNIDAD, se necesitan 85)') });
+
+    await request(servidor).post('/api/inventario/entradas').set(auth())
+      .send({ documento: 'REM E2E', lineas: [{ itemId: etiqueta.id, cantidad: 100 }] }).expect(201);
     const aprobada = await request(servidor)
       .post(`/api/remisiones/${id}/aprobar`).set(auth())
       .send({ opaNombre: 'Carlos', opaCargo: 'Facturador' }).expect(200);
     expect(aprobada.body.estaPendienteDeConciliar).toBe(true);
+    // Descontó 85 (34 × 2,5) con la salida enlazada a la remisión.
+    const kardex = await request(servidor).get(`/api/inventario/items/${etiqueta.id}/movimientos`).set(auth()).expect(200);
+    expect(kardex.body[0]).toMatchObject({ tipo: 'SALIDA', cantidad: -85, saldo: 15, remisionId: id });
 
     const validada = await request(servidor)
       .post(`/api/remisiones/${id}/validar`).set(auth()).send({ concilidadoCon: 'María' }).expect(200);

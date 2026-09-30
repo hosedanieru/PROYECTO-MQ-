@@ -21,10 +21,12 @@
  */
 
 import type { AuditoriaRepository } from '../../domain/auditoria/auditoria.repository.js';
+import type { HorarioRepository } from '../../domain/mfr/horas-turno.js';
 import type { Remision } from '../../domain/remision/remision.entity.js';
 import { RemisionNoEncontradaError } from '../../domain/remision/remision.errors.js';
-import type { RemisionRepository } from '../../domain/remision/remision.repository.js';
 import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import { prepararConsumo, registrarConsumo, type ConsumoPreparado, type RemisionAConsumir } from '../inventario/consumo-remision.js';
+import { momentoOperativo } from '../shared/momento-operativo.js';
 import { verificarContraProgramacion } from './control-programacion.js';
 import type { Reloj } from './crear-remision.use-case.js';
 
@@ -50,9 +52,10 @@ abstract class CasoUsoFlujoRemision {
         /** Verificaciones que necesitan leer otros datos, antes de mutar (dentro de la transacción). */
         antes?: (remision: Remision, contexto: ContextoTransaccional) => Promise<void>;
         transicion: (remision: Remision) => string | null | void;
+        /** Escrituras adicionales después de guardar (dentro de la transacción; sin lecturas nuevas). */
         despues?: (
             remision: Remision,
-            repos: RemisionRepository,
+            contexto: ContextoTransaccional,
         ) => Promise<void>;
     }): Promise<Remision> {
         return this.uow.ejecutar(async (contexto) => {
@@ -75,7 +78,7 @@ abstract class CasoUsoFlujoRemision {
             const guardada = await remisiones.actualizar(remision);
 
             if (parametros.despues) {
-                await parametros.despues(guardada, remisiones);
+                await parametros.despues(guardada, contexto);
             }
 
             await this.auditar({
@@ -145,30 +148,59 @@ export interface AprobarRemisionComando {
     registradaPorId: string;
 }
 
+/**
+ * Al aprobar, además, el PT DESCUENTA sus PI e insumos del inventario
+ * (usuario, 2026-09-29): cajas × receta vigente, también en las
+ * extraoficiales. Sin receta o sin existencia suficiente, la aprobación
+ * se bloquea. Aprobación y descuento van en la MISMA transacción: o
+ * quedan los dos, o ninguno.
+ */
 export class AprobarRemisionUseCase extends CasoUsoFlujoRemision {
+    constructor(
+        uow: UnidadDeTrabajo,
+        reloj: Reloj,
+        private readonly horarios: HorarioRepository,
+    ) {
+        super(uow, reloj);
+    }
+
     async ejecutar(comando: AprobarRemisionComando): Promise<Remision> {
+        // Día operativo y turno de los movimientos del consumo (el de la aprobación).
+        const momento = await momentoOperativo(this.reloj, this.horarios);
+        let aConsumir: RemisionAConsumir;
+        let consumo: ConsumoPreparado;
+
         return this.aplicar({
             remisionId: comando.remisionId,
             usuarioId: comando.registradaPorId,
-            /**
-             * Solo las APROBADAS/VALIDADAS cuentan contra el DPP (área,
-             * 2026-09-18): al aprobar es cuando la remisión entra en la
-             * cuenta, así que aquí se vuelve a verificar el tope. Dos
-             * borradores del mismo SKU no pueden terminar aprobados por
-             * encima de lo programado.
-             */
-            antes: async (remision, { bloques, estandares, remisiones }) => {
+            antes: async (remision, contexto) => {
                 const d = remision.aObjeto();
-                await verificarContraProgramacion(
-                    { bloques, estandares, remisiones },
-                    {
-                        fechaOperativa: d.fechaOperativa,
-                        productoId: d.productoId,
-                        codigoProducto: d.codigoSnapshot,
-                        cantidadCajas: d.cantidadCajas,
-                        extraoficial: d.extraoficial,
-                    },
-                );
+                /**
+                 * Solo las APROBADAS/VALIDADAS cuentan contra el DPP (área,
+                 * 2026-09-18): al aprobar es cuando la remisión entra en la
+                 * cuenta, así que aquí se vuelve a verificar el tope. Dos
+                 * borradores del mismo SKU no pueden terminar aprobados por
+                 * encima de lo programado.
+                 */
+                await verificarContraProgramacion(contexto, {
+                    fechaOperativa: d.fechaOperativa,
+                    productoId: d.productoId,
+                    codigoProducto: d.codigoSnapshot,
+                    cantidadCajas: d.cantidadCajas,
+                    extraoficial: d.extraoficial,
+                });
+                // Lecturas del consumo (receta y existencias) antes de escribir nada.
+                aConsumir = {
+                    id: remision.id,
+                    productoId: d.productoId,
+                    codigoProducto: d.codigoSnapshot,
+                    cantidadCajas: d.cantidadCajas,
+                    consecutivo: remision.consecutivo,
+                };
+                consumo = await prepararConsumo(contexto, aConsumir, comando.registradaPorId);
+            },
+            despues: async (_, contexto) => {
+                await registrarConsumo(contexto, aConsumir, consumo, momento, comando.registradaPorId);
             },
             transicion: (remision) => {
                 // El OPA no es usuario del sistema: se registra como dato.
@@ -239,7 +271,7 @@ export class RectificarRemisionUseCase extends CasoUsoFlujoRemision {
                 return motivoRechazo;
             },
             // El registro de versión ocurre en la misma transacción.
-            despues: async (guardada, remisiones) => {
+            despues: async (guardada, { remisiones }) => {
                 await remisiones.registrarVersion({
                     remisionId: guardada.id,
                     version: versionAnterior,

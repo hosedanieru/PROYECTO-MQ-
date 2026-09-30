@@ -30,7 +30,10 @@ import { ReporteAveriaFirestoreRepository } from './repositorios/reporte-averia.
 import {
   EntradaMercanciaFirestoreRepository,
   ItemInventarioFirestoreRepository,
+  MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  RecetaFirestoreRepository,
+  UnidadMedidaFirestoreRepository,
 } from './repositorios/inventario.firestore.repositories.js';
 import { GrupoFirestoreRepository } from './repositorios/grupo.firestore.repository.js';
 import {
@@ -77,6 +80,9 @@ export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
         itemsInventario: new ItemInventarioFirestoreRepository(cliente),
         movimientosInventario: new MovimientoInventarioFirestoreRepository(cliente),
         entradasMercancia: new EntradaMercanciaFirestoreRepository(cliente),
+        materiales: new MaterialFirestoreRepository(cliente),
+        unidadesMedida: new UnidadMedidaFirestoreRepository(cliente),
+        recetas: new RecetaFirestoreRepository(cliente),
       });
     });
   }

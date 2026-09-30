@@ -85,6 +85,7 @@ export class ProductoController {
       subdescripcion: dto.subdescripcion ?? null,
       cajasPorHora: dto.cajasPorHora ?? null,
       pesoNetoKg: dto.pesoNetoKg ?? null,
+      receta: dto.receta,
       usuarioId: actual.id,
     });
   }

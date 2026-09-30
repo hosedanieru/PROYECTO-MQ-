@@ -144,7 +144,7 @@ export function ProgramacionPage() {
           </Link>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-tinta">Programación del día</h1>
           <p className="mt-1 max-w-2xl text-sm text-tinta-suave">
-            Qué producto corre en cada línea y en qué horas, tal como lo manda PepsiCo en el DPP.
+            Qué PT corre en cada línea y en qué horas, tal como lo manda PepsiCo en el DPP.
             De cada bloque salen el <strong className="font-semibold text-tinta">máximo teórico</strong>{' '}
             (cajas por hora × horas) y la <strong className="font-semibold text-tinta">meta</strong>{' '}
             (máximo × eficiencia).
@@ -354,14 +354,14 @@ function TarjetaLinea({
             })
           }
         >
-          <option value="">Producto…</option>
+          <option value="">PT…</option>
           {productos.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.descripcion}</option>)}
         </Select>
       </td>
       <td className="px-2 py-1"><Campo etiqueta="" type="number" min={0.01} step="0.01" value={b.cajasPorHora} onChange={(e) => cambiar({ cajasPorHora: e.target.value })} /></td>
       <td className="px-2 py-1"><Campo etiqueta="" type="number" min={1} max={100} value={b.eficiencia} onChange={(e) => cambiar({ eficiencia: e.target.value })} /></td>
       <td className="px-2 py-1"><Campo etiqueta="" placeholder="LOOP1" value={b.loop} onChange={(e) => cambiar({ loop: e.target.value })} /></td>
-      <td className="px-2 py-1"><Campo etiqueta="" type="number" min={0} placeholder="ideal" title="Vacío = línea ideal del producto" value={b.personas} onChange={(e) => cambiar({ personas: e.target.value })} /></td>
+      <td className="px-2 py-1"><Campo etiqueta="" type="number" min={0} placeholder="ideal" title="Vacío = línea ideal del PT" value={b.personas} onChange={(e) => cambiar({ personas: e.target.value })} /></td>
       <td className="px-2 py-1 text-right text-tinta-suave" colSpan={3}>
         {esCorreccion && <Campo etiqueta="" placeholder="Motivo (obligatorio, mín. 5)" value={b.motivo} onChange={(e) => cambiar({ motivo: e.target.value })} />}
       </td>
@@ -402,7 +402,7 @@ function TarjetaLinea({
               <th className="w-24 px-2 py-2">Desde</th>
               <th className="w-24 px-2 py-2">Hasta</th>
               <th className="w-14 px-2 py-2">Turno</th>
-              <th className="px-2 py-2">Producto</th>
+              <th className="px-2 py-2">PT</th>
               <th className="w-24 px-2 py-2">Cajas por hora</th>
               <th className="w-16 px-2 py-2" title="Eficiencia esperada del bloque. En el DPP aparece como «E».">
                 Eficiencia
@@ -621,7 +621,7 @@ function DialogoImportar({
           <thead className="text-left uppercase text-tinta-suave">
             <tr>
               {variosDias && <th className="py-1 pr-2">Día</th>}
-              <th className="py-1 pr-2">Línea</th><th className="py-1 pr-2">Horario</th><th className="py-1 pr-2">Producto</th><th className="py-1 pr-2 text-right">Cajas/h</th><th className="py-1 pr-2">E</th><th className="py-1 pr-2 text-right">Mx</th><th className="py-1 pr-2 text-right">T</th><th></th>
+              <th className="py-1 pr-2">Línea</th><th className="py-1 pr-2">Horario</th><th className="py-1 pr-2">PT</th><th className="py-1 pr-2 text-right">Cajas/h</th><th className="py-1 pr-2">E</th><th className="py-1 pr-2 text-right">Mx</th><th className="py-1 pr-2 text-right">T</th><th></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-borde">
