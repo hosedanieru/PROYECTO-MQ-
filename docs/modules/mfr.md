@@ -117,13 +117,14 @@ Estado 2026-09-19: el catálogo se completó a mano en el panel; la simulación 
 
 Los antiguos "proveedores" pasaron a llamarse **grupos** en todo el sistema. Cada grupo tiene `personasEsperadas` (número fijo de personas que debería enviar por turno) y una `descripcion` donde se escribe a mano a qué proveedor corresponde. Ambos los edita el administrador en `/admin/grupos`.
 
-En la programación del día, por turno, el coordinador registra cuántas personas de cada grupo **llegaron** (varios grupos por turno). El sistema compara **solo contra las personas esperadas del grupo**:
+En la programación del día, por turno, el coordinador registra cuántas personas de cada grupo **llegaron** (varios grupos por turno). Registrar de nuevo el mismo (fecha, turno, grupo) corrige el valor y se audita con el anterior.
 
-- `A_FIN`: todos los grupos registrados llegaron con las esperadas o más;
-- `AFECTADA`: al menos un grupo llegó por debajo (llegar de más en otro grupo no compensa);
-- `SIN_DATO`: nada registrado, o el grupo no tiene esperadas definidas (se registra pero no se compara).
+**Cambio del usuario (2026-09-30): el personal debe ser proporcional a lo que pide el DPP.** El turno se compara **dos veces** (`domain/mfr/asistencia-turno.ts`) y queda `AFECTADA` si falla **cualquiera**:
 
-La "línea ideal" del DPP (`personasIdeal` del producto → `personasAsignadas` del bloque) se muestra como referencia (`requeridasDpp` = Σ por línea del máximo del turno) pero **no decide** el estado. Registrar de nuevo el mismo (fecha, turno, grupo) corrige el valor y se audita con el anterior.
+1. **Contra el DPP** (`estadoDpp`): llegaron (todos los grupos) vs `requeridasDpp` = Σ por línea del **máximo** de personas de sus bloques en el turno (`personasAsignadas` del bloque, que por defecto toma la "línea ideal" `personasIdeal` del producto). Máximo y no promedio: la gente llega para todo el turno y la línea debe cubrir el pico. Se reporta `faltanteDpp` y la **cobertura %** (`coberturaDpp` = llegaron ÷ requeridas), base del indicador de afectación.
+2. **Contra los grupos** (`estadoGrupos`): cada grupo contra sus `personasEsperadas` (llegar de más en un grupo no compensa a otro).
+
+`SIN_DATO` mientras no haya asistencia registrada en el turno. Las líneas con bloques sin personas definidas se cuentan en `lineasSinDato` y generan una advertencia: lo que pide el DPP queda corto. El tablero trae además `personal` del **día** (`resumirPersonalDia`): suma solo los turnos ya evaluados, para que un turno que aún no empieza no baje la cobertura.
 
 ### Grupos por línea (área, 2026-09-21, opción B)
 

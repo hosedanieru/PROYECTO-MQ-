@@ -72,7 +72,7 @@ export const es = {
   'inicio.mfrDelDia': 'MFR del día',
   'inicio.meta': 'Meta {meta} %',
   'inicio.personalDelDia': 'Personal del día',
-  'inicio.llegaronFrenteEsperado': 'Llegaron frente a lo esperado',
+  'inicio.llegaronFrenteEsperado': 'Llegaron frente a lo que pide el DPP',
   'inicio.lineasEnProduccion': 'Líneas en producción',
   'inicio.lineasDescripcion': 'Qué SKU corre ahora en cada plataforma y con cuánta gente.',
   'inicio.cargandoProgramacion': 'Cargando la programación…',

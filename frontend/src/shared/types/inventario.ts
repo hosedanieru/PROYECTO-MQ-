@@ -139,6 +139,29 @@ export interface ResumenReceta {
 
 export const MAXIMO_COMPONENTES_RECETA = 30
 
+/** Fase D. Se calculan en el momento con existencias, recetas, DPP y aprobadas del día. */
+export type TipoAlertaInventario = 'PT_SIN_RECETA' | 'COMPONENTE_INACTIVO' | 'AGOTADO' | 'NO_ALCANZA_DPP'
+
+export interface AlertaInventario {
+  tipo: TipoAlertaInventario
+  gravedad: 'CRITICA' | 'ADVERTENCIA'
+  /** El PT (sin receta, componente inactivo) o el PI/insumo (agotado, no alcanza). */
+  itemId: string
+  codigo: string
+  descripcion: string
+  mensaje: string
+  necesita?: number
+  hay?: number
+  falta?: number
+  unidad?: string
+}
+
+export interface AlertasInventarioDia {
+  fechaOperativa: string
+  hayDpp: boolean
+  alertas: AlertaInventario[]
+}
+
 export interface MovimientoInventario {
   id: string
   itemId: string

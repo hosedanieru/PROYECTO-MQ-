@@ -1,6 +1,7 @@
 import { http } from '../../../services/http'
 import {
   RUTA_MATERIAL,
+  type AlertasInventarioDia,
   type ComponenteReceta,
   type DatosAjuste,
   type DatosEntrada,
@@ -44,6 +45,9 @@ export const inventarioApi = {
     http.post<Material>(`/inventario/catalogo/${RUTA_MATERIAL[tipo]}`, datos).then((r) => r.data),
   actualizarMaterial: (tipo: TipoMaterial, id: string, cambios: Partial<DatosMaterial> & { activo?: boolean }) =>
     http.patch<Material>(`/inventario/catalogo/${RUTA_MATERIAL[tipo]}/${id}`, cambios).then((r) => r.data),
+
+  // Alertas del día (fase D)
+  alertas: (fecha: string) => http.get<AlertasInventarioDia>('/inventario/alertas', { params: { fecha } }).then((r) => r.data),
 
   // Receta del PT (versionada: guardar crea una versión nueva)
   resumenRecetas: () => http.get<ResumenReceta[]>('/inventario/recetas').then((r) => r.data),

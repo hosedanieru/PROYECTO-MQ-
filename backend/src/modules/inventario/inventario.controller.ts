@@ -22,6 +22,7 @@
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Query } from '@nestjs/common';
 
+import { AlertasInventarioUseCase } from '../../application/inventario/alertas-inventario.use-case.js';
 import {
   RegistrarEntradaMercanciaUseCase,
   RegistrarMovimientoUseCase,
@@ -43,6 +44,7 @@ import { validarRango } from '../../domain/shared/rango-fechas.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decoradores.js';
 import {
+  FechaAlertasDto,
   FiltroItemsDto,
   FiltroMovimientosDto,
   KardexDto,
@@ -60,6 +62,7 @@ const presentarEntrada = <T extends EntradaMercancia>(e: T) => ({ ...e, fechaOpe
 @Controller('inventario')
 export class InventarioController {
   constructor(
+    private readonly alertasInventario: AlertasInventarioUseCase,
     private readonly registrarMovimiento: RegistrarMovimientoUseCase,
     private readonly registrarEntrada: RegistrarEntradaMercanciaUseCase,
     @Inject(ITEM_INVENTARIO_REPOSITORY) private readonly items: ItemInventarioRepository,
@@ -169,6 +172,14 @@ export class InventarioController {
       }),
     );
     return presentarEntrada({ ...entrada, lineas: lineas.sort((a, b) => a.codigo.localeCompare(b.codigo)) });
+  }
+
+  /** Fase D: PT sin receta, componente inactivo, agotado y "no alcanza para el DPP" del día. */
+  @Get('alertas')
+  @RequierePermisos('inventario.consultar')
+  async alertas(@Query() consulta: FechaAlertasDto) {
+    const r = await this.alertasInventario.ejecutar(fechaOperativaADate(consulta.fecha));
+    return { ...r, fechaOperativa: consulta.fecha };
   }
 
   @Get('movimientos')

@@ -3,12 +3,12 @@
  * =========================================
  *
  * Muestra, para un turno del día, qué grupos llegaron y con cuántas
- * personas, comparado con las que cada grupo debía enviar
- * (`Grupo.personasEsperadas`). Si algún grupo llegó por debajo, la
- * productividad del turno queda "afectada"; si todos cumplen, "a fin".
- *
- * La "línea ideal" del DPP (personas por línea) se muestra solo como
- * referencia: no decide el estado (decisión del área, 2026-09-21).
+ * personas. Desde el 2026-09-30 (usuario) el turno se compara dos veces y
+ * queda AFECTADO si falla cualquiera:
+ *   - contra lo que pide el DPP: Σ por línea del máximo de personas de
+ *     sus bloques en el turno, con la cobertura %;
+ *   - contra lo que cada grupo debía enviar (`Grupo.personasEsperadas`).
+ * El cálculo lo hace el backend; aquí solo se explica.
  */
 
 import { useState, type FormEvent } from 'react'
@@ -20,6 +20,7 @@ import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
 import type { Grupo } from '../../../shared/types/catalogo'
 import type { EstadoPersonal, PersonalTurno as Personal } from '../../../shared/types/mfr'
+import { porcentaje } from '../../../shared/utils/numeros'
 import { useRegistrarAsistencia } from '../hooks/useMfr'
 import { LineasTurno } from './LineasTurno'
 
@@ -41,12 +42,16 @@ const ETIQUETA_ESTADO_GRUPO: Record<EstadoPersonal, string> = {
   SIN_DATO: 'Sin registrar',
 }
 
-function textoPersonal(personal: Personal): string {
-  if (personal.estado === 'SIN_DATO') return 'Falta registrar la asistencia'
-  if (personal.faltante > 0) {
-    return `Faltaron ${personal.faltante} de ${personal.esperadas} personas`
-  }
-  return `Llegaron las ${personal.esperadas} personas esperadas`
+/** Dice el hecho y la causa: contra el DPP, contra los grupos, o las dos. */
+function textoPersonal(p: Personal): string {
+  if (p.estado === 'SIN_DATO') return 'Falta registrar la asistencia'
+  const causas: string[] = []
+  if (p.estadoDpp === 'AFECTADA') causas.push(`Faltan ${p.faltanteDpp} de las ${p.requeridasDpp} que pide el DPP (${porcentaje(p.coberturaDpp)})`)
+  if (p.estadoGrupos === 'AFECTADA') causas.push(`${causas.length ? 'y ' : 'Faltaron '}${p.faltante} de lo que debían enviar los grupos`)
+  if (causas.length > 0) return causas.join(' ')
+  return p.estadoDpp === 'A_FIN'
+    ? `Cubre el DPP: ${p.llegaron} de ${p.requeridasDpp} (${porcentaje(p.coberturaDpp)})`
+    : `Llegaron las ${p.esperadas} personas esperadas`
 }
 
 export function PersonalBadge({ personal }: { personal: Personal }) {
@@ -54,7 +59,7 @@ export function PersonalBadge({ personal }: { personal: Personal }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${clase}`}
-      title="Se compara contra las personas que cada grupo debe enviar por turno, no contra la línea ideal del DPP."
+      title="Afectada si llegaron menos personas de las que pide el DPP (máximo por línea en el turno) o si algún grupo envió menos de las que debía."
     >
       <span className={`h-1.5 w-1.5 rounded-full ${punto}`} aria-hidden="true" />
       {textoPersonal(personal)}
@@ -111,10 +116,16 @@ export function PanelPersonalTurno({ fecha, turnoId, codigoTurno, personal, grup
         <h3 className="font-semibold text-tinta">
           Personal {codigoTurno} <PersonalBadge personal={personal} />
         </h3>
-        <span className="text-xs text-tinta-suave">
-          Referencia DPP (línea ideal): {personal.requeridasDpp} persona(s)
+        <span className="text-xs text-tinta-suave" title="Por cada línea, el máximo de personas que piden sus productos en el turno; se suman las líneas.">
+          Pide el DPP: <strong className="text-tinta">{personal.requeridasDpp}</strong> persona(s)
+          {personal.coberturaDpp !== null && <> · cobertura <strong className="text-tinta">{porcentaje(personal.coberturaDpp)}</strong></>}
         </span>
       </div>
+      {personal.lineasSinDato > 0 && (
+        <p className="mt-1 text-xs text-alerta">
+          {personal.lineasSinDato} línea(s) tienen bloques sin personas definidas: lo que pide el DPP queda corto. Complételo en la programación.
+        </p>
+      )}
 
       {personal.grupos.length > 0 ? (
         <table className="mt-2 w-full text-left">

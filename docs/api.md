@@ -219,6 +219,7 @@ Una tabla por tipo (2026-09-29): PT (`producto`, se crea con `POST /productos`, 
 | GET | `/inventario/items/:id/movimientos?limite=` | `inventario.consultar` | kardex, más reciente primero (100 por defecto, máx. 500) |
 | POST | `/inventario/movimientos` | `inventario.registrar` | `{ itemId, tipo: ENTRADA \| SALIDA, cantidad (> 0, hasta 3 decimales; PT entero), referencia?, observacion? }` · 409 `INVENTARIO_EXISTENCIA_INSUFICIENTE` si la salida deja negativo |
 | POST | `/inventario/ajustes` | `inventario.ajustar` | `{ itemId, cantidad (con signo, ≠ 0, hasta 3 decimales), motivo, observacion? }` |
+| GET | `/inventario/alertas?fecha=YYYY-MM-DD` | `inventario.consultar` | `{ fechaOperativa, hayDpp, alertas[] }`; cada alerta: `tipo` (`PT_SIN_RECETA` · `COMPONENTE_INACTIVO` · `AGOTADO` · `NO_ALCANZA_DPP`), `gravedad` (`CRITICA` · `ADVERTENCIA`), `itemId`, `codigo`, `descripcion`, `mensaje` y, en "no alcanza", `necesita`, `hay`, `falta`, `unidad`. Se calculan en el momento; críticas primero |
 | GET | `/inventario/movimientos?desde=&hasta=&tipo=` | `inventario.consultar` | todos los movimientos del rango (máx. 93 días) |
 | POST | `/inventario/entradas` | `inventario.registrar` | entrada de mercancía: `{ documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }` (1 a 50 líneas, sin ítems repetidos, solo INSUMO y PI). Todo o nada. Responde el encabezado con `lineas[]` (código, descripción, unidad, cantidad, saldo) |
 | GET | `/inventario/entradas?desde=&hasta=` | `inventario.consultar` | encabezados del rango, más recientes primero |

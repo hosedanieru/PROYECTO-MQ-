@@ -336,6 +336,15 @@ export class RecetaPrismaRepository implements RecetaRepository {
     return filas.map((f) => ({ productoId: f.productoId, version: f.version, vigenteDesde: f.vigenteDesde, componentes: f._count.componentes }));
   }
 
+  async vigentes(): Promise<RecetaPt[]> {
+    const filas = await this.cliente.receta.findMany({
+      orderBy: [{ productoId: 'asc' }, { version: 'desc' }],
+      distinct: ['productoId'],
+      include: CON_COMPONENTES,
+    });
+    return filas.map(recetaADominio);
+  }
+
   async crear(receta: NuevaRecetaPt): Promise<RecetaPt> {
     const { componentes, ...encabezado } = receta;
     const f = await this.cliente.receta.create({

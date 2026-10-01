@@ -16,6 +16,7 @@
  *   /averias/:id             detalle con fotos; corregir / anular (administrador)
  *   /inventario              UN SOLO MÓDULO (pestañas, `InventarioLayout`):
  *     (índice)               existencias de insumos, PI y PT; registrar movimiento
+ *     /alertas               alertas del día: sin receta, agotado, no alcanza para el DPP…
  *     /entradas              entradas de mercancía (listado; /nueva formulario; /:id detalle)
  *     /pt                    catálogo de PT (tabla `producto`; antes /admin/productos)
  *     /pi, /insumos          catálogo de PI y de insumos (una tabla cada uno)
@@ -31,6 +32,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { CausalesPage } from '../modules/admin/pages/CausalesPage'
 import { GruposPage } from '../modules/admin/pages/GruposPage'
+import { AlertasPage } from '../modules/inventario/pages/AlertasPage'
 import { InventarioPage } from '../modules/inventario/pages/InventarioPage'
 import { EntradaDetallePage } from '../modules/inventario/pages/EntradaDetallePage'
 import { EntradasPage } from '../modules/inventario/pages/EntradasPage'
@@ -83,6 +85,7 @@ export const router = createBrowserRouter([
             element: <InventarioLayout />,
             children: [
               { index: true, element: <InventarioPage /> },
+              { path: 'alertas', element: <AlertasPage /> },
               { path: 'entradas', element: <EntradasPage /> },
               { path: 'entradas/nueva', element: <NuevaEntradaPage /> },
               { path: 'entradas/:id', element: <EntradaDetallePage /> },

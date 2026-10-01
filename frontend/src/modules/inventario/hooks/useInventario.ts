@@ -7,6 +7,7 @@
  *   ['inventario', 'kardex', id]        movimientos de un ítem
  *   ['inventario', 'entradas', …]       entradas de mercancía de un rango
  *   ['inventario', 'entrada', id]       una entrada con sus líneas
+ *   ['inventario', 'alertas', fecha]    alertas del día (se refrescan solas)
  *   ['inventario', 'recetas']           resumen: versión vigente de cada PT con receta
  *   ['inventario', 'receta', productoId] vigente + historial de un PT
  *
@@ -25,6 +26,7 @@ import type {
   TipoItem,
   TipoMaterial,
 } from '../../../shared/types/inventario'
+import { REFRESCO_NORMAL } from '../../../shared/refresco'
 import { inventarioApi } from '../api/inventario.api'
 
 export function useItemsInventario(filtro: { tipo?: TipoItem; texto?: string; soloActivos?: boolean } = {}) {
@@ -112,6 +114,22 @@ export function useGuardarUnidad() {
     mutationFn: ({ id, datos }: { id?: string; datos: Partial<{ codigo: string; nombre: string; activo: boolean }> }) =>
       id ? inventarioApi.actualizarUnidad(id, datos) : inventarioApi.crearUnidad(datos as { codigo: string; nombre: string }),
     onSuccess: refrescar,
+  })
+}
+
+// ---------- Alertas (fase D) ----------
+
+/**
+ * Se calculan en el backend en cada consulta. Se refrescan solas cada 30 s
+ * porque cambian por cosas que pasan en otras pantallas (aprobar una
+ * remisión descuenta insumos; cargar el DPP cambia lo que se necesita).
+ */
+export function useAlertasInventario(fecha: string, habilitado = true) {
+  return useQuery({
+    queryKey: ['inventario', 'alertas', fecha],
+    queryFn: () => inventarioApi.alertas(fecha),
+    enabled: habilitado,
+    refetchInterval: REFRESCO_NORMAL,
   })
 }
 

@@ -21,7 +21,9 @@ import {
 } from '../../domain/mfr/asignacion-linea.js';
 import {
   evaluarPersonalTurno,
+  resumirPersonalDia,
   type AsistenciaRepository,
+  type PersonalDia,
   type PersonalGrupo,
   type PersonalTurno,
 } from '../../domain/mfr/asistencia-turno.js';
@@ -66,6 +68,8 @@ export interface IndicadoresDia {
   bloques: BloqueCalculado[];
   mfr: MfrDia;
   turnos: Array<ResumenTurno & { codigo: string; nombre: string; horasTurno: number | null; personal: PersonalTurnoResuelto }>;
+  /** Personal del día contra el DPP (solo turnos ya evaluados): base del indicador de afectación. */
+  personal: PersonalDia;
   lineas: Array<ResumenLinea & { codigo: string; nombre: string; tipo: LineaProduccion['tipo']; capacidadKgHora: number | null }>;
   horario: VistaHoraria;
   /** "Flavor Breakdown": kg target por hora agrupados por familia (SUBDESCRIPCION). */
@@ -154,6 +158,12 @@ export class IndicadoresDiaUseCase {
       const e = estandarDe.get(productoId);
       if (!e || e.pesoNetoKg === null) advertencias.add(`El producto ${e?.codigo ?? productoId} no tiene peso neto por caja: sin kilogramos.`);
     }
+    // Sin personas definidas en un bloque, las requeridas del DPP quedan cortas.
+    for (const t of porTurno) {
+      if (t.personal.lineasSinDato > 0) {
+        advertencias.add(`${t.codigo}: ${t.personal.lineasSinDato} línea(s) con bloques sin personas definidas; lo que pide el DPP queda corto.`);
+      }
+    }
 
     return {
       fechaOperativa,
@@ -161,6 +171,7 @@ export class IndicadoresDiaUseCase {
       bloques,
       mfr,
       turnos: porTurno,
+      personal: resumirPersonalDia(porTurno.map((t) => t.personal)),
       lineas: porLinea,
       horario: calcularVistaHoraria(bloques, lineasDelDia.map((l) => ({ id: l.id, capacidadKgHora: l.capacidadKgHora }))),
       familias: calcularFamiliasHorarias(bloques, estandares),

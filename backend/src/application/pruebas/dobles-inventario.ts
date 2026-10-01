@@ -38,12 +38,16 @@ export class RecetaRepositorioFalso implements RecetaRepository {
     return (await this.versiones(productoId))[0] ?? null;
   }
 
-  resumenVigentes(): Promise<ResumenReceta[]> {
+  vigentes(): Promise<RecetaPt[]> {
     const vigentes = new Map<string, RecetaPt>();
     for (const r of this.recetas) {
       if ((vigentes.get(r.productoId)?.version ?? 0) < r.version) vigentes.set(r.productoId, r);
     }
-    return Promise.resolve([...vigentes.values()].map((r) => ({ productoId: r.productoId, version: r.version, vigenteDesde: r.vigenteDesde, componentes: r.componentes.length })));
+    return Promise.resolve([...vigentes.values()]);
+  }
+
+  async resumenVigentes(): Promise<ResumenReceta[]> {
+    return (await this.vigentes()).map((r) => ({ productoId: r.productoId, version: r.version, vigenteDesde: r.vigenteDesde, componentes: r.componentes.length }));
   }
 
   crear(receta: NuevaRecetaPt): Promise<RecetaPt> {

@@ -370,14 +370,18 @@ export class RecetaFirestoreRepository implements RecetaRepository {
     return (await this.versiones(productoId))[0] ?? null;
   }
 
-  async resumenVigentes(): Promise<ResumenReceta[]> {
+  async vigentes(): Promise<RecetaPt[]> {
     const q = await this.cliente.consultar(this.coleccion());
     const vigentes = new Map<string, RecetaPt>();
     for (const r of q.docs.map(recetaADominio)) {
       const actual = vigentes.get(r.productoId);
       if (!actual || r.version > actual.version) vigentes.set(r.productoId, r);
     }
-    return [...vigentes.values()].map((r) => ({
+    return [...vigentes.values()];
+  }
+
+  async resumenVigentes(): Promise<ResumenReceta[]> {
+    return (await this.vigentes()).map((r) => ({
       productoId: r.productoId,
       version: r.version,
       vigenteDesde: r.vigenteDesde,

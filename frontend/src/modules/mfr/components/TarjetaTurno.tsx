@@ -118,15 +118,16 @@ export function TarjetaTurno({ turno, meta, productos, lineas }: Props) {
           />
         )}
 
+        {/* Contra lo que pide el DPP (2026-09-30); la nota dice si además un grupo quedó corto. */}
         <Dato
           etiqueta="Personal del turno"
-          valor={`${turno.personal.llegaron} de ${turno.personal.esperadas}`}
-          unidad="personas"
-          nota={
-            turno.personal.faltante > 0
-              ? `Faltaron ${turno.personal.faltante}`
-              : 'Llegó todo el personal esperado'
-          }
+          valor={`${turno.personal.llegaron} de ${turno.personal.requeridasDpp || turno.personal.esperadas}`}
+          unidad={turno.personal.requeridasDpp > 0 ? 'que pide el DPP' : 'personas'}
+          nota={[
+            turno.personal.coberturaDpp !== null ? `Cobertura ${porcentaje(turno.personal.coberturaDpp)}` : null,
+            turno.personal.faltanteDpp > 0 ? `faltan ${turno.personal.faltanteDpp} contra el DPP` : null,
+            turno.personal.faltante > 0 ? `faltaron ${turno.personal.faltante} de los grupos` : null,
+          ].filter(Boolean).join(' · ') || (turno.personal.estado === 'SIN_DATO' ? 'Falta registrar la asistencia' : 'Personal completo')}
         />
       </dl>
 

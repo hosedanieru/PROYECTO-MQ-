@@ -22,6 +22,7 @@ import { useSesion } from '../auth/useSesion'
 
 const PESTANAS = [
   { a: '/inventario', texto: 'Existencias', permiso: 'inventario.consultar', exacta: true },
+  { a: '/inventario/alertas', texto: 'Alertas', permiso: 'inventario.consultar' },
   { a: '/inventario/entradas', texto: 'Entradas de mercancía', permiso: 'inventario.consultar' },
   { a: '/inventario/pt', texto: 'PT', permiso: 'catalogo.editar' },
   { a: '/inventario/pi', texto: 'PI', permiso: 'inventario.catalogo' },

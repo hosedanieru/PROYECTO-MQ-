@@ -10,7 +10,11 @@ import {
   RegistrarEntradaMercanciaUseCase,
   RegistrarMovimientoUseCase,
 } from '../../application/inventario/inventario.use-cases.js';
+import { AlertasInventarioUseCase } from '../../application/inventario/alertas-inventario.use-case.js';
 import { ConsultarRecetaUseCase, GuardarRecetaUseCase } from '../../application/inventario/receta.use-cases.js';
+import { BLOQUE_REPOSITORY, type BloqueRepository } from '../../domain/mfr/bloque-programacion.js';
+import { ESTANDAR_REPOSITORY, type EstandarRepository } from '../../domain/mfr/estandar-produccion.js';
+import { REMISION_REPOSITORY, type RemisionRepository } from '../../domain/remision/remision.repository.js';
 import { RELOJ, type Reloj } from '../../application/remision/crear-remision.use-case.js';
 import { ITEM_INVENTARIO_REPOSITORY, type ItemInventarioRepository } from '../../domain/inventario/item-inventario.js';
 import { RECETA_REPOSITORY, type RecetaRepository } from '../../domain/inventario/receta.js';
@@ -40,6 +44,12 @@ const conUow = <T>(Clase: new (uow: UnidadDeTrabajo) => T) => ({
       provide: GuardarRecetaUseCase,
       inject: [UNIDAD_DE_TRABAJO, RELOJ],
       useFactory: (uow: UnidadDeTrabajo, reloj: Reloj) => new GuardarRecetaUseCase(uow, reloj),
+    },
+    {
+      provide: AlertasInventarioUseCase,
+      inject: [ITEM_INVENTARIO_REPOSITORY, RECETA_REPOSITORY, BLOQUE_REPOSITORY, ESTANDAR_REPOSITORY, REMISION_REPOSITORY],
+      useFactory: (items: ItemInventarioRepository, recetas: RecetaRepository, bloques: BloqueRepository, estandares: EstandarRepository, remisiones: RemisionRepository) =>
+        new AlertasInventarioUseCase(items, recetas, bloques, estandares, remisiones),
     },
     {
       provide: ConsultarRecetaUseCase,

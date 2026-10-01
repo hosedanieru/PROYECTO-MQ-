@@ -118,14 +118,35 @@ export interface PersonalLinea {
   estado: EstadoLinea
 }
 
+/**
+ * Personal del turno (2026-09-30): dos comparaciones y el turno queda
+ * AFECTADO si falla cualquiera: contra lo que pide el DPP (Σ por línea del
+ * máximo de personas de sus bloques) y contra lo esperado de cada grupo.
+ */
 export interface PersonalTurno {
   grupos: PersonalGrupo[]
   lineas: PersonalLinea[]
   esperadas: number
   llegaron: number
+  /** Faltante contra lo esperado de los grupos. */
   faltante: number
-  /** Referencia del DPP (línea ideal por línea); no decide el estado. */
   requeridasDpp: number
+  faltanteDpp: number
+  /** llegaron ÷ requeridas DPP × 100; null sin DPP o sin asistencia. */
+  coberturaDpp: number | null
+  /** Líneas con bloques sin personas definidas (las requeridas quedan cortas). */
+  lineasSinDato: number
+  estadoDpp: EstadoPersonal
+  estadoGrupos: EstadoPersonal
+  estado: EstadoPersonal
+}
+
+/** Personal del día contra el DPP (solo turnos ya evaluados). */
+export interface PersonalDia {
+  requeridasDpp: number
+  llegaron: number
+  faltanteDpp: number
+  coberturaDpp: number | null
   estado: EstadoPersonal
 }
 
@@ -230,6 +251,8 @@ export interface IndicadoresDia {
     extraoficialesCajas: number
   }
   turnos: ResumenTurno[]
+  /** Personal del día contra el DPP: base del indicador de afectación. */
+  personal: PersonalDia
   lineas: ResumenLinea[]
   horario: {
     horas: string[]

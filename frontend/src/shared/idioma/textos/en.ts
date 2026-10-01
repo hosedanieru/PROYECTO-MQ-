@@ -72,7 +72,7 @@ export const en: Record<ClaveTexto, string> = {
   'inicio.mfrDelDia': "Today's MFR",
   'inicio.meta': 'Target {meta} %',
   'inicio.personalDelDia': "Today's staffing",
-  'inicio.llegaronFrenteEsperado': 'Turned up vs. expected',
+  'inicio.llegaronFrenteEsperado': 'Turned up vs. what the DPP requires',
   'inicio.lineasEnProduccion': 'Lines in production',
   'inicio.lineasDescripcion': 'Which SKU is running on each platform and with how many people.',
   'inicio.cargandoProgramacion': 'Loading the schedule…',

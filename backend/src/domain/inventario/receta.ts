@@ -114,6 +114,8 @@ export interface RecetaRepository {
   versiones(productoId: string): Promise<RecetaPt[]>;
   /** La versión vigente de cada PT que tiene receta. */
   resumenVigentes(): Promise<ResumenReceta[]>;
+  /** Lo mismo pero con sus componentes (alertas de inventario). */
+  vigentes(): Promise<RecetaPt[]>;
   /**
    * Escritura pura (regla de Firestore: lecturas antes que escrituras).
    * El número de versión lo decide el caso de uso; la base impide dos

@@ -28,6 +28,7 @@ import { useTextos } from '../../shared/idioma/useTextos'
 import { useSesion } from '../../modules/auth/useSesion'
 import { useProductos } from '../../modules/catalogo/hooks/useCatalogos'
 import { useIndicadorAverias } from '../../modules/averias/hooks/useAverias'
+import { useAlertasInventario } from '../../modules/inventario/hooks/useInventario'
 import { useIndicadoresDia } from '../../modules/mfr/hooks/useMfr'
 import { useConteoPorEstado, useRemisiones } from '../../modules/remisiones/hooks/useRemisiones'
 import { REFRESCO_LENTO, REFRESCO_TABLERO } from '../../shared/refresco'
@@ -114,18 +115,13 @@ export function InicioPage() {
   const dia = useIndicadoresDia(fecha, puedeMfr, REFRESCO_TABLERO)
   const productos = useProductos({}, puedeCatalogo)
   const averiasDia = useIndicadorAverias(fecha, fecha, tienePermiso('averia.consultar'))
+  const inventarioDia = useAlertasInventario(fecha, tienePermiso('inventario.consultar'))
 
   const mfr = dia.data?.mfr
   const diferencia = conteo.total - (ayer.data?.total ?? 0)
 
-  // Personal del día: suma de lo que llegó y de lo esperado en los tres turnos.
-  const personal = (dia.data?.turnos ?? []).reduce(
-    (acumulado, turno) => ({
-      llegaron: acumulado.llegaron + turno.personal.llegaron,
-      esperadas: acumulado.esperadas + turno.personal.esperadas,
-    }),
-    { llegaron: 0, esperadas: 0 },
-  )
+  // Personal del día contra lo que pide el DPP (lo suma el backend, solo turnos ya registrados).
+  const personal = dia.data?.personal
 
   const segmentos: SegmentoDona[] = ORDEN_DONA.map((estado) => ({
     clave: estado,
@@ -146,6 +142,7 @@ export function InicioPage() {
     indicadores: dia.data,
     porEstado: puedeRemisiones ? conteo.porEstado : undefined,
     averias: averiasDia.data,
+    inventario: inventarioDia.data,
     fecha,
   })
 
@@ -213,11 +210,11 @@ export function InicioPage() {
 
             <TarjetaKpi
               etiqueta={t('inicio.personalDelDia')}
-              valor={personal.llegaron}
-              sobre={personal.esperadas || null}
-              sinDato={personal.esperadas === 0}
-              porcentaje={proporcion(personal.llegaron, personal.esperadas)}
-              tono={personal.llegaron >= personal.esperadas ? 'exito' : 'alerta'}
+              valor={personal?.llegaron ?? 0}
+              sobre={personal?.requeridasDpp || null}
+              sinDato={!personal || personal.coberturaDpp === null}
+              porcentaje={personal?.coberturaDpp ?? null}
+              tono={personal?.estado === 'AFECTADA' ? 'alerta' : 'exito'}
               Icono={IconoPersonas}
               a={`/mfr/programacion?fecha=${fecha}`}
               detalle={t('inicio.llegaronFrenteEsperado')}

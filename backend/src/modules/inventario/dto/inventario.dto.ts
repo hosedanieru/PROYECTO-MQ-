@@ -317,6 +317,12 @@ export class GuardarRecetaDto {
   componentes!: ComponenteRecetaDto[];
 }
 
+/** Día operativo de las alertas. */
+export class FechaAlertasDto {
+  @Matches(FECHA, { message: 'fecha: formato YYYY-MM-DD' })
+  fecha!: string;
+}
+
 export class RangoFechasDto {
   @Matches(FECHA, { message: 'desde: formato YYYY-MM-DD' })
   desde!: string;

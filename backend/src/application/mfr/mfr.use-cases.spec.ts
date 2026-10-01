@@ -567,7 +567,34 @@ describe('MFR — casos de uso', () => {
       expect(asistencias.items).toHaveLength(0);
     });
 
-    it('evalúa el personal solo contra las personas esperadas del grupo', () => {
+    it('contra el DPP: máximo por línea en el turno, cobertura % y AFECTADA si falta cualquiera de las dos', () => {
+      const registro = (grupoId: string, personasLlegaron: number) => ({
+        id: grupoId, fechaOperativa: FECHA, turnoId: 'T1', grupoId, personasLlegaron, observacion: null, registradaPorId: 'coord', fechaRegistro: FECHA,
+      });
+      const bloque = (lineaId: string, personasAsignadas: number | null, turnoId = 'T1') =>
+        ({ turnoId, lineaId, personasAsignadas }) as unknown as Parameters<typeof evaluarPersonalTurno>[3][number];
+      // L1 cambia de producto (13 y luego 8 personas) → pide 13; L2 pide 10; el T2 no cuenta. Requeridas T1 = 23.
+      const dpp = [bloque('L1', 13), bloque('L1', 8), bloque('L2', 10), bloque('L3', 20, 'T2')];
+      const catalogoGrupos = grupos.items; // G1 espera 10; G2 sin esperadas
+
+      // G1 manda sus 10 (cumple con su grupo) y G2 manda 10: 20 de 23 → afectada por el DPP.
+      const corto = evaluarPersonalTurno('T1', [registro('G1', 10), registro('G2', 10)], catalogoGrupos, dpp);
+      expect(corto).toMatchObject({
+        requeridasDpp: 23, llegaron: 20, faltanteDpp: 3, coberturaDpp: 87, estadoDpp: 'AFECTADA', estadoGrupos: 'A_FIN', estado: 'AFECTADA',
+      });
+
+      // Llegan 24 pero G1 manda 7 de sus 10: el DPP se cubre, el grupo no → afectada igual.
+      const grupoCorto = evaluarPersonalTurno('T1', [registro('G1', 7), registro('G2', 17)], catalogoGrupos, dpp);
+      expect(grupoCorto).toMatchObject({ coberturaDpp: 104.3, estadoDpp: 'A_FIN', estadoGrupos: 'AFECTADA', estado: 'AFECTADA' });
+
+      // Las dos se cumplen → a fin.
+      expect(evaluarPersonalTurno('T1', [registro('G1', 10), registro('G2', 13)], catalogoGrupos, dpp)).toMatchObject({ estado: 'A_FIN', coberturaDpp: 100 });
+
+      // Sin asistencia no se evalúa; un bloque sin personas definidas se reporta.
+      expect(evaluarPersonalTurno('T1', [], catalogoGrupos, [...dpp, bloque('L4', null)])).toMatchObject({ estado: 'SIN_DATO', coberturaDpp: null, lineasSinDato: 1 });
+    });
+
+    it('contra los grupos: cada grupo contra sus personas esperadas', () => {
       const registro = (turnoId: string, grupoId: string, personasLlegaron: number) => ({
         id: `${turnoId}-${grupoId}`, fechaOperativa: FECHA, turnoId, grupoId, personasLlegaron, observacion: null, registradaPorId: 'coord', fechaRegistro: FECHA,
       });
