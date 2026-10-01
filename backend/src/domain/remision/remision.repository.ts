@@ -107,6 +107,13 @@ export interface RemisionRepository {
    * programado.
    */
   totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]>;
+
+  /**
+   * Cajas por producto de TODAS las remisiones en esos estados, de
+   * cualquier fecha. Para el material "en tránsito" del cierre de
+   * inventario: lo producido que aún no se aprueba.
+   */
+  totalizarCajasEnEstados(estados: readonly EstadoRemision[]): Promise<Array<{ productoId: string; cajas: number }>>;
 }
 
 /** Un número por estado; los estados sin remisiones van en cero. */

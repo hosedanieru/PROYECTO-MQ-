@@ -32,6 +32,7 @@ import {
   ItemInventarioFirestoreRepository,
   MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  CierreInventarioFirestoreRepository,
   RecetaFirestoreRepository,
   UnidadMedidaFirestoreRepository,
 } from './repositorios/inventario.firestore.repositories.js';
@@ -83,6 +84,7 @@ export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
         materiales: new MaterialFirestoreRepository(cliente),
         unidadesMedida: new UnidadMedidaFirestoreRepository(cliente),
         recetas: new RecetaFirestoreRepository(cliente),
+        cierresInventario: new CierreInventarioFirestoreRepository(cliente),
       });
     });
   }

@@ -34,6 +34,7 @@ import {
   ItemInventarioPrismaRepository,
   MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  CierreInventarioPrismaRepository,
   RecetaPrismaRepository,
   UnidadMedidaPrismaRepository,
 } from '../src/infrastructure/persistence/prisma/inventario.prisma.repositories.js';
@@ -158,6 +159,7 @@ describe('atomicidad de la unidad de trabajo', () => {
           materiales: new MaterialPrismaRepository(tx),
           unidadesMedida: new UnidadMedidaPrismaRepository(tx),
           recetas: new RecetaPrismaRepository(tx),
+          cierresInventario: new CierreInventarioPrismaRepository(tx),
         }),
       ),
   };

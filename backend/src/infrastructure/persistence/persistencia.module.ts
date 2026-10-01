@@ -22,6 +22,7 @@ import { REPORTE_AVERIA_REPOSITORY } from '../../domain/averia/reporte-averia.js
 import { ENTRADA_MERCANCIA_REPOSITORY } from '../../domain/inventario/entrada-mercancia.js';
 import { ITEM_INVENTARIO_REPOSITORY } from '../../domain/inventario/item-inventario.js';
 import { MATERIAL_REPOSITORY } from '../../domain/inventario/material.js';
+import { CIERRE_INVENTARIO_REPOSITORY } from '../../domain/inventario/cierre-inventario.js';
 import { RECETA_REPOSITORY } from '../../domain/inventario/receta.js';
 import { UNIDAD_MEDIDA_REPOSITORY } from '../../domain/inventario/unidad-medida.js';
 import { MOVIMIENTO_INVENTARIO_REPOSITORY } from '../../domain/inventario/movimiento-inventario.js';
@@ -50,6 +51,7 @@ import {
   ItemInventarioFirestoreRepository,
   MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  CierreInventarioFirestoreRepository,
   RecetaFirestoreRepository,
   UnidadMedidaFirestoreRepository,
 } from '../firestore/repositorios/inventario.firestore.repositories.js';
@@ -76,6 +78,7 @@ import {
   ItemInventarioPrismaRepository,
   MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  CierreInventarioPrismaRepository,
   RecetaPrismaRepository,
   UnidadMedidaPrismaRepository,
 } from './prisma/inventario.prisma.repositories.js';
@@ -126,6 +129,7 @@ const TOKENS = [
   MATERIAL_REPOSITORY,
   UNIDAD_MEDIDA_REPOSITORY,
   RECETA_REPOSITORY,
+  CIERRE_INVENTARIO_REPOSITORY,
 ];
 
 // ---------- PostgreSQL ----------
@@ -158,6 +162,7 @@ const REGISTROS_POSTGRES: Provider[] = [
   conPrisma(MATERIAL_REPOSITORY, MaterialPrismaRepository),
   conPrisma(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaPrismaRepository),
   conPrisma(RECETA_REPOSITORY, RecetaPrismaRepository),
+  conPrisma(CIERRE_INVENTARIO_REPOSITORY, CierreInventarioPrismaRepository),
 ];
 
 // ---------- Firestore ----------
@@ -191,6 +196,7 @@ const REGISTROS_FIRESTORE: Provider[] = [
   conFirestore(MATERIAL_REPOSITORY, MaterialFirestoreRepository),
   conFirestore(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaFirestoreRepository),
   conFirestore(RECETA_REPOSITORY, RecetaFirestoreRepository),
+  conFirestore(CIERRE_INVENTARIO_REPOSITORY, CierreInventarioFirestoreRepository),
 ];
 
 const tipo = tipoPersistencia();

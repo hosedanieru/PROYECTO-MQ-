@@ -99,6 +99,10 @@ class RemisionRepositorioFalso implements RemisionRepository {
   }
 
   /** Igual que la base: suma cajas por turno, producto y extraoficial, solo de los estados pedidos. */
+  totalizarCajasEnEstados(): Promise<Array<{ productoId: string; cajas: number }>> {
+    return Promise.resolve([]);
+  }
+
   totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]> {
     const grupos = new Map<string, CajasAgrupadas>();
     for (const r of this.guardadas) {

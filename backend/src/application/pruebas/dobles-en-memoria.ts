@@ -54,6 +54,7 @@ import {
   ItemInventarioRepositorioFalso,
   MaterialRepositorioFalso,
   MovimientoInventarioRepositorioFalso,
+  CierreInventarioRepositorioFalso,
   RecetaRepositorioFalso,
   UnidadMedidaRepositorioFalso,
 } from './dobles-inventario.js';
@@ -231,6 +232,7 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
       materiales: new MaterialRepositorioFalso(),
       unidadesMedida: new UnidadMedidaRepositorioFalso(),
       recetas: new RecetaRepositorioFalso(),
+      cierresInventario: new CierreInventarioRepositorioFalso(),
       ...parcial,
     };
   }
@@ -257,6 +259,7 @@ export const REMISIONES_SIN_USO: RemisionRepository = {
   buscarPorIds: () => Promise.resolve([]),
   contarPorEstado: () => Promise.resolve(conteoEnCero()),
   totalizarCajas: () => Promise.resolve([]),
+  totalizarCajasEnEstados: () => Promise.resolve([]),
 };
 
 /**
@@ -329,5 +332,14 @@ export class RemisionRepositorioEnMemoria implements RemisionRepository {
       grupos.set(clave, g);
     }
     return Promise.resolve([...grupos.values()]);
+  }
+
+  totalizarCajasEnEstados(estados: readonly EstadoRemision[]): Promise<Array<{ productoId: string; cajas: number }>> {
+    const porProducto = new Map<string, number>();
+    for (const r of this.porId.values()) {
+      const d = r.aObjeto();
+      if (estados.includes(d.estado)) porProducto.set(d.productoId, (porProducto.get(d.productoId) ?? 0) + d.cantidadCajas);
+    }
+    return Promise.resolve([...porProducto.entries()].map(([productoId, cajas]) => ({ productoId, cajas })));
   }
 }

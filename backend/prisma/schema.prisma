@@ -102,6 +102,7 @@ model Usuario {
   movimientosInventario MovimientoInventario[]
   entradasMercancia     EntradaMercancia[]
   recetasCreadas        Receta[]
+  cierresInventario     CierreInventario[]
 
   @@map("usuario")
 }
@@ -764,6 +765,7 @@ model ItemInventario {
   movimientos         MovimientoInventario[]
   /// Recetas de PT en las que este PI o insumo es componente.
   componentesDeReceta RecetaComponente[]
+  lineasDeCierre      CierreInventarioLinea[]
 
   @@index([tipo])
   @@map("item_inventario")
@@ -842,10 +844,15 @@ model MovimientoInventario {
   remisionId String?   @map("remision_id")
   remision   Remision? @relation(fields: [remisionId], references: [id], onDelete: Restrict)
 
+  /// Cierre del día cuyo conteo físico originó este ajuste (merma o sobrante).
+  cierreId String?            @map("cierre_id")
+  cierre   CierreInventario? @relation(fields: [cierreId], references: [id], onDelete: Restrict)
+
   @@index([itemId, fechaHoraRegistro])
   @@index([fechaOperativa])
   @@index([entradaId])
   @@index([remisionId])
+  @@index([cierreId])
   @@map("movimiento_inventario")
 }
 
@@ -870,4 +877,48 @@ model EntradaMercancia {
 
   @@index([fechaOperativa])
   @@map("entrada_mercancia")
+}
+
+/// Cierre del día operativo (usuario, 2026-10-01): conteo físico de los
+/// materiales de las recetas y su merma. Uno por día (`fecha_operativa`
+/// única). Sus ajustes en el kardex llevan `cierre_id`.
+model CierreInventario {
+  id                String   @id @default(uuid())
+  /// El día operativo que se cierra.
+  fechaOperativa    DateTime @unique @map("fecha_operativa") @db.Date
+  fechaHoraRegistro DateTime @map("fecha_hora_registro") @db.Timestamptz(3)
+  usuarioId         String   @map("usuario_id")
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioNombre     String   @map("usuario_nombre")
+  observacion       String?
+
+  lineas      CierreInventarioLinea[]
+  movimientos MovimientoInventario[]
+
+  @@map("cierre_inventario")
+}
+
+/// Un material contado: lo que decía el sistema, lo en tránsito, lo
+/// esperado, lo contado y la merma (esperado − contado; negativa = sobrante).
+/// Es la foto del momento: se guarda tal cual para la trazabilidad.
+model CierreInventarioLinea {
+  id                String           @id @default(uuid())
+  cierreId          String           @map("cierre_id")
+  cierre            CierreInventario @relation(fields: [cierreId], references: [id])
+  itemId            String           @map("item_id")
+  item              ItemInventario   @relation(fields: [itemId], references: [id])
+  codigo            String
+  descripcion       String
+  unidad            String
+  existenciaSistema Decimal          @map("existencia_sistema") @db.Decimal(14, 3)
+  enTransito        Decimal          @map("en_transito") @db.Decimal(14, 3)
+  esperado          Decimal          @db.Decimal(14, 3)
+  contado           Decimal          @db.Decimal(14, 3)
+  merma             Decimal          @db.Decimal(14, 3)
+  consumoTeorico    Decimal          @map("consumo_teorico") @db.Decimal(14, 3)
+  mermaPorcentaje   Decimal?         @map("merma_porcentaje") @db.Decimal(8, 1)
+  conteoTexto       String?          @map("conteo_texto")
+
+  @@unique([cierreId, itemId])
+  @@map("cierre_inventario_linea")
 }

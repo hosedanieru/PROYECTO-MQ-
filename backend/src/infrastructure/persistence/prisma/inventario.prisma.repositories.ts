@@ -18,6 +18,7 @@ import type {
   TipoItemInventario as TipoItemPrisma,
   TipoMovimientoInventario as TipoMovPrisma,
 } from '../../../generated/prisma/client.js';
+import type { CierreInventario, CierreInventarioRepository, NuevoCierre } from '../../../domain/inventario/cierre-inventario.js';
 import type {
   EntradaMercancia,
   EntradaMercanciaRepository,
@@ -262,6 +263,7 @@ function movimientoADominio(f: FilaMovimiento): MovimientoInventario {
     entradaId: f.entradaId,
     remisionId: f.remisionId,
     conteoTexto: f.conteoTexto,
+    cierreId: f.cierreId,
   };
 }
 
@@ -352,6 +354,67 @@ export class RecetaPrismaRepository implements RecetaRepository {
       include: CON_COMPONENTES,
     });
     return recetaADominio(f);
+  }
+}
+
+// ---------- Cierres del día (conteo físico y merma) ----------
+
+const CON_LINEAS = { lineas: { orderBy: { codigo: 'asc' } } } as const satisfies Prisma.CierreInventarioInclude;
+type FilaCierre = Prisma.CierreInventarioGetPayload<{ include: typeof CON_LINEAS }>;
+
+const cierreADominio = (f: FilaCierre): CierreInventario => ({
+  id: f.id,
+  fechaOperativa: f.fechaOperativa,
+  fechaHoraRegistro: f.fechaHoraRegistro,
+  usuarioId: f.usuarioId,
+  usuarioNombre: f.usuarioNombre,
+  observacion: f.observacion,
+  lineas: f.lineas.map((l) => ({
+    itemId: l.itemId,
+    codigo: l.codigo,
+    descripcion: l.descripcion,
+    unidad: l.unidad,
+    existenciaSistema: aNumero(l.existenciaSistema),
+    enTransito: aNumero(l.enTransito),
+    esperado: aNumero(l.esperado),
+    contado: aNumero(l.contado),
+    merma: aNumero(l.merma),
+    consumoTeorico: aNumero(l.consumoTeorico),
+    mermaPorcentaje: l.mermaPorcentaje === null ? null : aNumero(l.mermaPorcentaje),
+    conteoTexto: l.conteoTexto,
+  })),
+});
+
+export class CierreInventarioPrismaRepository implements CierreInventarioRepository {
+  constructor(private readonly cliente: ClientePrisma) {}
+
+  async buscarPorFecha(fechaOperativa: Date): Promise<CierreInventario | null> {
+    const f = await this.cliente.cierreInventario.findUnique({ where: { fechaOperativa }, include: CON_LINEAS });
+    return f ? cierreADominio(f) : null;
+  }
+
+  async anteriorA(fechaOperativa: Date): Promise<CierreInventario | null> {
+    const f = await this.cliente.cierreInventario.findFirst({
+      where: { fechaOperativa: { lt: fechaOperativa } },
+      orderBy: { fechaOperativa: 'desc' },
+      include: CON_LINEAS,
+    });
+    return f ? cierreADominio(f) : null;
+  }
+
+  async listar(desde: Date, hasta: Date): Promise<CierreInventario[]> {
+    const filas = await this.cliente.cierreInventario.findMany({
+      where: { fechaOperativa: { gte: desde, lte: hasta } },
+      orderBy: { fechaOperativa: 'desc' },
+      include: CON_LINEAS,
+    });
+    return filas.map(cierreADominio);
+  }
+
+  async crear(cierre: NuevoCierre): Promise<CierreInventario> {
+    const { lineas, ...encabezado } = cierre;
+    const f = await this.cliente.cierreInventario.create({ data: { ...encabezado, lineas: { create: lineas } }, include: CON_LINEAS });
+    return cierreADominio(f);
   }
 }
 

@@ -27,6 +27,7 @@ import {
   ItemInventarioPrismaRepository,
   MaterialPrismaRepository,
   MovimientoInventarioPrismaRepository,
+  CierreInventarioPrismaRepository,
   RecetaPrismaRepository,
   UnidadMedidaPrismaRepository,
 } from './inventario.prisma.repositories.js';
@@ -77,6 +78,7 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
           materiales: new MaterialPrismaRepository(tx),
           unidadesMedida: new UnidadMedidaPrismaRepository(tx),
           recetas: new RecetaPrismaRepository(tx),
+          cierresInventario: new CierreInventarioPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

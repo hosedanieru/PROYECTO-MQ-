@@ -20,6 +20,7 @@
 
 import type { DocumentData, DocumentSnapshot } from 'firebase-admin/firestore';
 
+import type { CierreInventario, CierreInventarioRepository, NuevoCierre } from '../../../domain/inventario/cierre-inventario.js';
 import type {
   EntradaMercancia,
   EntradaMercanciaRepository,
@@ -288,6 +289,7 @@ function movimientoADominio(s: DocumentSnapshot): MovimientoInventario {
     entradaId: d.entradaId ?? null,
     remisionId: d.remisionId ?? null,
     conteoTexto: d.conteoTexto ?? null,
+    cierreId: d.cierreId ?? null,
   };
 }
 
@@ -394,6 +396,60 @@ export class RecetaFirestoreRepository implements RecetaRepository {
     const id = `${receta.productoId}_v${receta.version}`;
     await this.cliente.crearNuevo(this.coleccion().doc(id), receta);
     return { id, ...receta };
+  }
+}
+
+// ---------- Cierres del día (conteo físico y merma) ----------
+
+function cierreADominio(s: DocumentSnapshot): CierreInventario {
+  const d = s.data()!;
+  return {
+    id: s.id,
+    fechaOperativa: aDate(d.fechaOperativa),
+    fechaHoraRegistro: aDate(d.fechaHoraRegistro),
+    usuarioId: d.usuarioId,
+    usuarioNombre: d.usuarioNombre,
+    observacion: d.observacion ?? null,
+    lineas: d.lineas ?? [],
+  };
+}
+
+/**
+ * `cierresInventario/{YYYY-MM-DD}` con las líneas embebidas. El id es la
+ * fecha y se crea con `crearNuevo`: un segundo cierre del mismo día falla,
+ * como la restricción única en PostgreSQL.
+ */
+export class CierreInventarioFirestoreRepository implements CierreInventarioRepository {
+  constructor(private readonly cliente: ClienteFirestore) {}
+
+  private coleccion() {
+    return this.cliente.coleccion(COLECCION.cierresInventario);
+  }
+
+  async buscarPorFecha(fechaOperativa: Date): Promise<CierreInventario | null> {
+    const s = await this.cliente.obtener(this.coleccion().doc(claveFecha(fechaOperativa)));
+    return s.exists ? cierreADominio(s) : null;
+  }
+
+  async anteriorA(fechaOperativa: Date): Promise<CierreInventario | null> {
+    const q = await this.cliente.consultar(
+      this.coleccion().where('fechaOperativaTexto', '<', claveFecha(fechaOperativa)).orderBy('fechaOperativaTexto', 'desc').limit(1),
+    );
+    return q.empty ? null : cierreADominio(q.docs[0]);
+  }
+
+  async listar(desde: Date, hasta: Date): Promise<CierreInventario[]> {
+    const q = await this.cliente.consultar(
+      this.coleccion().where('fechaOperativaTexto', '>=', claveFecha(desde)).where('fechaOperativaTexto', '<=', claveFecha(hasta)),
+    );
+    return q.docs.map(cierreADominio).sort((a, b) => b.fechaOperativa.getTime() - a.fechaOperativa.getTime());
+  }
+
+  /** Escritura pura (lecturas antes que escrituras). */
+  async crear(cierre: NuevoCierre): Promise<CierreInventario> {
+    const id = claveFecha(cierre.fechaOperativa);
+    await this.cliente.crearNuevo(this.coleccion().doc(id), { ...cierre, fechaOperativaTexto: id });
+    return { id, ...cierre };
   }
 }
 

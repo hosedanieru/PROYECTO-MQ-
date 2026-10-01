@@ -54,6 +54,7 @@ export const COLECCION = {
   pis: 'pis',
   insumos: 'insumos',
   recetas: 'recetas',
+  cierresInventario: 'cierresInventario',
 } as const;
 
 export class ClienteFirestore {

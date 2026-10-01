@@ -36,6 +36,7 @@ import {
   ItemInventarioFirestoreRepository,
   MaterialFirestoreRepository,
   MovimientoInventarioFirestoreRepository,
+  CierreInventarioFirestoreRepository,
   RecetaFirestoreRepository,
   UnidadMedidaFirestoreRepository,
 } from '../src/infrastructure/firestore/repositorios/inventario.firestore.repositories.js';
@@ -164,6 +165,7 @@ describe('atomicidad', () => {
           materiales: new MaterialFirestoreRepository(c),
           unidadesMedida: new UnidadMedidaFirestoreRepository(c),
           recetas: new RecetaFirestoreRepository(c),
+          cierresInventario: new CierreInventarioFirestoreRepository(c),
         });
       }),
   };

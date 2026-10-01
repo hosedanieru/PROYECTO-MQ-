@@ -79,6 +79,13 @@ class RemisionRepositorioFalso implements RemisionRepository {
     return Promise.resolve(conteo);
   }
 
+  totalizarCajasEnEstados(): Promise<Array<{ productoId: string; cajas: number }>> {
+
+    return Promise.resolve([]);
+
+  }
+
+
   totalizarCajas(fechaOperativa: Date, estados: readonly EstadoRemision[]): Promise<CajasAgrupadas[]> {
     return Promise.resolve(
       [...this.porId.values()]

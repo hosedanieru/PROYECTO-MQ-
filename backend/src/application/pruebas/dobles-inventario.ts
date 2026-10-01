@@ -5,6 +5,7 @@
  * Solo se importan desde archivos `*.spec.ts`.
  */
 
+import type { CierreInventario, CierreInventarioRepository, NuevoCierre } from '../../domain/inventario/cierre-inventario.js';
 import type {
   EntradaMercancia,
   EntradaMercanciaRepository,
@@ -26,6 +27,33 @@ import type {
 } from '../../domain/inventario/movimiento-inventario.js';
 import type { NuevaRecetaPt, RecetaPt, RecetaRepository, ResumenReceta } from '../../domain/inventario/receta.js';
 import type { DatosUnidad, UnidadMedida, UnidadMedidaRepository } from '../../domain/inventario/unidad-medida.js';
+
+export class CierreInventarioRepositorioFalso implements CierreInventarioRepository {
+  readonly cierres: CierreInventario[] = [];
+
+  buscarPorFecha(fechaOperativa: Date): Promise<CierreInventario | null> {
+    return Promise.resolve(this.cierres.find((c) => c.fechaOperativa.getTime() === fechaOperativa.getTime()) ?? null);
+  }
+
+  anteriorA(fechaOperativa: Date): Promise<CierreInventario | null> {
+    const previos = this.cierres.filter((c) => c.fechaOperativa < fechaOperativa).sort((a, b) => b.fechaOperativa.getTime() - a.fechaOperativa.getTime());
+    return Promise.resolve(previos[0] ?? null);
+  }
+
+  listar(desde: Date, hasta: Date): Promise<CierreInventario[]> {
+    return Promise.resolve(this.cierres.filter((c) => c.fechaOperativa >= desde && c.fechaOperativa <= hasta));
+  }
+
+  crear(cierre: NuevoCierre): Promise<CierreInventario> {
+    // Igual que la restricción única de la base.
+    if (this.cierres.some((c) => c.fechaOperativa.getTime() === cierre.fechaOperativa.getTime())) {
+      return Promise.reject(new Error('Cierre del día repetido'));
+    }
+    const creado = { ...cierre, id: `cierre-${this.cierres.length + 1}` };
+    this.cierres.push(creado);
+    return Promise.resolve(creado);
+  }
+}
 
 export class RecetaRepositorioFalso implements RecetaRepository {
   readonly recetas: RecetaPt[] = [];

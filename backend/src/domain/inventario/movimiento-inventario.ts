@@ -60,6 +60,8 @@ export interface MovimientoInventario {
   remisionId: string | null;
   /** Lo que se digitó si fue un conteo mixto: "10 ROLLO (1 ROLLO = 50 METRO)". */
   conteoTexto: string | null;
+  /** Cierre del día cuyo conteo físico originó este ajuste (merma o sobrante). */
+  cierreId: string | null;
 }
 
 export type NuevoMovimiento = Omit<MovimientoInventario, 'id'>;

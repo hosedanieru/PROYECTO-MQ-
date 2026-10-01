@@ -251,6 +251,15 @@ export class RemisionPrismaRepository implements RemisionRepository {
     }));
   }
 
+  async totalizarCajasEnEstados(estados: readonly EstadoRemision[]): Promise<Array<{ productoId: string; cajas: number }>> {
+    const grupos = await this.cliente.remision.groupBy({
+      by: ['productoId'],
+      where: { estado: { in: estados.map((e) => RemisionMapper.estadoAPrisma(e)) } },
+      _sum: { cantidadCajas: true },
+    });
+    return grupos.map((g) => ({ productoId: g.productoId, cajas: g._sum.cantidadCajas ?? 0 }));
+  }
+
   private construirWhere(filtro: FiltroRemisiones): Prisma.RemisionWhereInput {
     const where: Prisma.RemisionWhereInput = {};
 

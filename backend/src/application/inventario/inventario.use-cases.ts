@@ -88,6 +88,7 @@ export class RegistrarMovimientoUseCase {
         entradaId: null,
         remisionId: null,
         conteoTexto,
+        cierreId: null,
       });
       await itemsInventario.fijarExistencia(item.id, calculado.saldo);
       await auditoria.registrar({
@@ -190,6 +191,7 @@ export class RegistrarEntradaMercanciaUseCase {
           entradaId: entrada.id,
           remisionId: null,
           conteoTexto,
+          cierreId: null,
         });
         await itemsInventario.fijarExistencia(item.id, calculo.saldo);
         lineas.push({

@@ -72,6 +72,7 @@ export async function registrarConsumo(
       entradaId: null,
       remisionId: remision.id,
       conteoTexto: null,
+      cierreId: null,
     });
     await ctx.itemsInventario.fijarExistencia(item.id, saldo);
   }

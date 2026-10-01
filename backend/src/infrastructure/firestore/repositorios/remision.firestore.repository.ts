@@ -194,6 +194,17 @@ export class RemisionFirestoreRepository implements RemisionRepository {
     return [...grupos.values()];
   }
 
+  /** Consulta por estado (índice de un solo campo, automático) y suma en memoria. */
+  async totalizarCajasEnEstados(estados: readonly EstadoRemision[]): Promise<Array<{ productoId: string; cajas: number }>> {
+    if (estados.length === 0) return [];
+    const q = await this.cliente.consultar(this.cliente.coleccion(COLECCION.remisiones).where('estado', 'in', [...estados]));
+    const porProducto = new Map<string, number>();
+    for (const d of q.docs) {
+      porProducto.set(d.get('productoId'), (porProducto.get(d.get('productoId')) ?? 0) + Number(d.get('cantidadCajas') ?? 0));
+    }
+    return [...porProducto.entries()].map(([productoId, cajas]) => ({ productoId, cajas }));
+  }
+
   /**
    * La parte de la consulta que Firestore SÍ puede resolver: el rango de
    * fecha operativa. Lo demás no tiene índice y se filtra en memoria.

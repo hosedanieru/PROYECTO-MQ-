@@ -25,6 +25,7 @@ import type { AuditoriaRepository } from '../auditoria/auditoria.repository.js';
 import type { CausalAveriaRepository } from '../averia/causal-averia.js';
 import type { ReporteAveriaRepository } from '../averia/reporte-averia.js';
 import type { GrupoRepository } from '../grupo/grupo.repository.js';
+import type { CierreInventarioRepository } from '../inventario/cierre-inventario.js';
 import type { EntradaMercanciaRepository } from '../inventario/entrada-mercancia.js';
 import type { ItemInventarioRepository } from '../inventario/item-inventario.js';
 import type { MaterialRepository } from '../inventario/material.js';
@@ -69,6 +70,7 @@ export interface ContextoTransaccional {
   materiales: MaterialRepository;
   unidadesMedida: UnidadMedidaRepository;
   recetas: RecetaRepository;
+  cierresInventario: CierreInventarioRepository;
 }
 
 export interface UnidadDeTrabajo {
