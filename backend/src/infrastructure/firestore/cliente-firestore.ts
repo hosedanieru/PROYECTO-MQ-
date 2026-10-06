@@ -55,6 +55,11 @@ export const COLECCION = {
   insumos: 'insumos',
   recetas: 'recetas',
   cierresInventario: 'cierresInventario',
+  listasDistribucion: 'listasDistribucion',
+  enviosCorreo: 'enviosCorreo',
+  resumenesTurno: 'resumenesTurno',
+  ajustesEsperadas: 'ajustesEsperadas',
+  firmasRemision: 'firmasRemision',
 } as const;
 
 export class ClienteFirestore {

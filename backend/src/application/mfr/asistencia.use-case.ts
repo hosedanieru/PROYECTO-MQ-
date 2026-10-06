@@ -6,12 +6,22 @@
  * registro de (fecha, turno, grupo); la corrección se audita con el
  * valor anterior. Exige que el grupo exista y esté activo, y que el
  * número no quede por debajo de lo que el grupo ya tiene asignado en
- * líneas (trazabilidad: primero se ajustan las líneas).
+ * líneas (trazabilidad: primero se ajustan las líneas). Si llegan más de
+ * las esperadas, la observación es obligatoria.
+ *
+ * También: ajustar las esperadas de un grupo para un día puntual.
  */
 
 import type { Reloj } from '../remision/crear-remision.use-case.js';
 import { asignadasPorGrupo, verificarAsistenciaContraAsignadas } from '../../domain/mfr/asignacion-linea.js';
 import { validarAsistencia, type AsistenciaTurno, type DatosAsistencia } from '../../domain/mfr/asistencia-turno.js';
+import {
+  esperadasDe,
+  exigirMotivoSiLleganDeMas,
+  validarAjusteEsperadas,
+  type AjusteEsperadas,
+  type DatosAjusteEsperadas,
+} from '../../domain/mfr/esperadas-personal.js';
 import { GrupoNoEncontradoError } from '../../domain/grupo/grupo.errors.js';
 import type { UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
 
@@ -28,11 +38,15 @@ export class RegistrarAsistenciaUseCase {
   async ejecutar(comando: RegistrarAsistenciaComando): Promise<AsistenciaTurno> {
     const datos = validarAsistencia(comando);
 
-    return this.uow.ejecutar(async ({ asistencias, asignaciones, grupos, auditoria }) => {
+    return this.uow.ejecutar(async ({ asistencias, asignaciones, grupos, ajustesEsperadas, auditoria }) => {
       const grupo = await grupos.buscarPorId(datos.grupoId);
       if (!grupo || !grupo.activo) {
         throw new GrupoNoEncontradoError(`El grupo "${datos.grupoId}" no existe o está inactivo.`);
       }
+
+      // Llegar de más se permite solo con observación (usuario, 2026-10-03).
+      const esperadas = esperadasDe(grupo, datos.turnoId, await ajustesEsperadas.listarPorFecha(datos.fechaOperativa));
+      exigirMotivoSiLleganDeMas(esperadas.personas, datos.personasLlegaron, datos.observacion);
 
       const asignadas = asignadasPorGrupo(datos.turnoId, await asignaciones.listarPorFecha(datos.fechaOperativa)).get(datos.grupoId) ?? 0;
       verificarAsistenciaContraAsignadas(datos.personasLlegaron, asignadas);
@@ -49,6 +63,46 @@ export class RegistrarAsistenciaUseCase {
         usuarioId: comando.usuarioId,
       });
       return guardada;
+    });
+  }
+}
+
+export interface AjustarEsperadasComando extends DatosAjusteEsperadas {
+  usuarioId: string;
+}
+
+/**
+ * Ajusta, para un día puntual, cuántas personas se esperan de un grupo en
+ * un turno (manda sobre lo fijo del grupo). Motivo obligatorio y auditado
+ * con el valor que regía antes (el ajuste anterior o lo fijo del grupo).
+ */
+export class AjustarEsperadasUseCase {
+  constructor(
+    private readonly uow: UnidadDeTrabajo,
+    private readonly reloj: Reloj,
+  ) {}
+
+  async ejecutar(comando: AjustarEsperadasComando): Promise<AjusteEsperadas> {
+    const datos = validarAjusteEsperadas(comando);
+
+    return this.uow.ejecutar(async ({ grupos, ajustesEsperadas, auditoria }) => {
+      const grupo = await grupos.buscarPorId(datos.grupoId);
+      if (!grupo || !grupo.activo) {
+        throw new GrupoNoEncontradoError(`El grupo "${datos.grupoId}" no existe o está inactivo.`);
+      }
+      const anterior = esperadasDe(grupo, datos.turnoId, await ajustesEsperadas.listarPorFecha(datos.fechaOperativa));
+      const guardado = await ajustesEsperadas.guardar(datos, comando.usuarioId, this.reloj.ahora());
+
+      await auditoria.registrar({
+        entidad: 'ajuste_esperadas',
+        entidadId: guardado.id,
+        accion: anterior.origen === 'AJUSTE' ? 'ACTUALIZAR' : 'CREAR',
+        valorAnterior: { personas: anterior.personas, origen: anterior.origen },
+        valorNuevo: { fechaOperativa: datos.fechaOperativa, turnoId: datos.turnoId, grupoId: datos.grupoId, personas: datos.personas },
+        motivo: datos.motivo,
+        usuarioId: comando.usuarioId,
+      });
+      return guardado;
     });
   }
 }

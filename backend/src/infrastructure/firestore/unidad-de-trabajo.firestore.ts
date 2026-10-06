@@ -45,6 +45,10 @@ import {
 import { ProductoFirestoreRepository } from './repositorios/producto.firestore.repository.js';
 import { RemisionFirestoreRepository } from './repositorios/remision.firestore.repository.js';
 import { UsuarioFirestoreRepository } from './repositorios/usuario.firestore.repository.js';
+import { AjusteEsperadasFirestoreRepository } from './repositorios/ajuste-esperadas.firestore.repository.js';
+import { FirmaRemisionFirestoreRepository } from './repositorios/firma-remision.firestore.repository.js';
+import { ResumenTurnoFirestoreRepository } from './repositorios/resumen-turno.firestore.repository.js';
+import { EnvioCorreoFirestoreRepository, ListaDistribucionFirestoreRepository } from './repositorios/correo.firestore.repositories.js';
 
 @Injectable()
 export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
@@ -85,6 +89,11 @@ export class UnidadDeTrabajoFirestore implements UnidadDeTrabajo {
         unidadesMedida: new UnidadMedidaFirestoreRepository(cliente),
         recetas: new RecetaFirestoreRepository(cliente),
         cierresInventario: new CierreInventarioFirestoreRepository(cliente),
+        listasDistribucion: new ListaDistribucionFirestoreRepository(cliente),
+        enviosCorreo: new EnvioCorreoFirestoreRepository(cliente),
+        resumenesTurno: new ResumenTurnoFirestoreRepository(cliente),
+        firmasRemision: new FirmaRemisionFirestoreRepository(cliente),
+        ajustesEsperadas: new AjusteEsperadasFirestoreRepository(cliente),
       });
     });
   }

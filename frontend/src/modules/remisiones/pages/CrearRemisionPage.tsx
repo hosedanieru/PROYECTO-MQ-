@@ -10,6 +10,8 @@
 
 import { useNavigate } from 'react-router-dom'
 
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoRemision } from '../../../components/Iconos'
 import { fechaCorta, fechaOperativaDe } from '../../../shared/utils/fechas'
 import { RemisionForm } from '../components/RemisionForm'
 import { useCrearRemision } from '../hooks/useRemisiones'
@@ -21,13 +23,19 @@ export function CrearRemisionPage() {
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-tinta">Nueva remisión</h1>
-        <p className="text-sm text-tinta-suave">
-          Quedará registrada en el día operativo <strong>{fechaCorta(fechaOperativa)}</strong>{' '}
-          (corte 06:00 a 06:00).
-        </p>
-      </header>
+      <EncabezadoPagina
+        Icono={IconoRemision}
+        escena="remision"
+        volver={{ a: '/remisiones', texto: 'Remisiones' }}
+        titulo="Nueva remisión"
+        descripcion={
+          <>
+            Quedará registrada en el día operativo{' '}
+            <strong className="font-semibold text-white">{fechaCorta(fechaOperativa)}</strong> (corte 06:00 a
+            06:00).
+          </>
+        }
+      />
 
       <RemisionForm
         fechaOperativa={fechaOperativa}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Remision } from '../../domain/remision/remision.entity.js';
+import type { FirmaRemision } from '../../domain/remision/firma-remision.js';
 import { plantillaRemisiones } from './plantilla-remision.js';
 
 function remision(sobrescribir: Partial<Parameters<typeof Remision.desdePersistencia>[0]> = {}) {
@@ -34,7 +35,14 @@ function remision(sobrescribir: Partial<Parameters<typeof Remision.desdePersiste
   });
 }
 
-const contexto = { turno: 'T1', grupo: 'APOYOS MAXI', lugar: 'MAQUILA PEPSICO SANTO DOMINGO' };
+const contexto = { turno: 'T1', grupo: 'APOYOS MAXI', lugar: 'MAQUILA PEPSICO SANTO DOMINGO', firmas: [] as FirmaRemision[] };
+
+const TRAZO = `data:image/png;base64,${'A'.repeat(200)}`;
+const firma = (tipo: FirmaRemision['tipo'], nombre: string): FirmaRemision => ({
+  id: tipo, remisionId: 'r', version: 1, tipo, usuarioId: 'u', usuarioNombre: nombre, usuarioDocumento: '1010', usuarioRol: 'PATINADOR',
+  declaracion: 'Certifico el conteo físico de las cantidades de esta remisión.', huella: 'abc123', trazo: TRAZO,
+  dispositivo: null, ip: null, fechaHora: new Date('2026-09-17T13:00:00Z'),
+});
 
 describe('plantillaRemisiones', () => {
   it('muestra la fecha operativa y el vencimiento como días, sin correrlos por zona horaria', () => {
@@ -83,6 +91,20 @@ describe('plantillaRemisiones', () => {
     expect(plantillaRemisiones([{ remision: remision({ version: 2 }), ...contexto }])).toContain(
       'Versión 2 — rectificada',
     );
+  });
+
+  it('firmas electrónicas: trazo en su casilla, nombre, declaración, constancia con huella y marca de piloto', () => {
+    const conFirmas = plantillaRemisiones([{ remision: remision({ estado: 'ENTREGADA' }), ...contexto, firmas: [firma('VERIFICADOR', 'Pedro Patinador')] }]);
+    expect(conFirmas).toContain(`src="${TRAZO}"`);
+    expect(conFirmas).toContain('<b>Nombre:</b> Pedro Patinador');
+    expect(conFirmas).toContain('Certifico el conteo físico');
+    expect(conFirmas).toContain('Huella SHA-256 del documento firmado: abc123');
+    expect(conFirmas).toContain('17/09/2026 8:00'); // fecha y hora de la firma en Bogotá (13:00Z)
+    expect(conFirmas).toContain('PILOTO');
+    const sinPiloto = plantillaRemisiones([{ remision: remision(), ...contexto, firmas: [firma('INLOTRANS', 'Ana')] }], { pilotoFirmas: false });
+    expect(sinPiloto).not.toContain('PILOTO');
+    // Sin firmas no hay constancia.
+    expect(plantillaRemisiones([{ remision: remision(), ...contexto }])).not.toContain('class="constancia"');
   });
 
   it('agrupa de a dos por hoja', () => {

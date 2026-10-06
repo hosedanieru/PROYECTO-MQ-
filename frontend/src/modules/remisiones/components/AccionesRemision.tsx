@@ -23,7 +23,7 @@ import { Dialogo } from '../../../components/Dialogo'
 import { comoErrorApi } from '../../../services/http'
 import type { Remision } from '../../../shared/types/remision'
 import { useSesion } from '../../auth/useSesion'
-import { useAccionRemision, type AccionRemision } from '../hooks/useRemisiones'
+import { useAccionRemision, useFirmasRemision, type AccionRemision } from '../hooks/useRemisiones'
 
 type Tipo = AccionRemision['tipo']
 
@@ -57,13 +57,20 @@ const ACCIONES_POR_ESTADO: Record<Remision['estado'], Definicion[]> = {
 }
 
 export function AccionesRemision({ remision }: { remision: Remision }) {
-  const { tienePermiso } = useSesion()
+  const { tienePermiso, usuario } = useSesion()
   const accion = useAccionRemision(remision.id)
   const [abierta, setAbierta] = useState<Definicion | null>(null)
   const [campos, setCampos] = useState({ opaNombre: '', opaCargo: '', motivo: '', concilidadoCon: '' })
 
-  const disponibles = ACCIONES_POR_ESTADO[remision.estado].filter((a) =>
-    tienePermiso(a.permiso),
+  // El OPA no "registra" la aprobación de otro: aprueba firmando en la sección de firmas.
+  const esOpa = usuario?.rolCodigo === 'OPA_PEPSICO'
+  // Fin del piloto: aprobar y validar solo se hacen firmando (sección de firmas).
+  const firmasObligatorias = useFirmasRemision(remision.id).data?.modo === 'OBLIGATORIA'
+  const disponibles = ACCIONES_POR_ESTADO[remision.estado].filter(
+    (a) =>
+      tienePermiso(a.permiso) &&
+      !(esOpa && a.tipo === 'aprobar') &&
+      !(firmasObligatorias && (a.tipo === 'aprobar' || a.tipo === 'validar')),
   )
 
   const ejecutar = async (def: Definicion) => {

@@ -12,6 +12,8 @@
 import { useState } from 'react'
 
 import { Alerta } from '../../../components/Alerta'
+import { Seccion } from '../../../components/Seccion'
+import { SelectorSegmentado } from '../../../components/SelectorSegmentado'
 import { comoErrorApi } from '../../../services/http'
 import type { EntradaAuditoria, VersionRemision } from '../../../shared/types/remision'
 import { fechaHora } from '../../../shared/utils/fechas'
@@ -59,9 +61,9 @@ function Versiones({ id }: { id: string }) {
     return <p className="text-sm text-tinta-suave">Sin rectificaciones: esta es la primera versión.</p>
   }
   return (
-    <ol className="space-y-4">
+    <ol className="divide-y divide-borde">
       {versiones.data.map((v: VersionRemision) => (
-        <li key={v.version} className="rounded-md border border-borde p-4 text-sm">
+        <li key={v.version} className="py-4 text-sm first:pt-0 last:pb-0">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <strong>Versión {v.version}</strong>
             <span className="text-tinta-suave">
@@ -90,11 +92,11 @@ function Auditoria({ id }: { id: string }) {
   if (auditoria.isError) return <Alerta tipo="error">{comoErrorApi(auditoria.error).mensaje}</Alerta>
   if (!auditoria.data?.length) return <p className="text-sm text-tinta-suave">Sin registros.</p>
   return (
-    <ol className="space-y-3">
+    <ol className="divide-y divide-borde">
       {auditoria.data.map((e) => {
         const cambios = e.accion === 'CREAR' ? [] : diferencias(e.valorAnterior, e.valorNuevo)
         return (
-          <li key={e.id} className="rounded-md border border-borde p-3 text-sm">
+          <li key={e.id} className="py-3 text-sm first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <strong>{ETIQUETA_ACCION[e.accion]}</strong>
               <span className="text-tinta-suave">
@@ -124,22 +126,28 @@ export function HistorialRemision({ remisionId }: { remisionId: string }) {
   const puedeAuditoria = tienePermiso('admin.auditoria')
   const [pestana, setPestana] = useState<'versiones' | 'auditoria'>('versiones')
 
-  const clase = (activa: boolean) =>
-    `border-b-2 px-3 py-2 text-sm ${activa ? 'border-marca font-medium text-marca' : 'border-transparent text-tinta-suave hover:text-tinta'}`
-
+  // Sin caja (usuario, 2026-10-05): sección abierta con un selector, y los registros separados por líneas.
   return (
-    <section className="rounded-lg bg-base p-5 shadow-sm">
-      <nav className="mb-4 flex gap-2 border-b border-borde">
-        <button className={clase(pestana === 'versiones')} onClick={() => setPestana('versiones')}>
-          Versiones
-        </button>
-        {puedeAuditoria && (
-          <button className={clase(pestana === 'auditoria')} onClick={() => setPestana('auditoria')}>
-            Auditoría
-          </button>
-        )}
-      </nav>
-      {pestana === 'versiones' ? <Versiones id={remisionId} /> : <Auditoria id={remisionId} />}
-    </section>
+    <Seccion
+      titulo="Historial"
+      tono="neutro"
+      accion={
+        puedeAuditoria && (
+          <SelectorSegmentado
+            etiqueta="Qué historial ver"
+            opciones={[
+              { valor: 'versiones', texto: 'Versiones' },
+              { valor: 'auditoria', texto: 'Auditoría' },
+            ]}
+            activo={pestana}
+            cambiar={setPestana}
+          />
+        )
+      }
+    >
+      <div className="border-y border-borde py-4">
+        {pestana === 'versiones' ? <Versiones id={remisionId} /> : <Auditoria id={remisionId} />}
+      </div>
+    </Seccion>
   )
 }

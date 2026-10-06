@@ -21,6 +21,7 @@ import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
 import { Logo } from '../../../components/Logo'
 import { comoErrorApi } from '../../../services/http'
+import { HeroVisual3D } from '../../../shared/visual3d/HeroVisual3D'
 import { useAparecer } from '../../../shared/animacion/useAnimacion'
 import { useTextos } from '../../../shared/idioma/useTextos'
 import { useSesion } from '../useSesion'
@@ -81,21 +82,18 @@ export function LoginPage() {
       <section className="relative hidden flex-col justify-between overflow-hidden bg-marina p-12 text-white lg:flex">
         <Logo variante="claro" />
         <div className="relative z-10 max-w-md">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/50">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/80">
             {t('login.marcaEtiqueta')}
           </p>
           <h2 className="mt-4 text-4xl font-bold leading-tight tracking-tight">
             {t('login.marcaTitulo')}
           </h2>
-          <p className="mt-4 leading-relaxed text-white/70">{t('login.marcaTexto')}</p>
+          <p className="mt-4 leading-relaxed text-white/90">{t('login.marcaTexto')}</p>
         </div>
-        <p className="text-xs text-white/40">{t('login.sede')}</p>
+        <p className="text-xs text-white/80">{t('login.sede')}</p>
 
         {/* Formas de fondo: puro adorno, fuera del flujo del contenido. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 top-1/3 h-96 w-96 rounded-full border-[40px] border-white/5"
-        />
+        <HeroVisual3D className="absolute right-0 top-6 h-[26rem] w-[36rem] [mask-image:linear-gradient(to_left,black_60%,transparent)]" />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-marca/20 blur-3xl"

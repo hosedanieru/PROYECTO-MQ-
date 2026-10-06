@@ -24,7 +24,7 @@ export function Campo({ etiqueta, error, id, className = '', ...resto }: Props) 
         id={idCampo}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${idCampo}-error` : undefined}
-        className={`block w-full rounded-lg border bg-base px-3 py-2 text-sm text-tinta shadow-sm transition outline-none placeholder:text-tinta-suave/60 focus:border-marca focus:ring-2 focus:ring-marca/30 ${
+        className={`block w-full rounded-lg border bg-base px-3 py-2 text-sm text-tinta shadow-sm transition pointer-coarse:min-h-11 outline-none placeholder:text-tinta-suave/60 focus:border-marca focus:ring-2 focus:ring-marca/30 ${
           error ? 'border-critico' : 'border-borde'
         } ${className}`}
         {...resto}

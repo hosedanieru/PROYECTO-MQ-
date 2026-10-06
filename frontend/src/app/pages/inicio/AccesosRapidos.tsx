@@ -97,7 +97,7 @@ export function AccesosRapidos({ tienePermiso }: { tienePermiso: (permiso: strin
           to={a}
           className="group flex gap-3 rounded-xl border border-borde bg-base p-4 transition duration-200 hover:-translate-y-0.5 hover:border-marca/30 hover:shadow-tarjeta"
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-marca-claro text-marca-texto transition group-hover:bg-marca group-hover:text-white">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-marca-claro text-marca-texto transition group-hover:bg-marca-relleno group-hover:text-white">
             <Icono />
           </span>
           <span className="min-w-0">

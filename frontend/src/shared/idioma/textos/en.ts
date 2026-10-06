@@ -24,12 +24,18 @@ export const en: Record<ClaveTexto, string> = {
   'nav.grupos': 'Crews',
   'nav.averias': 'Damages',
   'nav.causales': 'Damage causes',
+  'nav.correos': 'Email',
   'nav.inventario': 'Inventory',
   'nav.usuarios': 'Users',
   'nav.abrirMenu': 'Open menu',
   'nav.cerrarMenu': 'Close menu',
   'nav.irAlInicio': 'Go to home',
   'nav.eslogan': 'Together we take every product further',
+  'nav.produccion': 'Production',
+  'nav.navegacionPrincipal': 'Main navigation',
+  'nav.menuCuenta': 'Account menu',
+  'nav.planta': 'Plant',
+  'nav.preferencias': 'Language and theme',
 
   // ---------- Barra superior ----------
   'barra.diaOperativo': 'Operating day {fecha}',
@@ -97,6 +103,13 @@ export const en: Record<ClaveTexto, string> = {
   'inicio.ultimasDescripcion': 'The most recent entries of the operating day.',
   'inicio.verTodas': 'See all',
   'inicio.accesosRapidos': 'Quick links',
+  'inicio.vistas': 'Home views',
+  'inicio.vistaLineas': 'Live lines',
+  'inicio.vistaRemisiones': "Today's delivery notes",
+  'inicio.vistaTurnos': 'Shifts and kilos',
+  'inicio.resumenLineas': 'What runs on each platform',
+  'inicio.resumenRemisiones': '{n} registered today',
+  'inicio.resumenTurnos': 'Target {meta} %',
 
   // ---------- Estados de remisión ----------
   'estado.BORRADOR': 'Draft',

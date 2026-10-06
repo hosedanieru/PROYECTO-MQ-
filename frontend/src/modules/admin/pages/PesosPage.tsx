@@ -20,6 +20,8 @@ import { useMemo, useState } from 'react'
 
 import { Alerta } from '../../../components/Alerta'
 import { Boton } from '../../../components/Boton'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoBalanza } from '../../../components/Iconos'
 import { Campo } from '../../../components/Campo'
 import { comoErrorApi } from '../../../services/http'
 import type { CambioEstandarLote, EstandarProducto, ResultadoLoteEstandares } from '../../../shared/types/mfr'
@@ -106,18 +108,17 @@ export function PesosPage() {
 
   return (
     <section className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold text-tinta">Pesos por caja</h1>
-        <p className="mt-1 text-sm text-tinta-suave">
-          Kilos netos de una caja. Sin este dato el tablero del MFR no puede mostrar kilogramos. El sistema propone un
-          valor leyendo la descripción de PepsiCo; usted decide cuáles acepta.
-        </p>
-      </header>
+      <EncabezadoPagina
+        Icono={IconoBalanza}
+        escena="pesos"
+        titulo="Pesos por caja"
+        descripcion="Kilos netos de una caja. Sin este dato el tablero del MFR no puede mostrar kilogramos. El sistema propone un valor leyendo la descripción de PepsiCo; usted decide cuáles acepta."
+      />
 
       {!puedeEditar && (
         <Alerta tipo="info">
-          Puede consultar los pesos, pero cambiarlos exige el permiso <strong>catalogo.editar_estandares</strong>, que
-          hoy solo tiene el administrador.
+          Puede consultar los pesos, pero cambiarlos exige el permiso{' '}
+          <strong>catalogo.editar_estandares</strong>, que hoy solo tiene el administrador.
         </Alerta>
       )}
 
@@ -146,7 +147,11 @@ export function PesosPage() {
         <Alerta tipo="exito">
           Se actualizaron <strong>{resultado.actualizados.length}</strong> producto(s).
           {resultado.sinCambios.length > 0 && (
-            <> {resultado.sinCambios.length} ya tenían ese mismo valor y no se tocaron: {resultado.sinCambios.join(', ')}.</>
+            <>
+              {' '}
+              {resultado.sinCambios.length} ya tenían ese mismo valor y no se tocaron:{' '}
+              {resultado.sinCambios.join(', ')}.
+            </>
           )}
         </Alerta>
       )}
@@ -186,8 +191,8 @@ export function PesosPage() {
 
       {sinSugerencia > 0 && (
         <p className="text-xs text-tinta-suave">
-          {sinSugerencia} producto(s) sin sugerencia: su descripción no sigue ninguno de los formatos conocidos del DPP.
-          Hay que escribir el peso a mano.
+          {sinSugerencia} producto(s) sin sugerencia: su descripción no sigue ninguno de los formatos
+          conocidos del DPP. Hay que escribir el peso a mano.
         </p>
       )}
 
@@ -199,7 +204,9 @@ export function PesosPage() {
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
           />
-          {hayInvalidos && <Alerta tipo="error">Hay pesos escritos que no son un número mayor que cero.</Alerta>}
+          {hayInvalidos && (
+            <Alerta tipo="error">Hay pesos escritos que no son un número mayor que cero.</Alerta>
+          )}
           {excedeTope && (
             <Alerta tipo="error">
               Un lote admite máximo {MAXIMO_POR_LOTE} PT y lleva {cambios.length}. Aplique por partes.
@@ -252,7 +259,11 @@ function FilaPeso({
         {fila.pesoSugeridoKg === null ? (
           <span className="text-tinta-suave">—</span>
         ) : editable ? (
-          <button type="button" className="text-marca hover:underline" onClick={() => onEscribir(String(fila.pesoSugeridoKg))}>
+          <button
+            type="button"
+            className="text-marca hover:underline"
+            onClick={() => onEscribir(String(fila.pesoSugeridoKg))}
+          >
             {fila.pesoSugeridoKg}
           </button>
         ) : (
@@ -274,7 +285,11 @@ function FilaPeso({
             }`}
           />
           {valor !== '' && (
-            <button type="button" className="text-xs text-tinta-suave hover:underline" onClick={() => onEscribir('')}>
+            <button
+              type="button"
+              className="text-xs text-tinta-suave hover:underline"
+              onClick={() => onEscribir('')}
+            >
               limpiar
             </button>
           )}

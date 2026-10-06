@@ -179,6 +179,11 @@ export class CerrarTurnoDto {
   @MinLength(5)
   @MaxLength(500)
   motivoFaltante?: string;
+
+  /** Obligatorias (usuario, 2026-10-03). El mínimo lo valida el dominio, con un mensaje claro. */
+  @IsString()
+  @MaxLength(4000)
+  novedades!: string;
 }
 
 // ---------- Asistencia (personal del turno) ----------
@@ -201,6 +206,27 @@ export class RegistrarAsistenciaDto {
   @IsString()
   @MaxLength(300)
   observacion?: string;
+}
+
+/** Ajuste de un día a las personas esperadas de un grupo en un turno. */
+export class AjustarEsperadasDto {
+  @Matches(FECHA_OPERATIVA, { message: 'fechaOperativa debe ser YYYY-MM-DD' })
+  fechaOperativa!: string;
+
+  @EsId()
+  turnoId!: string;
+
+  @EsId()
+  grupoId!: string;
+
+  /** 0 = ese día el grupo no se espera en el turno. */
+  @IsInt()
+  @Min(0)
+  personas!: number;
+
+  @IsString()
+  @MaxLength(300)
+  motivo!: string;
 }
 
 // ---------- Asignación de grupos a líneas ----------

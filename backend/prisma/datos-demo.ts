@@ -39,7 +39,7 @@ import bcrypt from 'bcrypt';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { crearAdaptadorPostgres } from '../src/infrastructure/database/prisma/adaptador-postgres.js';
 
-const MARCA_DEMO = '[DEMO]';
+const MARCA_DEMO = 'PRUEBAS';
 const DIAS_HISTORICO = 3;
 
 if ((process.env.PERSISTENCIA ?? 'postgres').toLowerCase() !== 'postgres') {
@@ -269,11 +269,12 @@ async function main(): Promise<void> {
     }
   }
 
-  // Personas esperadas: sin ellas el semáforo de personal no compara nada.
+  // Personas esperadas por turno: sin ellas el semáforo de personal no compara nada.
   for (const [indice, grupo] of grupos.entries()) {
+    const personas = ESPERADAS_POR_GRUPO[indice % ESPERADAS_POR_GRUPO.length];
     await prisma.grupo.update({
       where: { id: grupo.id },
-      data: { personasEsperadas: ESPERADAS_POR_GRUPO[indice % ESPERADAS_POR_GRUPO.length] },
+      data: { esperadasPorTurno: { deleteMany: {}, create: turnos.map((t) => ({ turnoId: t.id, personas })) } },
     });
   }
 

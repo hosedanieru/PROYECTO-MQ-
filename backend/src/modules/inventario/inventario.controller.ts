@@ -23,6 +23,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Query } from '@nestjs/common';
 
 import { AlertasInventarioUseCase } from '../../application/inventario/alertas-inventario.use-case.js';
+import { PrepararCierreUseCase, RegistrarCierreUseCase } from '../../application/inventario/cierre-inventario.use-cases.js';
+import {
+  CIERRE_INVENTARIO_REPOSITORY,
+  type CierreInventario,
+  type CierreInventarioRepository,
+} from '../../domain/inventario/cierre-inventario.js';
 import {
   RegistrarEntradaMercanciaUseCase,
   RegistrarMovimientoUseCase,
@@ -44,6 +50,7 @@ import { validarRango } from '../../domain/shared/rango-fechas.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decoradores.js';
 import {
+  RegistrarCierreDto,
   FechaAlertasDto,
   FiltroItemsDto,
   FiltroMovimientosDto,
@@ -58,11 +65,15 @@ const KARDEX_POR_DEFECTO = 100;
 
 const presentarMovimiento = (m: MovimientoInventario) => ({ ...m, fechaOperativa: m.fechaOperativa.toISOString().slice(0, 10) });
 const presentarEntrada = <T extends EntradaMercancia>(e: T) => ({ ...e, fechaOperativa: e.fechaOperativa.toISOString().slice(0, 10) });
+const presentarCierre = (c: CierreInventario) => ({ ...c, fechaOperativa: c.fechaOperativa.toISOString().slice(0, 10) });
 
 @Controller('inventario')
 export class InventarioController {
   constructor(
     private readonly alertasInventario: AlertasInventarioUseCase,
+    private readonly prepararCierreUseCase: PrepararCierreUseCase,
+    private readonly registrarCierreUseCase: RegistrarCierreUseCase,
+    @Inject(CIERRE_INVENTARIO_REPOSITORY) private readonly cierres: CierreInventarioRepository,
     private readonly registrarMovimiento: RegistrarMovimientoUseCase,
     private readonly registrarEntrada: RegistrarEntradaMercanciaUseCase,
     @Inject(ITEM_INVENTARIO_REPOSITORY) private readonly items: ItemInventarioRepository,
@@ -180,6 +191,39 @@ export class InventarioController {
   async alertas(@Query() consulta: FechaAlertasDto) {
     const r = await this.alertasInventario.ejecutar(fechaOperativaADate(consulta.fecha));
     return { ...r, fechaOperativa: consulta.fecha };
+  }
+
+  // ---------- Cierre del día: conteo físico y merma ----------
+
+  /** Qué hay que contar ese día (o el cierre ya registrado). No escribe. */
+  @Get('cierres/preparar')
+  @RequierePermisos('inventario.consultar')
+  async prepararCierre(@Query() consulta: FechaAlertasDto) {
+    const r = await this.prepararCierreUseCase.ejecutar(fechaOperativaADate(consulta.fecha));
+    return { ...r, fechaOperativa: consulta.fecha, cierre: r.cierre ? presentarCierre(r.cierre) : null };
+  }
+
+  /** Es un ajuste de inventario: exige el mismo permiso que el ajuste. */
+  @Post('cierres')
+  @HttpCode(HttpStatus.CREATED)
+  @RequierePermisos('inventario.ajustar')
+  async registrarCierre(@Body() dto: RegistrarCierreDto, @UsuarioActual() actual: Usuario) {
+    const cierre = await this.registrarCierreUseCase.ejecutar({
+      fechaOperativa: fechaOperativaADate(dto.fechaOperativa),
+      lineas: dto.lineas,
+      observacion: dto.observacion ?? null,
+      usuarioId: actual.id,
+    });
+    return presentarCierre(cierre);
+  }
+
+  @Get('cierres')
+  @RequierePermisos('inventario.consultar')
+  async listarCierres(@Query() rango: RangoFechasDto) {
+    const desde = fechaOperativaADate(rango.desde);
+    const hasta = fechaOperativaADate(rango.hasta);
+    validarRango(desde, hasta);
+    return (await this.cierres.listar(desde, hasta)).map(presentarCierre);
   }
 
   @Get('movimientos')

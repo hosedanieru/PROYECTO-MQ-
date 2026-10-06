@@ -5,6 +5,10 @@
  * `grupos/{id}`: los sembrados llevan como id su código; los creados
  * desde el panel, un id generado. Colección anterior: `proveedores`
  * (renombrada el 2026-09-21; ver `convertir-proveedores-a-grupos`).
+ *
+ * Esperadas por turno embebidas: `esperadasPorTurno: { turnoId: n }`. Los
+ * grupos con el campo viejo `personasEsperadas` se convierten con
+ * `npm run seed:firestore` (copia el número a cada turno).
  */
 
 import type { DocumentSnapshot } from 'firebase-admin/firestore';
@@ -19,7 +23,7 @@ function aDominio(snap: DocumentSnapshot): Grupo {
     codigo: d.codigo,
     nombre: d.nombre,
     descripcion: d.descripcion ?? null,
-    personasEsperadas: d.personasEsperadas ?? null,
+    esperadasPorTurno: d.esperadasPorTurno ?? {},
     activo: d.activo ?? true,
   };
 }

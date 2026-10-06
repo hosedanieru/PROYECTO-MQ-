@@ -42,7 +42,8 @@ import { MAXIMO_DIAS_POR_CARGA } from '../../domain/mfr/bloque-programacion.js';
 import { MAXIMO_ESTANDARES_POR_LOTE } from '../../domain/mfr/estandar-produccion.js';
 import { AnalizarDppUseCase } from './analizar-dpp.use-case.js';
 import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from './asignacion.use-cases.js';
-import { RegistrarAsistenciaUseCase } from './asistencia.use-case.js';
+import { AjustarEsperadasUseCase, RegistrarAsistenciaUseCase } from './asistencia.use-case.js';
+import { AsistenciaDeMasSinMotivoError, esperadasDe } from '../../domain/mfr/esperadas-personal.js';
 import {
   CargarDiaUseCase,
   CargarPeriodoUseCase,
@@ -53,6 +54,8 @@ import {
 } from './bloques.use-cases.js';
 import { ActualizarEstandaresEnLoteUseCase, ActualizarEstandarUseCase } from './catalogos-mfr.use-cases.js';
 import { IndicadoresDiaUseCase } from './indicadores-dia.use-case.js';
+import { consecutivoResumen, NovedadesObligatoriasError } from '../../domain/resumen/resumen-turno.js';
+import { armadorFalso, ResumenTurnoRepositorioFalso } from '../pruebas/dobles-resumen.js';
 
 const FECHA = new Date('2026-09-16T00:00:00.000Z'); // miércoles
 const MANANA = new Date('2026-09-17T00:00:00.000Z');
@@ -90,9 +93,9 @@ describe('MFR — casos de uso', () => {
     horarios = new HorarioRepositorioFalso(horariosDpp());
     auditoria = new AuditoriaRepositorioFalso();
     grupos = new GrupoRepositorioFalso();
-    grupos.agregar({ id: 'G1', codigo: 'LOGICMARD', nombre: 'LOGICMARD', descripcion: null, personasEsperadas: 10, activo: true });
-    grupos.agregar({ id: 'G2', codigo: 'MIX', nombre: 'MIX', descripcion: null, personasEsperadas: null, activo: true });
-    grupos.agregar({ id: 'G3', codigo: 'VIEJO', nombre: 'VIEJO', descripcion: null, personasEsperadas: 5, activo: false });
+    grupos.agregar({ id: 'G1', codigo: 'LOGICMARD', nombre: 'LOGICMARD', descripcion: null, esperadasPorTurno: { T1: 10, T2: 10, T3: 10 }, activo: true });
+    grupos.agregar({ id: 'G2', codigo: 'MIX', nombre: 'MIX', descripcion: null, esperadasPorTurno: {}, activo: true });
+    grupos.agregar({ id: 'G3', codigo: 'VIEJO', nombre: 'VIEJO', descripcion: null, esperadasPorTurno: { T1: 5 }, activo: false });
     asistencias = new AsistenciaRepositorioFalso();
     asignaciones = new AsignacionRepositorioFalso();
     uow = new UnidadDeTrabajoFalsa({ productos, bloques, lineas, estandares, auditoria, grupos, asistencias, asignaciones });
@@ -159,23 +162,63 @@ describe('MFR — casos de uso', () => {
       await eliminar.ejecutar(a.id, 'Error de digitación', 'coord');
       expect(bloques.items.has(a.id)).toBe(false);
 
-      const cerrar = new CerrarTurnoUseCase(uow, RELOJ);
+      const cerrar = new CerrarTurnoUseCase(uow, RELOJ, armadorFalso());
+      const comando = { fechaOperativa: FECHA, turnoId: 'T1', novedades: 'Turno sin novedades mayores.', usuarioId: 'coord', usuarioNombre: 'Coordinador' };
       // "Ni menos": no hay remisiones aprobadas → el T1 cierra con faltante y exige motivo.
-      await expect(cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', usuarioId: 'coord' })).rejects.toThrow(FaltanteSinMotivoError);
-      await expect(cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', usuarioId: 'coord' })).rejects.toMatchObject({
+      await expect(cerrar.ejecutar(comando)).rejects.toThrow(FaltanteSinMotivoError);
+      await expect(cerrar.ejecutar(comando)).rejects.toMatchObject({
         faltantes: [{ productoId: 'SPR', programadoCajas: 486, producidoCajas: 0, faltanteCajas: 486 }],
       });
-      const cerrados = await cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', motivoFaltante: 'Parada de línea por falta de material', usuarioId: 'coord' });
+      const { cerrados } = await cerrar.ejecutar({ ...comando, motivoFaltante: 'Parada de línea por falta de material' });
       expect(cerrados.map((c) => c.id)).toEqual([b.id]);
       expect(cerrados[0].estaCerrado).toBe(true);
-      expect(auditoria.entradas.at(-1)).toMatchObject({ accion: 'CAMBIO_ESTADO', motivo: 'Parada de línea por falta de material' });
+      expect(auditoria.entradas.find((e) => e.accion === 'CAMBIO_ESTADO')).toMatchObject({ motivo: 'Parada de línea por falta de material' });
 
       await expect(guardar.ejecutar(bloqueBase({ id: b.id, lineaId: 'L2', productoId: 'SPR', cajasPorHora: 77.14, eficienciaPorcentaje: 50, motivo: 'intento' }))).rejects.toThrow(TurnoCerradoError);
       await expect(eliminar.ejecutar(b.id, 'intento tardío', 'coord')).rejects.toThrow(TurnoCerradoError);
-      await expect(cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', usuarioId: 'coord' })).rejects.toThrow(TurnoCerradoError);
-      await expect(cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T3', usuarioId: 'coord' })).rejects.toThrow(BloqueNoEncontradoError);
+      await expect(cerrar.ejecutar(comando)).rejects.toThrow(TurnoCerradoError);
+      await expect(cerrar.ejecutar({ ...comando, turnoId: 'T3' })).rejects.toThrow(BloqueNoEncontradoError);
       // T2 sigue abierto (también con faltante: exige motivo).
-      await expect(cerrar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T2', motivoFaltante: 'Sin producción en T2', usuarioId: 'coord' })).resolves.toHaveLength(1);
+      const t2 = await cerrar.ejecutar({ ...comando, turnoId: 'T2', motivoFaltante: 'Sin producción en T2' });
+      expect(t2.cerrados).toHaveLength(1);
+    });
+  });
+
+  describe('CerrarTurnoUseCase — resumen del turno y del día', () => {
+    let resumenes: ResumenTurnoRepositorioFalso;
+    const comando = (turnoId: string, novedades = 'Se cambió la cinta de la L1 a las 10:00.') => ({
+      fechaOperativa: FECHA, turnoId, motivoFaltante: 'Sin remisiones aprobadas en la prueba', novedades, usuarioId: 'coord', usuarioNombre: 'Ana Coordinadora',
+    });
+
+    beforeEach(async () => {
+      resumenes = new ResumenTurnoRepositorioFalso();
+      uow = new UnidadDeTrabajoFalsa({ ...uow.contexto, resumenesTurno: resumenes });
+      const guardar = new GuardarBloqueUseCase(uow, productos, horarios, RELOJ);
+      await guardar.ejecutar(bloqueBase());
+      await guardar.ejecutar(bloqueBase({ horaInicio: '14:00', horaFin: '21:30' })); // T2
+    });
+
+    it('las novedades son obligatorias: sin ellas no se cierra nada', async () => {
+      const cerrar = new CerrarTurnoUseCase(uow, RELOJ, armadorFalso());
+      await expect(cerrar.ejecutar(comando('T1', '  corto '))).rejects.toThrow(NovedadesObligatoriasError);
+      expect((await bloques.listarPorFecha(FECHA)).every((b) => !b.estaCerrado)).toBe(true);
+      expect(resumenes.resumenes).toHaveLength(0);
+    });
+
+    it('guarda la foto del turno con su consecutivo; la del día solo al cerrar el último turno', async () => {
+      // El armador propone el día en los dos cierres; la transacción decide con los bloques reales.
+      const cerrar = new CerrarTurnoUseCase(uow, RELOJ, armadorFalso(true));
+
+      const t1 = await cerrar.ejecutar(comando('T1'));
+      expect(consecutivoResumen(t1.resumenTurno.tipo, t1.resumenTurno.anio, t1.resumenTurno.numero)).toBe('RT-2026-0001');
+      expect(t1.resumenTurno).toMatchObject({ turnoId: 'T1', cerradoPorNombre: 'Ana Coordinadora', formato: { codigo: null } });
+      expect(t1.resumenDia).toBeNull(); // el T2 sigue abierto
+
+      const t2 = await cerrar.ejecutar(comando('T2'));
+      expect(consecutivoResumen(t2.resumenTurno.tipo, t2.resumenTurno.anio, t2.resumenTurno.numero)).toBe('RT-2026-0002');
+      expect(t2.resumenDia && consecutivoResumen(t2.resumenDia.tipo, t2.resumenDia.anio, t2.resumenDia.numero)).toBe('RD-2026-0001');
+      expect(t2.resumenDia?.turnoId).toBeNull();
+      expect(auditoria.entradas.filter((e) => e.entidad === 'resumen_turno')).toHaveLength(3);
     });
   });
 
@@ -333,11 +376,13 @@ describe('MFR — casos de uso', () => {
       const useCase = nuevoUseCase();
       await useCase.ejecutar({ bloques: [bloqueDe(FECHA)], origen: 'DPP', reemplazar: false, usuarioId: 'coord' });
       // Sin remisiones aprobadas el turno cierra con faltante, y eso exige motivo (regla "ni menos").
-      await new CerrarTurnoUseCase(uow, RELOJ).ejecutar({
+      await new CerrarTurnoUseCase(uow, RELOJ, armadorFalso()).ejecutar({
         fechaOperativa: FECHA,
         turnoId: 'T1',
         motivoFaltante: 'Prueba: turno cerrado sin producción registrada',
+        novedades: 'Prueba: cierre del turno para el caso de carga.',
         usuarioId: 'coord',
+        usuarioNombre: 'Coordinador',
       });
 
       const resultado = await useCase.ejecutar({
@@ -506,7 +551,7 @@ describe('MFR — casos de uso', () => {
       await asignar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', lineaId: 'L2', grupoId: 'G1', personas: 3, usuarioId: 'coord' });
       await asignar.ejecutar({ fechaOperativa: FECHA, turnoId: 'T1', lineaId: 'L1', grupoId: 'G2', personas: 8, usuarioId: 'coord' });
 
-      const tablero = await new IndicadoresDiaUseCase(bloques, lineas, estandares, horarios, remisiones, catalogos, asistencias, grupos, asignaciones).ejecutar(FECHA);
+      const tablero = await new IndicadoresDiaUseCase(bloques, lineas, estandares, horarios, remisiones, catalogos, asistencias, grupos, asignaciones, uow.contexto.ajustesEsperadas).ejecutar(FECHA);
 
       expect(tablero.meta).toBe(95);
       // Personal: LOGICMARD esperaba 10 y llegaron 8 → afectada; MIX (sin esperadas) llegaron 8. Referencia DPP: L1 13 + L2 12 = 25.
@@ -522,7 +567,10 @@ describe('MFR — casos de uso', () => {
         ['L2', 3, 12, 'INCOMPLETA'],
       ]);
       expect(t1Personal(tablero).lineas[0].grupos.map((g) => `${g.nombre}:${g.personas}`)).toEqual(['LOGICMARD:5', 'MIX:8']);
-      expect(tablero.turnos.find((t) => t.codigo === 'T2')!.personal).toMatchObject({ estado: 'SIN_DATO' });
+      expect(tablero.turnos.find((t) => t.codigo === 'T2')!.personal).toMatchObject({ estado: 'SIN_DATO', esperadas: 10, llegaron: 0 });
+      // Total del día contra los grupos: LOGICMARD se espera 10 en cada turno (30); llegaron 16 en el T1.
+      expect(tablero.personal).toMatchObject({ esperadasDia: 30, llegaronDia: 16 });
+      expect(tablero.personal.porGrupo.map((g) => [g.codigo, g.esperadas, g.llegaron])).toEqual([['LOGICMARD', 30, 8], ['MIX', 0, 8]]);
       expect(tablero.turnos.find((t) => t.codigo === 'T2')!.personal.lineas).toMatchObject([{ codigo: 'L2', personas: 0, estado: 'SIN_DATO' }]);
       expect(tablero.bloques.map((b) => `${b.lineaId} ${b.horaInicio}`)).toEqual(['L1 06:00', 'L2 06:00', 'L2 14:00']);
       // LNC: 979 programadas / 940; SPR: 972 / 486 → total (940 + 486) / 1951
@@ -600,8 +648,10 @@ describe('MFR — casos de uso', () => {
       });
       const catalogoGrupos = grupos.items;
 
-      // Nada registrado → sin dato.
-      expect(evaluarPersonalTurno('T1', [], catalogoGrupos, [])).toMatchObject({ estado: 'SIN_DATO', esperadas: 0, llegaron: 0 });
+      // Nada registrado → sin dato, pero el grupo que se espera aparece como pendiente.
+      const vacio = evaluarPersonalTurno('T1', [], catalogoGrupos, []);
+      expect(vacio).toMatchObject({ estado: 'SIN_DATO', esperadas: 10, llegaron: 0, faltante: 0 });
+      expect(vacio.grupos).toMatchObject([{ grupoId: 'G1', registrado: false, esperadas: 10, origenEsperadas: 'FIJA' }]);
 
       // Un grupo cumple y otro no tiene esperadas definidas → a fin (no se castiga lo que no se puede comparar).
       const aFin = evaluarPersonalTurno('T1', [registro('T1', 'G1', 10), registro('T1', 'G2', 4), registro('T2', 'G1', 3)], catalogoGrupos, []);
@@ -611,7 +661,39 @@ describe('MFR — casos de uso', () => {
       // Un grupo por debajo basta para marcar el turno como afectado; llegar de más no compensa.
       const afectada = evaluarPersonalTurno('T1', [registro('T1', 'G1', 7)], catalogoGrupos, []);
       expect(afectada).toMatchObject({ estado: 'AFECTADA', faltante: 3 });
-      expect(evaluarPersonalTurno('T1', [registro('T1', 'G1', 12)], catalogoGrupos, [])).toMatchObject({ estado: 'A_FIN', faltante: 0, llegaron: 12 });
+      const deMas = evaluarPersonalTurno('T1', [registro('T1', 'G1', 12)], catalogoGrupos, []);
+      expect(deMas).toMatchObject({ estado: 'A_FIN', faltante: 0, llegaron: 12 });
+      expect(deMas.grupos[0]).toMatchObject({ deMas: 2, registrado: true });
+    });
+
+    it('esperadas: el ajuste del día manda sobre lo fijo del turno', () => {
+      const ajuste = { turnoId: 'T1', grupoId: 'G1', personas: 4, motivo: 'Festivo' };
+      expect(esperadasDe(grupos.items[0], 'T1', [])).toEqual({ personas: 10, origen: 'FIJA', motivo: null });
+      expect(esperadasDe(grupos.items[0], 'T1', [ajuste])).toEqual({ personas: 4, origen: 'AJUSTE', motivo: 'Festivo' });
+      expect(esperadasDe(grupos.items[0], 'T2', [ajuste])).toEqual({ personas: 10, origen: 'FIJA', motivo: null });
+      expect(esperadasDe(grupos.items[1], 'T1', [])).toEqual({ personas: null, origen: 'SIN_DATO', motivo: null });
+    });
+
+    it('llegar de más exige observación', async () => {
+      const useCase = new RegistrarAsistenciaUseCase(uow, RELOJ);
+      await expect(useCase.ejecutar(comando({ personasLlegaron: 12 }))).rejects.toBeInstanceOf(AsistenciaDeMasSinMotivoError);
+      await expect(useCase.ejecutar(comando({ personasLlegaron: 12, observacion: 'Apoyo extra por pedido urgente' }))).resolves.toMatchObject({ personasLlegaron: 12 });
+      // Un grupo sin esperadas no se compara: no exige observación.
+      await expect(useCase.ejecutar(comando({ grupoId: 'G2', personasLlegaron: 40 }))).resolves.toMatchObject({ personasLlegaron: 40 });
+    });
+
+    it('ajusta las esperadas de un día con motivo y lo audita con el valor que regía', async () => {
+      const ajustar = new AjustarEsperadasUseCase(uow, RELOJ);
+      const base = { fechaOperativa: FECHA, turnoId: 'T1', grupoId: 'G1', personas: 15, usuarioId: 'coord' };
+      await expect(ajustar.ejecutar({ ...base, motivo: '' })).rejects.toBeInstanceOf(DatosMfrInvalidosError);
+      await expect(ajustar.ejecutar({ ...base, grupoId: 'G3', motivo: 'Pedido especial' })).rejects.toBeInstanceOf(GrupoNoEncontradoError);
+
+      await ajustar.ejecutar({ ...base, motivo: 'Pedido especial de PepsiCo' });
+      expect(auditoria.entradas.at(-1)).toMatchObject({
+        entidad: 'ajuste_esperadas', accion: 'CREAR', motivo: 'Pedido especial de PepsiCo', valorAnterior: { personas: 10, origen: 'FIJA' },
+      });
+      // Con el ajuste a 15, llegar 12 ya no es "de más".
+      await expect(new RegistrarAsistenciaUseCase(uow, RELOJ).ejecutar(comando({ personasLlegaron: 12 }))).resolves.toMatchObject({ personasLlegaron: 12 });
     });
   });
 

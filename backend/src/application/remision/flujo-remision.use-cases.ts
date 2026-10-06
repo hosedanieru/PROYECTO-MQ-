@@ -29,6 +29,8 @@ import { prepararConsumo, registrarConsumo, type ConsumoPreparado, type Remision
 import { momentoOperativo } from '../shared/momento-operativo.js';
 import { verificarContraProgramacion } from './control-programacion.js';
 import type { Reloj } from './crear-remision.use-case.js';
+import { exigirFirmasPara, verificarPuedeFirmar, type ConfiguracionFirma, type NuevaFirma } from '../../domain/remision/firma-remision.js';
+import type { DatosFirma, FirmaDeRemision, FirmanteVerificado } from './firma-remision.use-cases.js';
 
 // ============================================================
 // BASE COMPARTIDA
@@ -142,10 +144,16 @@ export class EntregarRemisionUseCase extends CasoUsoFlujoRemision {
 
 export interface AprobarRemisionComando {
     remisionId: string;
-    opaNombre: string;
+    /** Sin firma: lo digita quien registra. Con firma: sale de la cuenta del OPA. */
+    opaNombre?: string;
     opaCargo?: string | null;
-    /** Usuario de Inlotrans que registra la respuesta del OPA. */
+    /** Quien registra la aprobación: un coordinador (transcribe) o el propio OPA (firma). */
     registradaPorId: string;
+    /**
+     * Fase 2 de la firma electrónica (usuario, 2026-10-03): el OPA aprueba
+     * desde su cuenta y firma la casilla "quien recibe" en el mismo paso.
+     */
+    firma?: DatosFirma;
 }
 
 /**
@@ -160,11 +168,24 @@ export class AprobarRemisionUseCase extends CasoUsoFlujoRemision {
         uow: UnidadDeTrabajo,
         reloj: Reloj,
         private readonly horarios: HorarioRepository,
+        /** Para aprobar firmando (fase 2). Sin él solo se puede registrar sin firma. */
+        private readonly firma?: FirmaDeRemision,
+        /** PILOTO u OBLIGATORIA (fin del piloto: no se aprueba sin firmas). */
+        private readonly configuracion: ConfiguracionFirma = { modo: 'PILOTO' },
     ) {
         super(uow, reloj);
     }
 
     async ejecutar(comando: AprobarRemisionComando): Promise<Remision> {
+        // Con firma: contraseña y permiso del OPA se verifican ANTES de la transacción.
+        let firmante: FirmanteVerificado | null = null;
+        if (comando.firma) {
+            if (!this.firma) throw new Error('AprobarRemisionUseCase sin FirmaDeRemision: no puede aprobar firmando.');
+            firmante = await this.firma.verificarFirmante(comando.registradaPorId, 'RECIBE', comando.firma);
+        }
+        const opaNombre = firmante?.usuario.nombre ?? comando.opaNombre ?? '';
+        let firmaRecibe: NuevaFirma | null = null;
+
         // Día operativo y turno de los movimientos del consumo (el de la aprobación).
         const momento = await momentoOperativo(this.reloj, this.horarios);
         let aConsumir: RemisionAConsumir;
@@ -198,18 +219,25 @@ export class AprobarRemisionUseCase extends CasoUsoFlujoRemision {
                     consecutivo: remision.consecutivo,
                 };
                 consumo = await prepararConsumo(contexto, aConsumir, comando.registradaPorId);
+                const firmas = await contexto.firmasRemision.listarPorRemision(remision.id);
+                // Fin del piloto: solo el OPA firmando, con Inlotrans y verificador ya firmados.
+                exigirFirmasPara('APROBAR', this.configuracion.modo, remision, firmas, firmante !== null);
+                if (firmante && this.firma) {
+                    // El OPA firma después del verificador y una sola vez por versión.
+                    verificarPuedeFirmar(remision, 'RECIBE', firmas);
+                    // La huella se toma antes de aprobar: el estado no entra en ella.
+                    firmaRecibe = this.firma.construir(remision, firmante);
+                }
             },
             despues: async (_, contexto) => {
                 await registrarConsumo(contexto, aConsumir, consumo, momento, comando.registradaPorId);
+                if (firmaRecibe && this.firma) await this.firma.registrar(contexto, firmaRecibe);
             },
             transicion: (remision) => {
-                // El OPA no es usuario del sistema: se registra como dato.
-                remision.aprobar(
-                    comando.opaNombre,
-                    comando.opaCargo ?? null,
-                    this.reloj.ahora(),
-                );
-                return `Aprobada por OPA: ${comando.opaNombre}`;
+                // Sin firma, el OPA se registra como dato (lo transcribe el coordinador);
+                // con firma, su nombre sale de su propia cuenta.
+                remision.aprobar(opaNombre, comando.opaCargo ?? null, this.reloj.ahora());
+                return firmante ? `Aprobada y firmada por el OPA: ${opaNombre}` : `Aprobada por OPA: ${opaNombre}`;
             },
         });
     }
@@ -293,13 +321,48 @@ export interface ValidarRemisionComando {
     validadaPorId: string;
     /** Contacto de PepsiCo con quien se concilió. */
     concilidadoCon: string;
+    /** Fase 3 de la firma electrónica: el coordinador valida firmando la casilla VALIDACION. */
+    firma?: DatosFirma;
 }
 
+/**
+ * Validar firmando (fase 3) sigue el mismo patrón que aprobar firmando:
+ * contraseña y permiso antes de la transacción; firma y validación en la
+ * misma transacción. Al terminar el piloto, validar exige firmar y que el
+ * OPA haya firmado.
+ */
 export class ValidarRemisionUseCase extends CasoUsoFlujoRemision {
+    constructor(
+        uow: UnidadDeTrabajo,
+        reloj: Reloj,
+        private readonly firma?: FirmaDeRemision,
+        private readonly configuracion: ConfiguracionFirma = { modo: 'PILOTO' },
+    ) {
+        super(uow, reloj);
+    }
+
     async ejecutar(comando: ValidarRemisionComando): Promise<Remision> {
+        let firmante: FirmanteVerificado | null = null;
+        if (comando.firma) {
+            if (!this.firma) throw new Error('ValidarRemisionUseCase sin FirmaDeRemision: no puede validar firmando.');
+            firmante = await this.firma.verificarFirmante(comando.validadaPorId, 'VALIDACION', comando.firma);
+        }
+        let firmaValidacion: NuevaFirma | null = null;
+
         return this.aplicar({
             remisionId: comando.remisionId,
             usuarioId: comando.validadaPorId,
+            antes: async (remision, contexto) => {
+                const firmas = await contexto.firmasRemision.listarPorRemision(remision.id);
+                exigirFirmasPara('VALIDAR', this.configuracion.modo, remision, firmas, firmante !== null);
+                if (firmante && this.firma) {
+                    verificarPuedeFirmar(remision, 'VALIDACION', firmas);
+                    firmaValidacion = this.firma.construir(remision, firmante);
+                }
+            },
+            despues: async (_, contexto) => {
+                if (firmaValidacion && this.firma) await this.firma.registrar(contexto, firmaValidacion);
+            },
             transicion: (remision) => {
                 /**
                  * La entidad ya impide validar algo que el OPA no aprobó. Esa

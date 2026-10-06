@@ -4,9 +4,11 @@ import type {
   EditarRemisionDatos,
   EntradaAuditoria,
   FiltroRemisiones,
+  FirmasRemision,
   Remision,
   ResumenRemisiones,
   ResultadoPaginado,
+  TipoFirma,
   VersionRemision,
 } from '../../../shared/types/remision'
 
@@ -48,4 +50,18 @@ export const remisionesApi = {
 
   validar: (id: string, datos: { concilidadoCon: string }) =>
     http.post<Remision>(`/remisiones/${id}/validar`, datos).then((r) => r.data),
+
+  firmas: (id: string) => http.get<FirmasRemision>(`/remisiones/${id}/firmas`).then((r) => r.data),
+
+  /** La contraseña se pide de nuevo al firmar (equipo compartido); el backend no la guarda. */
+  firmar: (id: string, datos: { tipo: TipoFirma; trazo: string; contrasena: string }) =>
+    http.post(`/remisiones/${id}/firmas`, datos).then(() => undefined),
+
+  /** El OPA aprueba desde su cuenta firmando "quien recibe" (descuenta inventario como cualquier aprobación). */
+  aprobarFirmando: (id: string, datos: { trazo: string; contrasena: string }) =>
+    http.post<Remision>(`/remisiones/${id}/aprobar-firmando`, datos).then((r) => r.data),
+
+  /** El coordinador valida (concilia) firmando la casilla de validación. */
+  validarFirmando: (id: string, datos: { concilidadoCon: string; trazo: string; contrasena: string }) =>
+    http.post<Remision>(`/remisiones/${id}/validar-firmando`, datos).then((r) => r.data),
 }

@@ -51,6 +51,14 @@ export const PERMISOS = [
   { codigo: 'inventario.registrar', modulo: 'inventario', descripcion: 'Registrar entradas y salidas de inventario' },
   { codigo: 'inventario.ajustar', modulo: 'inventario', descripcion: 'Registrar ajustes de inventario con motivo (administrador)' },
   { codigo: 'inventario.catalogo', modulo: 'inventario', descripcion: 'Crear y editar ítems de inventario (administrador)' },
+
+  // Correo (usuario, 2026-10-03): por ahora solo el administrador; los roles se reparten al final.
+  { codigo: 'remision.enviar_correo', modulo: 'remision', descripcion: 'Enviar remisiones por correo' },
+  { codigo: 'admin.correos', modulo: 'admin', descripcion: 'Administrar las listas de distribución de correo y ver los envíos' },
+  { codigo: 'resumen.consultar', modulo: 'mfr', descripcion: 'Ver el resumen del turno y del día (PDF)' },
+  { codigo: 'remision.firmar_emision', modulo: 'remision', descripcion: 'Firmar la casilla INLOTRANS (emite la remisión)' },
+  { codigo: 'remision.firmar_verificacion', modulo: 'remision', descripcion: 'Firmar la casilla VERIFICADOR (certifica el conteo físico)' },
+  { codigo: 'remision.firmar_recepcion', modulo: 'remision', descripcion: 'Aprobar firmando la casilla QUIEN RECIBE (OPA de PepsiCo)' },
 ] as const;
 
 export type CodigoPermiso = (typeof PERMISOS)[number]['codigo'];
@@ -78,6 +86,8 @@ export const ROLES: ReadonlyArray<{
     permisos: [
       'remision.crear', 'remision.consultar', 'remision.editar', 'remision.registrar_aprobacion',
       'remision.rectificar', 'remision.validar', 'remision.exportar', 'catalogo.consultar',
+      // Firma electrónica (2026-10-05): firma la casilla INLOTRANS.
+      'remision.firmar_emision',
       // Grupos: el coordinador puede crearlos y editarlos (área, 2026-09-21).
       // Se le da `catalogo.editar` completo por decisión del usuario.
       'catalogo.editar',
@@ -93,13 +103,24 @@ export const ROLES: ReadonlyArray<{
     descripcion: 'Entrega la remisión al OPA, firma como verificador e ingresa el PT al WMS de bodega.',
     // Decisión del área (2026-09-16): la respuesta del OPA la registra solo el coordinador.
     // Averías e inventario: por ahora solo el administrador (usuario, 2026-09-29).
-    permisos: ['remision.consultar', 'remision.entregar', 'catalogo.consultar'],
+    // Firma electrónica (2026-10-05): firma la casilla VERIFICADOR (certifica el conteo).
+    permisos: ['remision.consultar', 'remision.entregar', 'remision.firmar_verificacion', 'catalogo.consultar'],
   },
   {
     codigo: 'CONSULTA',
     nombre: 'Consulta',
     descripcion: 'Solo lectura. No modifica información.',
     permisos: ['remision.consultar', 'remision.exportar', 'catalogo.consultar', 'mfr.consultar'],
+  },
+  {
+    // Usuario externo (usuario, 2026-10-03): cada OPA de PepsiCo con su cuenta.
+    // Mínimo necesario: ver remisiones, aprobar firmando (después del
+    // verificador) o rechazar con motivo. `catalogo.consultar` (solo lectura)
+    // para que el listado y el detalle muestren los nombres de turno y grupo.
+    codigo: 'OPA_PEPSICO',
+    nombre: 'OPA PepsiCo',
+    descripcion: 'Facturador de PepsiCo. Aprueba (firmando como quien recibe) o rechaza las remisiones entregadas.',
+    permisos: ['remision.consultar', 'remision.registrar_aprobacion', 'remision.firmar_recepcion', 'catalogo.consultar'],
   },
 ];
 
@@ -194,11 +215,12 @@ export const LUGARES = [{ codigo: 'MQ_PEPSICO_SD', nombre: 'MAQUILA PEPSICO SANT
  * descripción (proveedor real) y las personas esperadas las completa el
  * administrador desde el panel: PENDIENTE DE DEFINIR sus valores.
  */
-export const GRUPOS: ReadonlyArray<{ codigo: string; nombre: string; descripcion: string | null; personasEsperadas: number | null }> = [
-  { codigo: 'LOGICMARD', nombre: 'LOGICMARD', descripcion: null, personasEsperadas: null },
-  { codigo: 'MAXISERVICE', nombre: 'MAXISERVICE', descripcion: null, personasEsperadas: null },
-  { codigo: 'APOYOS_MAXI', nombre: 'APOYOS MAXI', descripcion: null, personasEsperadas: null },
-  { codigo: 'MIX', nombre: 'MIX', descripcion: null, personasEsperadas: null },
+/** Las personas esperadas por turno las configura el administrador (no se siembran). */
+export const GRUPOS: ReadonlyArray<{ codigo: string; nombre: string; descripcion: string | null }> = [
+  { codigo: 'LOGICMARD', nombre: 'LOGICMARD', descripcion: null },
+  { codigo: 'MAXISERVICE', nombre: 'MAXISERVICE', descripcion: null },
+  { codigo: 'APOYOS_MAXI', nombre: 'APOYOS MAXI', descripcion: null },
+  { codigo: 'MIX', nombre: 'MIX', descripcion: null },
 ];
 
 // ============================================================

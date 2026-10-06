@@ -36,6 +36,13 @@ import {
 import type { Producto, ProductoRepository } from '../../domain/producto/producto.repository.js';
 import { ErrorDominio } from '../../domain/shared/errores.js';
 import type { ContextoTransaccional, UnidadDeTrabajo } from '../../domain/shared/unidad-de-trabajo.js';
+import {
+  consecutivoResumen,
+  validarNovedades,
+  type FormatoDocumento,
+  type ResumenTurno,
+} from '../../domain/resumen/resumen-turno.js';
+import type { ArmadorDeResumen } from '../resumen/armar-resumen.js';
 
 // ------------------------------------------------------------
 // Ayudas compartidas
@@ -449,24 +456,57 @@ export interface CerrarTurnoComando {
   turnoId: string;
   /** Obligatorio si algún SKU del turno quedó por debajo de su target ("ni menos"). */
   motivoFaltante?: string | null;
+  /** Obligatorias (usuario, 2026-10-03): qué pasó en el turno y qué queda pendiente. */
+  novedades: string;
   usuarioId: string;
+  usuarioNombre: string;
+}
+
+export interface ResultadoCierreTurno {
+  cerrados: BloqueProgramacion[];
+  /** La foto del turno (RT-…). */
+  resumenTurno: ResumenTurno;
+  /** La del día (RD-…), si este cierre terminó el día operativo. */
+  resumenDia: ResumenTurno | null;
+}
+
+/** Lo que el cierre necesita para tomar la foto del resumen. */
+export interface ConfiguracionResumen {
+  armador: Pick<ArmadorDeResumen, 'prepararCierre'>;
+  formato: FormatoDocumento;
 }
 
 /**
- * Cierra (congela) todos los bloques de un turno.
+ * Cierra (congela) todos los bloques de un turno y guarda su RESUMEN.
  *
  * "Ni menos de lo planeado" (área, 2026-09-18): si al cerrar hay SKU
  * con menos cajas aprobadas que su target, el cierre exige un motivo
  * que queda auditado junto con los faltantes.
+ *
+ * Resumen (usuario, 2026-10-03): las novedades son obligatorias; en la
+ * MISMA transacción se guarda la foto del turno con su consecutivo
+ * (RT-AAAA-NNNN) y, si con este cierre ya no queda ningún turno abierto
+ * en el día, también la del día (RD-AAAA-NNNN). O queda todo, o nada.
+ * El resumen se arma ANTES de abrir la transacción (solo lee).
  */
 export class CerrarTurnoUseCase {
   constructor(
     private readonly uow: UnidadDeTrabajo,
     private readonly reloj: Reloj,
+    private readonly resumen: ConfiguracionResumen,
   ) {}
 
-  async ejecutar(comando: CerrarTurnoComando): Promise<BloqueProgramacion[]> {
-    return this.uow.ejecutar(async ({ bloques, auditoria, estandares, remisiones }) => {
+  async ejecutar(comando: CerrarTurnoComando): Promise<ResultadoCierreTurno> {
+    const novedades = validarNovedades(comando.novedades);
+    const motivoComando = comando.motivoFaltante?.trim() || null;
+    const fotos = await this.resumen.armador.prepararCierre({
+      fechaOperativa: comando.fechaOperativa,
+      turnoId: comando.turnoId,
+      motivoFaltante: motivoComando,
+      novedades,
+    });
+
+    return this.uow.ejecutar(async ({ bloques, auditoria, estandares, remisiones, resumenesTurno }) => {
       const delDia = await bloques.listarPorFecha(comando.fechaOperativa);
       const delTurno = delDia.filter((b) => b.aObjeto().turnoId === comando.turnoId);
       if (delTurno.length === 0) {
@@ -486,10 +526,20 @@ export class CerrarTurnoUseCase {
         calcularBloques(delTurno.map((b) => b.aObjeto()), listaEstandares),
         produccion,
       );
-      const motivo = comando.motivoFaltante?.trim() || null;
+      const motivo = motivoComando;
       if (faltantes.length > 0 && !motivo) {
         throw new FaltanteSinMotivoError(faltantes);
       }
+
+      // El resumen del día solo si, dentro de la transacción, se confirma que
+      // este es el último turno abierto (otro cierre simultáneo pudo cambiarlo).
+      const terminaElDia = delDia.every((b) => b.aObjeto().turnoId === comando.turnoId || b.estaCerrado);
+      const datosDia = terminaElDia ? fotos.dia : null;
+
+      // Firestore: todas las lecturas (los consecutivos) antes de cualquier escritura.
+      const anio = comando.fechaOperativa.getUTCFullYear();
+      const numeroTurno = await resumenesTurno.siguienteNumero('TURNO', anio);
+      const numeroDia = datosDia ? await resumenesTurno.siguienteNumero('DIA', anio) : null;
 
       const momento = this.reloj.ahora();
       const cerrados: BloqueProgramacion[] = [];
@@ -506,7 +556,27 @@ export class CerrarTurnoUseCase {
           usuarioId: comando.usuarioId,
         });
       }
-      return cerrados;
+
+      const base = {
+        anio,
+        fechaOperativa: comando.fechaOperativa,
+        formato: this.resumen.formato,
+        cerradoPorId: comando.usuarioId,
+        cerradoPorNombre: comando.usuarioNombre,
+        fechaHora: momento,
+      };
+      const resumenTurno = await resumenesTurno.crear({ ...base, tipo: 'TURNO', turnoId: comando.turnoId, datos: fotos.turno }, numeroTurno);
+      const resumenDia = datosDia && numeroDia ? await resumenesTurno.crear({ ...base, tipo: 'DIA', turnoId: null, datos: datosDia }, numeroDia) : null;
+      for (const r of [resumenTurno, resumenDia].filter((x): x is ResumenTurno => x !== null)) {
+        await auditoria.registrar({
+          entidad: 'resumen_turno',
+          entidadId: r.id,
+          accion: 'CREAR',
+          valorNuevo: { consecutivo: consecutivoResumen(r.tipo, r.anio, r.numero), turnoId: r.turnoId, novedades: r.datos.novedades },
+          usuarioId: comando.usuarioId,
+        });
+      }
+      return { cerrados, resumenTurno, resumenDia };
     });
   }
 }

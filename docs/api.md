@@ -43,10 +43,10 @@ Antes "proveedores" (renombrados el 2026-09-21). Quien pone el personal del turn
 | Método | Ruta | Permiso | Notas |
 |---|---|---|---|
 | GET | `/grupos` | `catalogo.consultar` | activos e inactivos; el cliente decide qué muestra |
-| POST | `/grupos` | `catalogo.editar` | `{ codigo, nombre, descripcion?, personasEsperadas? }` · 409 `GRUPO_CODIGO_DUPLICADO` |
-| PATCH | `/grupos/:id` | `catalogo.editar` | parcial; `activo` para desactivar |
+| POST | `/grupos` | `catalogo.editar` | `{ codigo, nombre, descripcion?, esperadasPorTurno?: [{ turnoId, personas (1–500) }] }` · 409 `GRUPO_CODIGO_DUPLICADO` |
+| PATCH | `/grupos/:id` | `catalogo.editar` | parcial; `activo` para desactivar; `esperadasPorTurno`, si viene, reemplaza todas |
 
-`descripcion` es texto libre donde se escribe el proveedor real; `personasEsperadas` es lo que se compara contra la asistencia del turno.
+`descripcion` es texto libre donde se escribe el proveedor real. La respuesta trae `esperadasPorTurno` como `{ turnoId: personas }`: lo que el grupo debería enviar a cada turno (sin turno = no se espera); se compara contra la asistencia.
 
 ## Productos
 
@@ -123,9 +123,10 @@ La programación es por **bloques del DPP de PepsiCo** (línea × franja horaria
 | POST | `/mfr/bloques/periodo` | `mfr.cargar_programacion` | **Carga de N días** (DPP semanal o mensual): `{ bloques[], origen, reemplazar, motivo? }`, donde cada bloque trae su `fechaOperativa`. Máximo 62 días |
 | POST | `/mfr/bloques/copiar` | `mfr.cargar_programacion` | `{ desde, hacia, reemplazar, motivo? }` |
 | POST | `/mfr/dpp/analizar` | `mfr.cargar_programacion` | multipart, campo `archivo` (PDF ≤ 5 MB) → propuesta cruzada con el catálogo; **no escribe** |
-| POST | `/mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante? }`; irreversible. 400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes[]` si hay SKU bajo su target |
+| POST | `/mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante?, novedades }`; irreversible. 400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes[]` si hay SKU bajo su target · 400 `RESUMEN_NOVEDADES_OBLIGATORIAS` (mín. 10 caracteres). Responde `{ bloques, resumenTurno: { id, consecutivo }, resumenDia: { id, consecutivo } \| null }` |
 | GET | `/mfr/asistencia?fecha=` | `mfr.consultar` | personas que llegaron, por turno y grupo |
-| PUT | `/mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige |
+| PUT | `/mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige. Si llegan más de las esperadas, `observacion` es obligatoria (400 `MFR_DATOS_INVALIDOS`) |
+| PUT | `/mfr/esperadas-dia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personas (0–500; 0 = no viene), motivo }`: ajuste de ese día, manda sobre lo fijo del grupo; crea o reemplaza, auditado |
 | GET | `/mfr/asignaciones?fecha=` | `mfr.consultar` | grupos asignados a líneas, por turno |
 | PUT | `/mfr/asignaciones` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, lineaId, grupoId, personas }`; crea o corrige |
 | DELETE | `/mfr/asignaciones/:id` | `mfr.configurar_turno` | quita la asignación |
@@ -219,6 +220,9 @@ Una tabla por tipo (2026-09-29): PT (`producto`, se crea con `POST /productos`, 
 | GET | `/inventario/items/:id/movimientos?limite=` | `inventario.consultar` | kardex, más reciente primero (100 por defecto, máx. 500) |
 | POST | `/inventario/movimientos` | `inventario.registrar` | `{ itemId, tipo: ENTRADA \| SALIDA, cantidad (> 0, hasta 3 decimales; PT entero), referencia?, observacion? }` · 409 `INVENTARIO_EXISTENCIA_INSUFICIENTE` si la salida deja negativo |
 | POST | `/inventario/ajustes` | `inventario.ajustar` | `{ itemId, cantidad (con signo, ≠ 0, hasta 3 decimales), motivo, observacion? }` |
+| GET | `/inventario/cierres/preparar?fecha=YYYY-MM-DD` | `inventario.consultar` | Cierre del día: `{ fechaOperativa, cierre (o null), materiales[] }`; cada material: `existenciaSistema`, `enTransito` (remisiones sin aprobar × receta), `esperado`, `consumoTeorico`, `equivalencias`. No escribe |
+| POST | `/inventario/cierres` | `inventario.ajustar` | `{ fechaOperativa, lineas: [{ itemId, cantidad \| conteo }], observacion? }`. Todos los materiales de la lista. Guarda el cierre con su merma (esperado − contado) y ajusta cada existencia a contado + en tránsito. 409 `INVENTARIO_CIERRE_YA_REGISTRADO` si el día ya se cerró |
+| GET | `/inventario/cierres?desde=&hasta=` | `inventario.consultar` | cierres del rango con sus líneas (máx. 93 días) |
 | GET | `/inventario/alertas?fecha=YYYY-MM-DD` | `inventario.consultar` | `{ fechaOperativa, hayDpp, alertas[] }`; cada alerta: `tipo` (`PT_SIN_RECETA` · `COMPONENTE_INACTIVO` · `AGOTADO` · `NO_ALCANZA_DPP`), `gravedad` (`CRITICA` · `ADVERTENCIA`), `itemId`, `codigo`, `descripcion`, `mensaje` y, en "no alcanza", `necesita`, `hay`, `falta`, `unidad`. Se calculan en el momento; críticas primero |
 | GET | `/inventario/movimientos?desde=&hasta=&tipo=` | `inventario.consultar` | todos los movimientos del rango (máx. 93 días) |
 | POST | `/inventario/entradas` | `inventario.registrar` | entrada de mercancía: `{ documento, remitente?, observacion?, lineas: [{ itemId, cantidad }] }` (1 a 50 líneas, sin ítems repetidos, solo INSUMO y PI). Todo o nada. Responde el encabezado con `lineas[]` (código, descripción, unidad, cantidad, saldo) |
@@ -228,6 +232,47 @@ Una tabla por tipo (2026-09-29): PT (`producto`, se crea con `POST /productos`, 
 Por ahora todos los permisos de inventario (y de averías) los tiene solo el administrador; los roles se reparten al final (usuario, 2026-09-29).
 
 Respuesta de un movimiento: `{ movimiento, item }`. El movimiento trae `cantidad` con signo, `saldo`, `fechaHoraRegistro`, `fechaOperativa`, `turnoId`, `usuarioNombre`, `referencia`, `observacion`, `motivo`. Fecha, hora, turno y usuario los pone el servidor. Dos movimientos simultáneos sobre el mismo ítem se atienden uno detrás del otro (bloqueo de fila).
+
+## Firma electrónica de la remisión
+
+Fase 1 (2026-10-05): casillas INLOTRANS y VERIFICADOR, con la remisión ENTREGADA. Piloto hasta tener el aval de PepsiCo y del área legal.
+
+| Método | Ruta | Permiso | Notas |
+|---|---|---|---|
+| GET | `/remisiones/:id/firmas` | `remision.consultar` | `{ version, huellaActual, casillas: [{ tipo, declaracion, firma \| null }], historial }`; cada firma trae `trazo`, firmante, fecha, huella y `vigente` |
+| POST | `/remisiones/:id/firmas` | `remision.consultar` + el de la casilla (`remision.firmar_emision` / `remision.firmar_verificacion`) | `{ tipo, trazo (PNG data URL, ≤ 90.000 caracteres), contrasena }` → 201 la firma (sin el trazo). 400 `FIRMA_CONTRASENA_INCORRECTA` / `FIRMA_INVALIDA` · 409 `FIRMA_FUERA_DE_TIEMPO` / `FIRMA_YA_REGISTRADA` · 403 sin el permiso de la casilla |
+
+| POST | `/remisiones/:id/aprobar-firmando` | `remision.registrar_aprobacion` + `remision.firmar_recepcion` (rol `OPA_PEPSICO`) | `{ trazo, contrasena, opaCargo? }` → la remisión APROBADA. El OPA aprueba desde su cuenta y firma QUIEN RECIBE en la misma transacción que la aprobación y el descuento de inventario. 409 `FIRMA_FUERA_DE_TIEMPO` si el verificador no ha firmado; los demás errores de aprobar (tope, receta, existencia) aplican igual |
+
+| POST | `/remisiones/:id/validar-firmando` | `remision.validar` | `{ concilidadoCon, trazo, contrasena }` → la remisión VALIDADA con la firma de la casilla VALIDACION, en la misma transacción |
+
+RECIBE y VALIDACION no se firman por `POST /firmas` (409): van con aprobar y validar. Con `FIRMA_ELECTRONICA_PILOTO="false"` (fin del piloto) aprobar y validar sin firmar, o sin las firmas previas de la versión (aprobar: Inlotrans y verificador; validar: quien recibe), responden 409 `FIRMAS_INCOMPLETAS`. `GET /firmas` incluye `modo` (`PILOTO` / `OBLIGATORIA`). La contraseña se vuelve a pedir en cada firma (equipo compartido) y no se guarda. Se registran el user-agent y la IP como evidencia. El PDF de la remisión muestra las firmas vigentes y la constancia con la huella SHA-256.
+
+## Correo
+
+Envío de remisiones por correo (2026-10-03). Por ahora solo el administrador.
+
+| Método | Ruta | Permiso | Notas |
+|---|---|---|---|
+| GET | `/correos/listas` | `remision.enviar_correo` | listas de distribución (activas e inactivas) |
+| POST | `/correos/listas` | `admin.correos` | `{ nombre, recibe? (REMISIONES por defecto \| RESUMEN \| AMBOS), turnoId?, incluirEnCierres?, correos[] }` (1 a 50 correos; se normalizan a minúscula y sin repetir) |
+| PATCH | `/correos/listas/:id` | `admin.correos` | mismos campos + `activo` |
+| POST | `/correos/remisiones` | `remision.enviar_correo` | `{ remisionIds (1–50), listaIds, correos }` → el PDF (dos por hoja) adjunto a las listas + correos sueltos (máx. 100 destinatarios). Responde el envío registrado · 502 `CORREO_NO_ENVIADO` si el servidor lo rechaza (queda registrado como FALLIDO) |
+| GET | `/correos/envios?desde=&hasta=` | `admin.correos` | registro de envíos del rango (máx. 93 días) |
+
+Sin `CORREO_HOST` en el `.env` no se envía nada: cada correo se guarda como `.eml` en `CORREO_SALIDA_DIR`.
+
+## Resumen del turno / del día
+
+Se crea al cerrar el turno (`POST /mfr/turno/cerrar`); aquí solo se consulta. Es una foto: no cambia aunque después se aprueben o corrijan remisiones. Por ahora solo el administrador.
+
+| Método | Ruta | Permiso | Notas |
+|---|---|---|---|
+| GET | `/resumenes?fecha=AAAA-MM-DD` | `resumen.consultar` | `[{ id, tipo (TURNO\|DIA), consecutivo (RT-/RD-AAAA-NNNN), fechaOperativa, turnoId, titulo, cerradoPorNombre, fechaHora }]` |
+| GET | `/resumenes/:id` | `resumen.consultar` | lo anterior + `formato` (código SIG) + `datos` (producción, remisiones, personal, averías, inventario, novedades) · 404 `RESUMEN_NO_ENCONTRADO` |
+| GET | `/resumenes/:id/pdf` | `resumen.consultar` | el PDF (`inline`) · 503 si Chromium no está disponible |
+
+El código del formato sale de `FORMATO_RESUMEN_CODIGO`, `_VERSION` y `_VIGENCIA` en el `.env`; vacío = "FORMATO PENDIENTE DE APROBACIÓN SIG".
 
 ## Códigos de error de dominio
 

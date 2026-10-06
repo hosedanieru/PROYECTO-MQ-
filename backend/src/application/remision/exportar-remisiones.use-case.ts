@@ -41,7 +41,7 @@ export class ExportarRemisionesUseCase {
 export async function resolverNombres(
   fuentes: FuentesDeNombres,
   remisiones: Remision[],
-): Promise<RemisionParaImprimir[]> {
+): Promise<Array<Omit<RemisionParaImprimir, 'firmas'>>> {
   const [turnos, grupos, lugares] = await Promise.all([
     fuentes.catalogos.listarTurnos(),
     fuentes.grupos.listar(),

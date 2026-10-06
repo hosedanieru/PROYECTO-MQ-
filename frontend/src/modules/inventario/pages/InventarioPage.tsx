@@ -14,7 +14,11 @@ import { Alerta } from '../../../components/Alerta'
 import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
-import { Tarjeta } from '../../../components/Tarjeta'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoInventario } from '../../../components/Iconos'
+import { FilaRegistro, ListaRegistros } from '../../../components/ListaRegistros'
+import { Seccion } from '../../../components/Seccion'
+import { SelectorSegmentado } from '../../../components/SelectorSegmentado'
 import { comoErrorApi } from '../../../services/http'
 import { TIPOS_ITEM, type ItemInventario, type TipoItem } from '../../../shared/types/inventario'
 import { cantidad } from '../../../shared/utils/numeros'
@@ -46,79 +50,78 @@ export function InventarioPage() {
     setParams(siguiente, { replace: true })
   }
 
+  const lista = items.data ?? []
+  const enCero = lista.filter((i) => i.existencia === 0).length
+
   return (
-    <section className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave">Existencias de insumos, PI y PT. Cada movimiento queda en el kardex con quién, cuándo y por qué.</p>
+    <section className="space-y-6">
+      {/* Barra de herramientas: sin caja, el filtro y la acción a la vista. */}
+      <div className="flex flex-wrap items-end gap-4">
+        <SelectorSegmentado
+          etiqueta="Tipo de ítem"
+          opciones={PESTANAS.map((p) => ({ valor: p.tipo, texto: p.nombre }))}
+          activo={tipo ?? ''}
+          cambiar={(v) => cambiar('tipo', v)}
+        />
+        <div className="min-w-60 flex-1">
+          <Campo etiqueta="Buscar" placeholder="Código o descripción" value={texto} onChange={(e) => cambiar('texto', e.target.value)} />
+        </div>
         {tienePermiso('inventario.registrar') && (
-          <Link to="/inventario/entradas/nueva" className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-marca-hover">
-            + Entrada de mercancía
+          <Link to="/inventario/entradas/nueva">
+            <Boton>+ Entrada de mercancía</Boton>
           </Link>
         )}
-      </header>
-
-      <Tarjeta>
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex gap-1 rounded-lg bg-velo p-1">
-            {PESTANAS.map((p) => (
-              <button
-                key={p.nombre}
-                onClick={() => cambiar('tipo', p.tipo)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${(tipo ?? '') === p.tipo ? 'bg-base text-tinta shadow-sm' : 'text-tinta-suave'}`}
-              >
-                {p.nombre}
-              </button>
-            ))}
-          </div>
-          <div className="min-w-60 flex-1">
-            <Campo etiqueta="Buscar" placeholder="Código o descripción" value={texto} onChange={(e) => cambiar('texto', e.target.value)} />
-          </div>
-        </div>
-      </Tarjeta>
+      </div>
 
       {items.isError && <Alerta tipo="error">{comoErrorApi(items.error).mensaje}</Alerta>}
 
-      <Tarjeta sinRelleno>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-              <tr>
-                <th className="px-4 py-2">Tipo</th>
-                <th className="px-4 py-2">Código</th>
-                <th className="px-4 py-2">Descripción</th>
-                <th className="px-4 py-2 text-right">Existencia</th>
-                <th className="px-4 py-2">Unidad</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-borde">
-              {items.data?.map((i) => (
-                <tr key={i.id} className="hover:bg-velo/60">
-                  <td className="px-4 py-2"><Badge tono={TONO_TIPO[i.tipo]}>{i.tipo}</Badge></td>
-                  <td className="px-4 py-2 cifra">{i.codigo}</td>
-                  <td className="px-4 py-2">{i.descripcion}</td>
-                  <td className={`px-4 py-2 text-right cifra font-semibold ${i.existencia === 0 ? 'text-tinta-suave' : 'text-tinta'}`}>{cantidad(i.existencia)}</td>
-                  <td className="px-4 py-2 text-tinta-suave">{i.unidadMedida}</td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap">
-                    {tienePermiso('inventario.registrar') && (
-                      <Boton variante="sutil" tamano="sm" onClick={() => setMoviendo(i)}>Movimiento</Boton>
-                    )}
-                    <Link to={`/inventario/${i.id}`} className="ml-2 text-sm text-marca hover:underline">Kardex</Link>
-                  </td>
-                </tr>
-              ))}
-              {items.data?.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">
-                    {texto || tipo ? 'Ningún ítem coincide con el filtro.' : 'Todavía no hay ítems. Los PT, PI e insumos se crean cada uno en su pestaña.'}
-                  </td>
-                </tr>
-              )}
-              {items.isLoading && <tr><td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">Cargando…</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </Tarjeta>
+      <Seccion
+        titulo="Existencias"
+        contador={items.data ? lista.length : undefined}
+        descripcion="Cuánto hay de cada ítem. Cada movimiento queda en su kardex con quién, cuándo y por qué."
+        accion={enCero > 0 && <Badge tono="alerta">{enCero} en cero</Badge>}
+      >
+        <ListaRegistros
+          cargando={items.isLoading}
+          estaVacia={lista.length === 0}
+          claveAnimacion={`${tipo ?? ''}|${texto}`}
+          vacio={
+            <EstadoVacio
+              Icono={IconoInventario}
+              titulo={texto || tipo ? 'Ningún ítem coincide con el filtro' : 'Todavía no hay ítems'}
+              texto={texto || tipo ? 'Cambie el tipo o la búsqueda.' : 'Los PT, PI e insumos se crean cada uno en su pestaña.'}
+            />
+          }
+        >
+          {lista.map((i) => (
+            <FilaRegistro
+              key={i.id}
+              tono={i.existencia === 0 ? 'neutro' : TONO_TIPO[i.tipo]}
+              etiqueta={<Badge tono={TONO_TIPO[i.tipo]}>{i.tipo}</Badge>}
+              titulo={i.descripcion}
+              detalle={<span className="cifra">{i.codigo}</span>}
+              cifra={cantidad(i.existencia)}
+              unidad={i.unidadMedida}
+              colorCifra={i.existencia === 0 ? 'text-tinta-suave' : 'text-tinta'}
+              notaCifra={i.existencia === 0 ? 'en cero' : undefined}
+              acciones={
+                <>
+                  {tienePermiso('inventario.registrar') && (
+                    <Boton variante="secundario" tamano="sm" onClick={() => setMoviendo(i)}>
+                      Movimiento
+                    </Boton>
+                  )}
+                  <Link to={`/inventario/${i.id}`}>
+                    <Boton variante="sutil" tamano="sm">
+                      Kardex →
+                    </Boton>
+                  </Link>
+                </>
+              }
+            />
+          ))}
+        </ListaRegistros>
+      </Seccion>
 
       {moviendo && <MovimientoDialogo item={moviendo} onCerrar={() => setMoviendo(null)} />}
     </section>

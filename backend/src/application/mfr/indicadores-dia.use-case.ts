@@ -46,6 +46,7 @@ import {
   type VistaHoraria,
 } from '../../domain/mfr/calculo-mfr.js';
 import type { EstandarRepository } from '../../domain/mfr/estandar-produccion.js';
+import type { AjusteEsperadasRepository } from '../../domain/mfr/esperadas-personal.js';
 import { horasTurnoEn, type HorarioRepository } from '../../domain/mfr/horas-turno.js';
 import type { LineaProduccion, LineaRepository } from '../../domain/mfr/linea-produccion.js';
 import type { RemisionRepository } from '../../domain/remision/remision.repository.js';
@@ -68,8 +69,8 @@ export interface IndicadoresDia {
   bloques: BloqueCalculado[];
   mfr: MfrDia;
   turnos: Array<ResumenTurno & { codigo: string; nombre: string; horasTurno: number | null; personal: PersonalTurnoResuelto }>;
-  /** Personal del día contra el DPP (solo turnos ya evaluados): base del indicador de afectación. */
-  personal: PersonalDia;
+  /** Personal del día: contra el DPP (solo turnos ya evaluados) y total contra los grupos. */
+  personal: Omit<PersonalDia, 'porGrupo'> & { porGrupo: Array<PersonalDia['porGrupo'][number] & { codigo: string; nombre: string }> };
   lineas: Array<ResumenLinea & { codigo: string; nombre: string; tipo: LineaProduccion['tipo']; capacidadKgHora: number | null }>;
   horario: VistaHoraria;
   /** "Flavor Breakdown": kg target por hora agrupados por familia (SUBDESCRIPCION). */
@@ -89,10 +90,11 @@ export class IndicadoresDiaUseCase {
     private readonly asistencias: AsistenciaRepository,
     private readonly grupos: GrupoRepository,
     private readonly asignaciones: AsignacionRepository,
+    private readonly ajustesEsperadas: AjusteEsperadasRepository,
   ) {}
 
   async ejecutar(fechaOperativa: Date): Promise<IndicadoresDia> {
-    const [bloquesDia, lineas, estandares, horarios, produccion, turnos, asistencias, grupos, asignaciones] = await Promise.all([
+    const [bloquesDia, lineas, estandares, horarios, produccion, turnos, asistencias, grupos, asignaciones, ajustes] = await Promise.all([
       this.bloques.listarPorFecha(fechaOperativa),
       this.lineas.listar(),
       this.estandares.listar(),
@@ -102,6 +104,7 @@ export class IndicadoresDiaUseCase {
       this.asistencias.listarPorFecha(fechaOperativa),
       this.grupos.listar(),
       this.asignaciones.listarPorFecha(fechaOperativa),
+      this.ajustesEsperadas.listarPorFecha(fechaOperativa),
     ]);
     const grupoDe = new Map(grupos.map((g) => [g.id, g]));
     const lineaDe = new Map(lineas.map((l) => [l.id, l]));
@@ -120,7 +123,7 @@ export class IndicadoresDiaUseCase {
     const porTurno = turnos
       .filter((t) => t.activo)
       .map((t) => {
-        const personal = evaluarPersonalTurno(t.id, asistencias, grupos, bloques, asignadasPorGrupo(t.id, asignaciones));
+        const personal = evaluarPersonalTurno(t.id, asistencias, grupos, bloques, asignadasPorGrupo(t.id, asignaciones), ajustes);
         const lineasTurno = evaluarLineasTurno(t.id, asignaciones, bloques, (lineaId) => ordenDe.get(lineaId) ?? 999);
         return {
           ...calcularTurno(t.id, bloques, produccion, estandares, META_MFR_PORCENTAJE),
@@ -171,7 +174,10 @@ export class IndicadoresDiaUseCase {
       bloques,
       mfr,
       turnos: porTurno,
-      personal: resumirPersonalDia(porTurno.map((t) => t.personal)),
+      personal: (() => {
+        const dia = resumirPersonalDia(porTurno.map((t) => t.personal));
+        return { ...dia, porGrupo: dia.porGrupo.map((g) => ({ ...g, ...nombreGrupo(g.grupoId) })) };
+      })(),
       lineas: porLinea,
       horario: calcularVistaHoraria(bloques, lineasDelDia.map((l) => ({ id: l.id, capacidadKgHora: l.capacidadKgHora }))),
       familias: calcularFamiliasHorarias(bloques, estandares),

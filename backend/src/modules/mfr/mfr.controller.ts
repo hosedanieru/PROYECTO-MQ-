@@ -10,8 +10,10 @@
  *   POST   /mfr/bloques/periodo             mfr.cargar_programacion   carga N días (DPP semanal o mensual); una transacción por día
  *   POST   /mfr/bloques/copiar              mfr.cargar_programacion   copia la programación de otro día
  *   POST   /mfr/dpp/analizar  (multipart)   mfr.cargar_programacion   PDF del DPP → propuesta de bloques
- *   POST   /mfr/turno/cerrar                mfr.configurar_turno      { fechaOperativa, turnoId, motivoFaltante? } (400 MFR_FALTANTE_SIN_MOTIVO con `faltantes` si hay SKU bajo target)
+ *   POST   /mfr/turno/cerrar                mfr.configurar_turno      { fechaOperativa, turnoId, motivoFaltante?, novedades } (400 MFR_FALTANTE_SIN_MOTIVO con `faltantes` si hay SKU bajo target;
+ *                                                                     400 RESUMEN_NOVEDADES_OBLIGATORIAS) → { bloques, resumenTurno, resumenDia }
  *   GET    /mfr/asistencia?fecha=           mfr.consultar             asistencia registrada por turno y grupo
+ *   PUT    /mfr/esperadas-dia               mfr.configurar_turno      { fechaOperativa, turnoId, grupoId, personas, motivo } ajuste del día
  *   PUT    /mfr/asistencia                  mfr.configurar_turno      { fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? } crea o corrige
  *   GET    /mfr/asignaciones?fecha=         mfr.consultar             grupos asignados a líneas por turno
  *   PUT    /mfr/asignaciones                mfr.configurar_turno      { fechaOperativa, turnoId, lineaId, grupoId, personas } crea o corrige
@@ -61,8 +63,9 @@ import {
   CrearLineaUseCase,
 } from '../../application/mfr/catalogos-mfr.use-cases.js';
 import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from '../../application/mfr/asignacion.use-cases.js';
-import { RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
+import { AjustarEsperadasUseCase, RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
 import { IndicadoresDiaUseCase } from '../../application/mfr/indicadores-dia.use-case.js';
+import { consecutivoResumen, type ResumenTurno } from '../../domain/resumen/resumen-turno.js';
 import {
   ASIGNACION_REPOSITORY,
   type AsignacionLinea,
@@ -98,6 +101,7 @@ import {
   GuardarBloqueDto,
   MotivoDto,
   RegistrarAsistenciaDto,
+  AjustarEsperadasDto,
 } from './dto/mfr.dto.js';
 
 /** Lo que entrega multer; se tipa aquí para no depender de @types/multer. */
@@ -138,6 +142,7 @@ export class MfrController {
     private readonly copiarDia: CopiarDiaUseCase,
     private readonly cerrarTurno: CerrarTurnoUseCase,
     private readonly registrarAsistencia: RegistrarAsistenciaUseCase,
+    private readonly ajustarEsperadas: AjustarEsperadasUseCase,
     private readonly asignarGrupoLinea: AsignarGrupoLineaUseCase,
     private readonly quitarAsignacion: QuitarAsignacionUseCase,
     private readonly analizarDpp: AnalizarDppUseCase,
@@ -268,13 +273,20 @@ export class MfrController {
   @Post('turno/cerrar')
   @RequierePermisos('mfr.configurar_turno')
   async cerrar(@Body() dto: CerrarTurnoDto, @UsuarioActual() actual: Usuario) {
-    const cerrados = await this.cerrarTurno.ejecutar({
+    const resultado = await this.cerrarTurno.ejecutar({
       fechaOperativa: fechaOperativaADate(dto.fechaOperativa),
       turnoId: dto.turnoId,
       motivoFaltante: dto.motivoFaltante ?? null,
+      novedades: dto.novedades,
       usuarioId: actual.id,
+      usuarioNombre: actual.nombre,
     });
-    return cerrados.map(presentarBloque);
+    const resumen = (r: ResumenTurno | null) => (r ? { id: r.id, consecutivo: consecutivoResumen(r.tipo, r.anio, r.numero) } : null);
+    return {
+      bloques: resultado.cerrados.map(presentarBloque),
+      resumenTurno: resumen(resultado.resumenTurno),
+      resumenDia: resumen(resultado.resumenDia),
+    };
   }
 
   // ---------- Asistencia (personal del turno) ----------
@@ -297,6 +309,21 @@ export class MfrController {
       usuarioId: actual.id,
     });
     return presentarAsistencia(guardada);
+  }
+
+  /** Ajuste de un día a las personas esperadas de un grupo en un turno (motivo obligatorio). */
+  @Put('esperadas-dia')
+  @RequierePermisos('mfr.configurar_turno')
+  async ajustarEsperadasHttp(@Body() dto: AjustarEsperadasDto, @UsuarioActual() actual: Usuario) {
+    const ajuste = await this.ajustarEsperadas.ejecutar({
+      fechaOperativa: fechaOperativaADate(dto.fechaOperativa),
+      turnoId: dto.turnoId,
+      grupoId: dto.grupoId,
+      personas: dto.personas,
+      motivo: dto.motivo,
+      usuarioId: actual.id,
+    });
+    return { ...ajuste, fechaOperativa: dto.fechaOperativa };
   }
 
   // ---------- Asignación de grupos a líneas ----------

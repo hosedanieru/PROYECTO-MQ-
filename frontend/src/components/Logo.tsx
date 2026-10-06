@@ -5,7 +5,7 @@ type Variante = 'claro' | 'oscuro'
 interface Props {
   /** `claro` = logo blanco, para fondo oscuro. `oscuro` = para fondo blanco. */
   variante?: Variante
-  /** Solo el símbolo, sin el nombre (barra lateral colapsada). */
+  /** Solo el símbolo, sin el nombre (barra superior por debajo de 1280 px). */
   soloIsotipo?: boolean
   className?: string
 }
@@ -48,7 +48,7 @@ export function Logo({ variante = 'claro', soloIsotipo = false, className = '' }
   if (soloIsotipo) {
     return (
       <span
-        className={`grid h-9 w-9 place-items-center rounded-xl bg-marca text-sm font-bold tracking-wider text-white ${className}`}
+        className={`grid h-9 w-9 place-items-center rounded-xl bg-marca-relleno text-sm font-bold tracking-wider text-white ${className}`}
         aria-label="Inlotrans"
       >
         IN
@@ -58,7 +58,7 @@ export function Logo({ variante = 'claro', soloIsotipo = false, className = '' }
 
   return (
     <span className={`flex items-center gap-2 ${className}`} aria-label="Inlotrans">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-marca text-sm font-bold tracking-wider text-white">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-marca-relleno text-sm font-bold tracking-wider text-white">
         IN
       </span>
       <span className={`text-lg font-bold tracking-[0.12em] ${colorTexto}`}>INLOTRANS</span>

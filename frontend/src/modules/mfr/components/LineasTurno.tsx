@@ -81,9 +81,9 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
             <tr>
               <th className="py-1">Línea</th>
               <th className="py-1">Grupos asignados</th>
-              <th className="py-1 text-right">Personas</th>
-              <th className="py-1 text-right">Línea ideal (DPP)</th>
-              <th className="py-1">Estado</th>
+              <th className="py-1 pr-3 text-right">Personas</th>
+              <th className="py-1 pr-3 text-right">Línea ideal (DPP)</th>
+              <th className="py-1 pl-3">Estado</th>
             </tr>
           </thead>
           <tbody>
@@ -111,9 +111,9 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
                     </span>
                   ))}
                 </td>
-                <td className="py-1 text-right">{l.personas}</td>
-                <td className="py-1 text-right">{l.requeridasDpp > 0 ? l.requeridasDpp : '—'}</td>
-                <td className="py-1">
+                <td className="py-1 pr-3 text-right cifra">{l.personas}</td>
+                <td className="py-1 pr-3 text-right cifra">{l.requeridasDpp > 0 ? l.requeridasDpp : '—'}</td>
+                <td className="py-1 pl-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs ${ESTILO[l.estado].clase}`}>
                     {ESTILO[l.estado].texto}{l.faltante > 0 && l.estado === 'INCOMPLETA' ? ` · faltan ${l.faltante}` : ''}
                   </span>
@@ -121,6 +121,17 @@ export function LineasTurno({ fecha, turnoId, lineas, catalogoLineas, gruposConA
               </tr>
             ))}
           </tbody>
+          <tfoot className="border-t-2 border-borde font-semibold text-tinta">
+            <tr>
+              <td className="py-1">Total</td>
+              <td className="py-1 text-xs font-normal text-tinta-suave">
+                {gruposConAsistencia.reduce((s, g) => s + g.llegaron, 0)} llegaron en el turno
+              </td>
+              <td className="py-1 pr-3 text-right cifra">{lineas.reduce((s, l) => s + l.personas, 0)}</td>
+              <td className="py-1 pr-3 text-right cifra">{lineas.reduce((s, l) => s + l.requeridasDpp, 0)}</td>
+              <td />
+            </tr>
+          </tfoot>
         </table>
       ) : (
         <p className="mt-1 text-tinta-suave">Este turno no tiene bloques ni grupos asignados a líneas.</p>

@@ -40,10 +40,6 @@ export class CierreYaRegistradoError extends ErrorInventario {
   readonly codigo = 'INVENTARIO_CIERRE_YA_REGISTRADO';
 }
 
-export class CierreNoEncontradoError extends ErrorInventario {
-  readonly codigo = 'INVENTARIO_CIERRE_NO_ENCONTRADO';
-}
-
 /** Un material que hay que contar, con lo que dice el sistema. */
 export interface MaterialACerrar {
   item: ItemInventario;

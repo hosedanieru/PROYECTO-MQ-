@@ -8,14 +8,18 @@
  */
 
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
 import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
 import { Dato } from '../../../components/Dato'
+import { Ficha } from '../../../components/Ficha'
+import { MetaDato } from '../../../components/ListaRegistros'
+import { Seccion } from '../../../components/Seccion'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoAveria } from '../../../components/Iconos'
 import { PantallaCargando } from '../../../components/PantallaCargando'
-import { Tarjeta } from '../../../components/Tarjeta'
 import { comoErrorApi } from '../../../services/http'
 import { NOMBRE_UNIDAD, TIPOS_EVIDENCIA, type RegistroAveria } from '../../../shared/types/averia'
 import { fechaCorta, fechaHora } from '../../../shared/utils/fechas'
@@ -38,7 +42,11 @@ export function ReporteAveriaDetallePage() {
 
   if (reporte.isLoading) return <PantallaCargando />
   if (reporte.isError || !reporte.data) {
-    return <Alerta tipo="error">{reporte.error ? comoErrorApi(reporte.error).mensaje : 'No se encontró el reporte.'}</Alerta>
+    return (
+      <Alerta tipo="error">
+        {reporte.error ? comoErrorApi(reporte.error).mensaje : 'No se encontró el reporte.'}
+      </Alerta>
+    )
   }
   const r = reporte.data
   const puedeCorregir = tienePermiso('averia.corregir') && r.estado === 'REGISTRADO'
@@ -46,16 +54,25 @@ export function ReporteAveriaDetallePage() {
   const nombreCausal = (cid: string) => causales.data?.find((c) => c.id === cid)?.nombre ?? '—'
   return (
     <section className="mx-auto max-w-5xl space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link to="/averias" className="text-sm text-marca hover:underline">← Averías</Link>
-          <h1 className="mt-1 flex items-center gap-3 text-2xl font-semibold text-tinta">
-            Reporte de averías
-            <Badge tono={r.estado === 'REGISTRADO' ? 'exito' : 'neutro'}>{r.estado === 'REGISTRADO' ? 'Registrado' : 'Anulado'}</Badge>
-          </h1>
-        </div>
-        {puedeCorregir && <Boton variante="peligro" onClick={() => setAnulando(true)}>Anular reporte</Boton>}
-      </header>
+      <EncabezadoPagina
+        Icono={IconoAveria}
+        escena="averia"
+        volver={{ a: '/averias', texto: 'Averías' }}
+        titulo="Reporte de averías"
+        insignia={
+          <Badge tono={r.estado === 'REGISTRADO' ? 'exito' : 'neutro'}>
+            {r.estado === 'REGISTRADO' ? 'Registrado' : 'Anulado'}
+          </Badge>
+        }
+        descripcion={`Día operativo ${fechaCorta(r.fechaOperativa)} · reportado por ${r.reportadoPorNombre}`}
+        acciones={
+          puedeCorregir && (
+            <Boton variante="peligro" onClick={() => setAnulando(true)}>
+              Anular reporte
+            </Boton>
+          )
+        }
+      />
 
       {r.estado === 'ANULADO' && (
         <Alerta tipo="advertencia">
@@ -63,39 +80,73 @@ export function ReporteAveriaDetallePage() {
         </Alerta>
       )}
 
-      <Tarjeta titulo="Encabezado">
-        <dl className="grid gap-4 sm:grid-cols-3">
-          <Dato etiqueta="Fecha y hora de reporte" valor={fechaHora(r.fechaHoraRegistro)} />
-          <Dato etiqueta="Día operativo" valor={fechaCorta(r.fechaOperativa)} />
-          <Dato etiqueta="Turno" valor={turno ? `${turno.codigo} · ${turno.nombre}` : '—'} />
-          <Dato etiqueta="Operador MQ" valor={grupos.data?.find((g) => g.id === r.grupoId)?.nombre ?? '—'} />
-          <Dato etiqueta="Funcionario que reporta" valor={r.reportadoPorNombre} />
-          <Dato
-            etiqueta="Total de averías"
-            valor={`${r.total.unidades.toLocaleString('es-CO')} unidades${r.total.sinConvertir.BOLSA ? ` + ${r.total.sinConvertir.BOLSA} bolsa(s)` : ''}`}
-          />
-        </dl>
-      </Tarjeta>
+      {/* Rediseño (usuario, 2026-10-05: fuera las tarjetas): ficha abierta y cada avería como un bloque separado por líneas. */}
+      <Ficha>
+        <Dato
+          etiqueta="Total de averías"
+          valor={r.total.unidades.toLocaleString('es-CO')}
+          unidad={`unidades${r.total.sinConvertir.BOLSA ? ` + ${r.total.sinConvertir.BOLSA} bolsa(s)` : ''}`}
+          destacado
+        />
+        <Dato etiqueta="Fecha y hora de reporte" valor={fechaHora(r.fechaHoraRegistro)} />
+        <Dato etiqueta="Turno" valor={turno ? `${turno.codigo} · ${turno.nombre}` : '—'} />
+        <Dato etiqueta="Operador MQ" valor={grupos.data?.find((g) => g.id === r.grupoId)?.nombre ?? '—'} />
+        <Dato etiqueta="Funcionario que reporta" valor={r.reportadoPorNombre} />
+      </Ficha>
 
-      {r.registros.map((reg, i) => (
-        <Tarjeta
-          key={reg.id}
-          titulo={`${i + 1}. ${reg.productoCodigo} · ${reg.productoDescripcion}`}
-          accion={puedeCorregir ? <Boton variante="sutil" tamano="sm" onClick={() => setCorrigiendo(reg)}>Corregir</Boton> : undefined}
-        >
-          <dl className="grid gap-4 sm:grid-cols-3">
-            <Dato etiqueta="Causal" valor={nombreCausal(reg.causalId)} />
-            <Dato etiqueta="Cantidad" valor={`${reg.cantidad} ${NOMBRE_UNIDAD[reg.unidadMedida].toLowerCase()}`} />
-            <Dato etiqueta="Lote" valor={reg.lote} />
-            <Dato etiqueta="Vencimiento" valor={fechaCorta(reg.fechaVencimiento)} />
-          </dl>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {TIPOS_EVIDENCIA.map((t) => <FotoEvidencia key={t} reporteId={r.id} registroId={reg.id} tipo={t} />)}
-          </div>
-        </Tarjeta>
-      ))}
+      <Seccion
+        titulo="Averías del reporte"
+        contador={r.registros.length}
+        tono={r.estado === 'REGISTRADO' ? 'alerta' : 'neutro'}
+        descripcion="Cada una con sus tres fotos de evidencia."
+      >
+        <ol className="divide-y divide-borde border-y border-borde">
+          {r.registros.map((reg, i) => (
+            <li key={reg.id} className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <span className="cifra grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-alerta-claro text-xl font-black text-alerta">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-lg font-black leading-snug text-tinta">{reg.productoDescripcion}</p>
+                    <p className="cifra text-sm text-tinta-suave">{reg.productoCodigo}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                  <p className="cifra text-3xl font-black leading-none text-tinta">
+                    {reg.cantidad}
+                    <span className="ml-1.5 text-sm font-semibold text-tinta-suave">{NOMBRE_UNIDAD[reg.unidadMedida].toLowerCase()}</span>
+                  </p>
+                  <Badge tono="alerta">{nombreCausal(reg.causalId)}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
+                  <MetaDato etiqueta="Lote">{reg.lote}</MetaDato>
+                  <MetaDato etiqueta="Vence">{fechaCorta(reg.fechaVencimiento)}</MetaDato>
+                </div>
+                {puedeCorregir && (
+                  <Boton variante="secundario" tamano="sm" onClick={() => setCorrigiendo(reg)}>
+                    Corregir esta avería
+                  </Boton>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {TIPOS_EVIDENCIA.map((t) => (
+                  <FotoEvidencia key={t} reporteId={r.id} registroId={reg.id} tipo={t} />
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Seccion>
 
-      {corrigiendo && <CorregirRegistroDialogo reporteId={r.id} registro={corrigiendo} onCerrar={() => setCorrigiendo(null)} />}
+      {corrigiendo && (
+        <CorregirRegistroDialogo
+          reporteId={r.id}
+          registro={corrigiendo}
+          onCerrar={() => setCorrigiendo(null)}
+        />
+      )}
       <AnularReporteDialogo reporteId={r.id} abierto={anulando} onCerrar={() => setAnulando(false)} />
     </section>
   )

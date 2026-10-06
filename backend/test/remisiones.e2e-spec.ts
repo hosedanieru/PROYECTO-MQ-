@@ -27,6 +27,10 @@ import type { UnidadDeTrabajo } from '../src/domain/shared/unidad-de-trabajo.js'
 import { PrismaService } from '../src/infrastructure/database/prisma/prisma.service.js';
 import { ErrorDominioFilter } from '../src/infrastructure/http/filters/error-dominio.filter.js';
 import { AsignacionPrismaRepository } from '../src/infrastructure/persistence/prisma/asignacion.prisma.repository.js';
+import { AjusteEsperadasPrismaRepository } from '../src/infrastructure/persistence/prisma/ajuste-esperadas.prisma.repository.js';
+import { FirmaRemisionPrismaRepository } from '../src/infrastructure/persistence/prisma/firma-remision.prisma.repository.js';
+import { ResumenTurnoPrismaRepository } from '../src/infrastructure/persistence/prisma/resumen-turno.prisma.repository.js';
+import { EnvioCorreoPrismaRepository, ListaDistribucionPrismaRepository } from '../src/infrastructure/persistence/prisma/correo.prisma.repositories.js';
 import { CausalAveriaPrismaRepository } from '../src/infrastructure/persistence/prisma/causal-averia.prisma.repository.js';
 import { ReporteAveriaPrismaRepository } from '../src/infrastructure/persistence/prisma/reporte-averia.prisma.repository.js';
 import {
@@ -160,6 +164,11 @@ describe('atomicidad de la unidad de trabajo', () => {
           unidadesMedida: new UnidadMedidaPrismaRepository(tx),
           recetas: new RecetaPrismaRepository(tx),
           cierresInventario: new CierreInventarioPrismaRepository(tx),
+          listasDistribucion: new ListaDistribucionPrismaRepository(tx),
+          enviosCorreo: new EnvioCorreoPrismaRepository(tx),
+          resumenesTurno: new ResumenTurnoPrismaRepository(tx),
+          firmasRemision: new FirmaRemisionPrismaRepository(tx),
+          ajustesEsperadas: new AjusteEsperadasPrismaRepository(tx),
         }),
       ),
   };
@@ -387,5 +396,87 @@ describe('flujo completo por HTTP', () => {
 
     const excel = await request(servidor).get('/api/remisiones/exportar?estado=VALIDADA').set(auth()).expect(200);
     expect(excel.headers['content-type']).toContain('spreadsheetml');
+  });
+
+  it('firma electrónica: con la remisión entregada, contraseña obligatoria, queda en las casillas y en el PDF', async () => {
+    const servidor = app.getHttpServer();
+    const creada = await request(servidor).post('/api/remisiones').set(auth()).send({
+      turnoId: base.turnoId, grupoId: base.grupoId, lugarId: base.lugarId, productoId: base.productoId,
+      fechaVencimiento: '2027-03-01', cantidadCajas: 10, cantidadUnidades: 40, estibasCompletas: 0, cajasSueltas: 10, numerosEstiba: [],
+    }).expect(201);
+    const id: string = creada.body.id;
+    const firma = { tipo: 'VERIFICADOR', trazo: `data:image/png;base64,${'iVBORw0KGgo'.repeat(30)}`, contrasena: base.admin.contrasena };
+
+    // En borrador todavía no se firma.
+    const temprano = await request(servidor).post(`/api/remisiones/${id}/firmas`).set(auth()).send(firma).expect(409);
+    expect(temprano.body.codigo).toBe('FIRMA_FUERA_DE_TIEMPO');
+
+    await request(servidor).post(`/api/remisiones/${id}/entregar`).set(auth()).expect(200);
+    // Contraseña equivocada: 400 (no 401: la sesión sigue abierta).
+    const mala = await request(servidor).post(`/api/remisiones/${id}/firmas`).set(auth()).send({ ...firma, contrasena: 'equivocada' }).expect(400);
+    expect(mala.body.codigo).toBe('FIRMA_CONTRASENA_INCORRECTA');
+
+    const ok = await request(servidor).post(`/api/remisiones/${id}/firmas`).set(auth()).set('User-Agent', 'prueba-e2e').send(firma).expect(201);
+    expect(ok.body).toMatchObject({ tipo: 'VERIFICADOR', version: 1, dispositivo: 'prueba-e2e' });
+    expect(ok.body.huella).toMatch(/^[0-9a-f]{64}$/);
+    expect(ok.body.trazo).toBeUndefined();
+    await request(servidor).post(`/api/remisiones/${id}/firmas`).set(auth()).send(firma).expect(409);
+
+    const firmas = await request(servidor).get(`/api/remisiones/${id}/firmas`).set(auth()).expect(200);
+    expect(firmas.body.casillas.find((c: { tipo: string }) => c.tipo === 'VERIFICADOR').firma).toMatchObject({ vigente: true, huella: ok.body.huella });
+    expect(firmas.body.huellaActual).toBe(ok.body.huella);
+
+    // Fase 2: el OPA aprueba firmando "quien recibe" (después del verificador), en la
+    // misma transacción que el descuento de inventario. Receta y existencia mínimas:
+    const unidad = await prisma.unidadMedida.findUniqueOrThrow({ where: { codigo: 'UNIDAD' } });
+    await request(servidor).post('/api/inventario/catalogo/insumos').set(auth())
+      .send({ codigo: 'FIRMA-E2E', descripcion: 'Etiqueta', unidadBaseId: unidad.id }).expect(201);
+    const [etiqueta] = (await request(servidor).get('/api/inventario/items?tipo=INSUMO').set(auth()).expect(200)).body;
+    await request(servidor).put(`/api/inventario/recetas/${base.productoId}`).set(auth()).send({ componentes: [{ itemId: etiqueta.id, cantidad: 1 }] }).expect(200);
+    await request(servidor).post('/api/inventario/entradas').set(auth()).send({ documento: 'FIRMA E2E', lineas: [{ itemId: etiqueta.id, cantidad: 50 }] }).expect(201);
+
+    const recibe = { trazo: firma.trazo, contrasena: base.admin.contrasena };
+    await request(servidor).post(`/api/remisiones/${id}/aprobar-firmando`).set(auth()).send({ ...recibe, contrasena: 'equivocada' }).expect(400);
+    const aprobada = await request(servidor).post(`/api/remisiones/${id}/aprobar-firmando`).set(auth()).send(recibe).expect(200);
+    expect(aprobada.body).toMatchObject({ estado: 'APROBADA', aprobacion: { opaNombre: expect.any(String) } });
+    const despues = await request(servidor).get(`/api/remisiones/${id}/firmas`).set(auth()).expect(200);
+    expect(despues.body.casillas.find((c: { tipo: string }) => c.tipo === 'RECIBE').firma).toMatchObject({ vigente: true, version: 1 });
+    // Aprobar no cambia la huella: la firma del verificador sigue vigente.
+    expect(despues.body.casillas.find((c: { tipo: string }) => c.tipo === 'VERIFICADOR').firma.vigente).toBe(true);
+    expect(despues.body.modo).toBe('PILOTO');
+
+    // Fase 3: el coordinador valida firmando.
+    const validada = await request(servidor).post(`/api/remisiones/${id}/validar-firmando`).set(auth())
+      .send({ concilidadoCon: 'María (PepsiCo)', trazo: firma.trazo, contrasena: base.admin.contrasena }).expect(200);
+    expect(validada.body.estado).toBe('VALIDADA');
+    const alFinal = await request(servidor).get(`/api/remisiones/${id}/firmas`).set(auth()).expect(200);
+    expect(alFinal.body.casillas.filter((c: { firma: unknown }) => c.firma).map((c: { tipo: string }) => c.tipo)).toEqual(['VERIFICADOR', 'RECIBE', 'VALIDACION']);
+
+    const pdf = await request(servidor).get(`/api/remisiones/${id}/pdf`).set(auth()).expect(200);
+    expect(pdf.body.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('cerrar el turno exige novedades y guarda el resumen del turno y del día con su PDF', async () => {
+    const servidor = app.getHttpServer();
+    const fecha = registroActual(new Date()).fechaOperativa.toISOString().slice(0, 10);
+    const cierre = { fechaOperativa: fecha, turnoId: base.turnoId, motivoFaltante: 'Prueba: sin remisiones aprobadas' };
+
+    const sinNovedades = await request(servidor).post('/api/mfr/turno/cerrar').set(auth()).send({ ...cierre, novedades: 'corto' }).expect(400);
+    expect(sinNovedades.body.codigo).toBe('RESUMEN_NOVEDADES_OBLIGATORIAS');
+
+    const cerrado = await request(servidor).post('/api/mfr/turno/cerrar').set(auth()).send({ ...cierre, novedades: 'Turno de prueba: sin novedades en las líneas.' }).expect(201);
+    // El DPP de prueba solo tiene el T1: al cerrarlo, el día queda cerrado y sale también el resumen del día.
+    expect(cerrado.body.resumenTurno.consecutivo).toMatch(/^RT-\d{4}-0001$/);
+    expect(cerrado.body.resumenDia.consecutivo).toMatch(/^RD-\d{4}-0001$/);
+
+    const lista = await request(servidor).get(`/api/resumenes?fecha=${fecha}`).set(auth()).expect(200);
+    expect(lista.body.map((r: { tipo: string }) => r.tipo).sort()).toEqual(['DIA', 'TURNO']);
+
+    const detalle = await request(servidor).get(`/api/resumenes/${cerrado.body.resumenTurno.id}`).set(auth()).expect(200);
+    expect(detalle.body.datos.novedades[0].texto).toBe('Turno de prueba: sin novedades en las líneas.');
+    expect(detalle.body.datos.produccion.programadoCajas).toBe(1000);
+
+    const pdf = await request(servidor).get(`/api/resumenes/${cerrado.body.resumenTurno.id}/pdf`).set(auth()).expect(200);
+    expect(pdf.body.subarray(0, 5).toString()).toBe('%PDF-');
   });
 });

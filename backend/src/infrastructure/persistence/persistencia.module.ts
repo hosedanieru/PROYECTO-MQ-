@@ -23,6 +23,18 @@ import { ENTRADA_MERCANCIA_REPOSITORY } from '../../domain/inventario/entrada-me
 import { ITEM_INVENTARIO_REPOSITORY } from '../../domain/inventario/item-inventario.js';
 import { MATERIAL_REPOSITORY } from '../../domain/inventario/material.js';
 import { CIERRE_INVENTARIO_REPOSITORY } from '../../domain/inventario/cierre-inventario.js';
+import { AJUSTE_ESPERADAS_REPOSITORY } from '../../domain/mfr/esperadas-personal.js';
+import { AjusteEsperadasPrismaRepository } from './prisma/ajuste-esperadas.prisma.repository.js';
+import { AjusteEsperadasFirestoreRepository } from '../firestore/repositorios/ajuste-esperadas.firestore.repository.js';
+import { FIRMA_REMISION_REPOSITORY } from '../../domain/remision/firma-remision.js';
+import { FirmaRemisionPrismaRepository } from './prisma/firma-remision.prisma.repository.js';
+import { FirmaRemisionFirestoreRepository } from '../firestore/repositorios/firma-remision.firestore.repository.js';
+import { RESUMEN_TURNO_REPOSITORY } from '../../domain/resumen/resumen-turno.js';
+import { ResumenTurnoPrismaRepository } from './prisma/resumen-turno.prisma.repository.js';
+import { ResumenTurnoFirestoreRepository } from '../firestore/repositorios/resumen-turno.firestore.repository.js';
+import { ENVIO_CORREO_REPOSITORY, LISTA_DISTRIBUCION_REPOSITORY } from '../../domain/correo/correo.js';
+import { EnvioCorreoPrismaRepository, ListaDistribucionPrismaRepository } from './prisma/correo.prisma.repositories.js';
+import { EnvioCorreoFirestoreRepository, ListaDistribucionFirestoreRepository } from '../firestore/repositorios/correo.firestore.repositories.js';
 import { RECETA_REPOSITORY } from '../../domain/inventario/receta.js';
 import { UNIDAD_MEDIDA_REPOSITORY } from '../../domain/inventario/unidad-medida.js';
 import { MOVIMIENTO_INVENTARIO_REPOSITORY } from '../../domain/inventario/movimiento-inventario.js';
@@ -130,6 +142,11 @@ const TOKENS = [
   UNIDAD_MEDIDA_REPOSITORY,
   RECETA_REPOSITORY,
   CIERRE_INVENTARIO_REPOSITORY,
+  LISTA_DISTRIBUCION_REPOSITORY,
+  ENVIO_CORREO_REPOSITORY,
+  RESUMEN_TURNO_REPOSITORY,
+  FIRMA_REMISION_REPOSITORY,
+  AJUSTE_ESPERADAS_REPOSITORY,
 ];
 
 // ---------- PostgreSQL ----------
@@ -163,6 +180,11 @@ const REGISTROS_POSTGRES: Provider[] = [
   conPrisma(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaPrismaRepository),
   conPrisma(RECETA_REPOSITORY, RecetaPrismaRepository),
   conPrisma(CIERRE_INVENTARIO_REPOSITORY, CierreInventarioPrismaRepository),
+  conPrisma(LISTA_DISTRIBUCION_REPOSITORY, ListaDistribucionPrismaRepository),
+  conPrisma(ENVIO_CORREO_REPOSITORY, EnvioCorreoPrismaRepository),
+  conPrisma(RESUMEN_TURNO_REPOSITORY, ResumenTurnoPrismaRepository),
+  conPrisma(FIRMA_REMISION_REPOSITORY, FirmaRemisionPrismaRepository),
+  conPrisma(AJUSTE_ESPERADAS_REPOSITORY, AjusteEsperadasPrismaRepository),
 ];
 
 // ---------- Firestore ----------
@@ -197,6 +219,11 @@ const REGISTROS_FIRESTORE: Provider[] = [
   conFirestore(UNIDAD_MEDIDA_REPOSITORY, UnidadMedidaFirestoreRepository),
   conFirestore(RECETA_REPOSITORY, RecetaFirestoreRepository),
   conFirestore(CIERRE_INVENTARIO_REPOSITORY, CierreInventarioFirestoreRepository),
+  conFirestore(LISTA_DISTRIBUCION_REPOSITORY, ListaDistribucionFirestoreRepository),
+  conFirestore(ENVIO_CORREO_REPOSITORY, EnvioCorreoFirestoreRepository),
+  conFirestore(RESUMEN_TURNO_REPOSITORY, ResumenTurnoFirestoreRepository),
+  conFirestore(FIRMA_REMISION_REPOSITORY, FirmaRemisionFirestoreRepository),
+  conFirestore(AJUSTE_ESPERADAS_REPOSITORY, AjusteEsperadasFirestoreRepository),
 ];
 
 const tipo = tipoPersistencia();

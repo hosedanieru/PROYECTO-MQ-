@@ -4,7 +4,7 @@
  *
  *   GET   /api/grupos        catalogo.consultar   todos (activos e inactivos; el cliente decide)
  *   POST  /api/grupos        catalogo.editar
- *   PATCH /api/grupos/:id    catalogo.editar      (datos, activo)
+ *   PATCH /api/grupos/:id    catalogo.editar      (datos, activo, esperadasPorTurno [{ turnoId, personas }])
  */
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Patch, Post } from '@nestjs/common';
@@ -13,7 +13,7 @@ import { ActualizarGrupoUseCase, CrearGrupoUseCase } from '../../application/cat
 import { GRUPO_REPOSITORY, type GrupoRepository } from '../../domain/grupo/grupo.repository.js';
 import type { Usuario } from '../../domain/usuario/usuario.entity.js';
 import { RequierePermisos, UsuarioActual } from '../../infrastructure/auth/decoradores.js';
-import { ActualizarGrupoDto, CrearGrupoDto } from './dto/grupo.dto.js';
+import { ActualizarGrupoDto, aMapaEsperadas, CrearGrupoDto } from './dto/grupo.dto.js';
 
 @Controller('grupos')
 export class GrupoController {
@@ -37,7 +37,7 @@ export class GrupoController {
       codigo: dto.codigo,
       nombre: dto.nombre,
       descripcion: dto.descripcion ?? null,
-      personasEsperadas: dto.personasEsperadas ?? null,
+      esperadasPorTurno: aMapaEsperadas(dto.esperadasPorTurno ?? []),
       usuarioId: actual.id,
     });
   }
@@ -45,6 +45,11 @@ export class GrupoController {
   @Patch(':id')
   @RequierePermisos('catalogo.editar')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarGrupoDto, @UsuarioActual() actual: Usuario) {
-    return this.actualizarGrupo.ejecutar({ grupoId: id, cambios: dto, usuarioId: actual.id });
+    const { esperadasPorTurno, ...cambios } = dto;
+    return this.actualizarGrupo.ejecutar({
+      grupoId: id,
+      cambios: { ...cambios, ...(esperadasPorTurno ? { esperadasPorTurno: aMapaEsperadas(esperadasPorTurno) } : {}) },
+      usuarioId: actual.id,
+    });
   }
 }

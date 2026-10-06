@@ -11,8 +11,10 @@ import type {
   IndicadoresDia,
   LineaProduccion,
   PropuestaDpp,
+  ResultadoCierreTurno,
   ResultadoLoteEstandares,
   ResultadoPeriodo,
+  ResumenGuardado,
   TipoLinea,
 } from '../../../shared/types/mfr'
 
@@ -47,11 +49,17 @@ export const mfrApi = {
   }) => http.post<ResultadoPeriodo>('/mfr/bloques/periodo', datos, { timeout: 180_000 }).then((r) => r.data),
   copiarDia: (datos: { desde: string; hacia: string; reemplazar: boolean; motivo?: string }) =>
     http.post<BloqueCalculado[]>('/mfr/bloques/copiar', datos).then((r) => r.data),
-  cerrarTurno: (fechaOperativa: string, turnoId: string, motivoFaltante?: string) =>
-    http.post<BloqueCalculado[]>('/mfr/turno/cerrar', { fechaOperativa, turnoId, motivoFaltante }).then((r) => r.data),
+  /** Cierra el turno y guarda su resumen. Timeout largo: arma el resumen y lo guarda en la misma operación. */
+  cerrarTurno: (datos: { fechaOperativa: string; turnoId: string; novedades: string; motivoFaltante?: string }) =>
+    http.post<ResultadoCierreTurno>('/mfr/turno/cerrar', datos, { timeout: 60_000 }).then((r) => r.data),
+  resumenes: (fecha: string) =>
+    http.get<ResumenGuardado[]>('/resumenes', { params: { fecha } }).then((r) => r.data),
 
   registrarAsistencia: (datos: DatosAsistencia) =>
     http.put<AsistenciaTurno>('/mfr/asistencia', datos).then((r) => r.data),
+  /** Ajuste de un día a las esperadas de un grupo en un turno (manda sobre lo fijo del grupo). */
+  ajustarEsperadas: (datos: { fechaOperativa: string; turnoId: string; grupoId: string; personas: number; motivo: string }) =>
+    http.put('/mfr/esperadas-dia', datos).then(() => undefined),
   asignarGrupoLinea: (datos: DatosAsignacion) =>
     http.put<AsignacionLinea>('/mfr/asignaciones', datos).then((r) => r.data),
   quitarAsignacion: (id: string) => http.delete(`/mfr/asignaciones/${id}`).then(() => undefined),

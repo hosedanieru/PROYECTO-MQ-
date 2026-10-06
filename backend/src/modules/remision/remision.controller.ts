@@ -29,15 +29,17 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 import { CrearRemisionUseCase } from '../../application/remision/crear-remision.use-case.js';
 import { EditarRemisionUseCase } from '../../application/remision/editar-remision.use-case.js';
 import { ExportarRemisionesUseCase } from '../../application/remision/exportar-remisiones.use-case.js';
 import { ImprimirRemisionesUseCase } from '../../application/remision/imprimir-remisiones.use-case.js';
+import { ConsultarFirmasUseCase, FirmarRemisionUseCase } from '../../application/remision/firma-remision.use-cases.js';
 import {
   AprobarRemisionUseCase,
   EntregarRemisionUseCase,
@@ -67,8 +69,11 @@ import {
 import { CrearRemisionDto } from './dto/crear-remision.dto.js';
 import { EditarRemisionDto } from './dto/editar-remision.dto.js';
 import {
+  AprobarFirmandoDto,
   AprobarRemisionDto,
+  FirmarRemisionDto,
   RechazarRemisionDto,
+  ValidarFirmandoDto,
   ValidarRemisionDto,
 } from './dto/flujo-remision.dto.js';
 
@@ -143,7 +148,47 @@ export class RemisionController {
     private readonly remisiones: RemisionRepository,
     @Inject(HISTORIAL_REMISION_REPOSITORY)
     private readonly historial: HistorialRemisionRepository,
+    private readonly firmarRemision: FirmarRemisionUseCase,
+    private readonly consultarFirmas: ConsultarFirmasUseCase,
   ) { }
+
+  // ==========================================================
+  // FIRMA ELECTRÓNICA (2026-10-05)
+  // ==========================================================
+
+  /**
+   * Las casillas del formato con su firma vigente (o vacía) y el historial
+   * de firmas de versiones anteriores. Incluye el trazo para mostrarlo.
+   */
+  @Get(':id/firmas')
+  @RequierePermisos('remision.consultar')
+  async firmas(@Param('id') id: string) {
+    return this.consultarFirmas.ejecutar(id);
+  }
+
+  /**
+   * Firma una casilla. El permiso específico de cada casilla
+   * (remision.firmar_emision, remision.firmar_verificacion…) lo verifica
+   * el caso de uso, junto con la contraseña. Se registran el equipo
+   * (user-agent) y la IP como evidencia.
+   */
+  @Post(':id/firmas')
+  @HttpCode(HttpStatus.CREATED)
+  @RequierePermisos('remision.consultar')
+  async firmar(@Param('id') id: string, @Body() dto: FirmarRemisionDto, @UsuarioActual() actual: Usuario, @Req() req: Request) {
+    const firma = await this.firmarRemision.ejecutar({
+      remisionId: id,
+      tipo: dto.tipo,
+      trazo: dto.trazo,
+      contrasena: dto.contrasena,
+      usuarioId: actual.id,
+      dispositivo: req.headers['user-agent'] ?? null,
+      ip: req.ip ?? null,
+    });
+    // El trazo ya lo tiene el cliente: la respuesta no lo repite.
+    const { trazo: _trazo, ...resto } = firma;
+    return resto;
+  }
 
   // ==========================================================
   // CREACIÓN
@@ -229,6 +274,36 @@ export class RemisionController {
     return presentar(remision);
   }
 
+  /**
+   * El OPA aprueba desde su propia cuenta y firma "quien recibe" en el mismo
+   * paso (firma electrónica, fase 2). Exige que el verificador ya haya
+   * firmado y el permiso `remision.firmar_recepcion` (lo revisa el caso de
+   * uso, junto con la contraseña).
+   */
+  @Post(':id/aprobar-firmando')
+  @HttpCode(HttpStatus.OK)
+  @RequierePermisos('remision.registrar_aprobacion')
+  async aprobarFirmando(
+    @Param('id') id: string,
+    @Body() dto: AprobarFirmandoDto,
+    @UsuarioActual() actual: Usuario,
+    @Req() req: Request,
+  ) {
+    const remision = await this.aprobarRemision.ejecutar({
+      remisionId: id,
+      opaCargo: dto.opaCargo ?? null,
+      registradaPorId: actual.id,
+      firma: {
+        trazo: dto.trazo,
+        contrasena: dto.contrasena,
+        dispositivo: req.headers['user-agent'] ?? null,
+        ip: req.ip ?? null,
+      },
+    });
+
+    return presentar(remision);
+  }
+
   /** El OPA no acepta: debe verificarse y rectificarse. */
   @Post(':id/rechazar')
   @HttpCode(HttpStatus.OK)
@@ -273,6 +348,31 @@ export class RemisionController {
       remisionId: id,
       validadaPorId: actual.id,
       concilidadoCon: dto.concilidadoCon,
+    });
+
+    return presentar(remision);
+  }
+
+  /** Validar firmando la casilla VALIDACION (firma electrónica, fase 3). */
+  @Post(':id/validar-firmando')
+  @HttpCode(HttpStatus.OK)
+  @RequierePermisos('remision.validar')
+  async validarFirmando(
+    @Param('id') id: string,
+    @Body() dto: ValidarFirmandoDto,
+    @UsuarioActual() actual: Usuario,
+    @Req() req: Request,
+  ) {
+    const remision = await this.validarRemision.ejecutar({
+      remisionId: id,
+      validadaPorId: actual.id,
+      concilidadoCon: dto.concilidadoCon,
+      firma: {
+        trazo: dto.trazo,
+        contrasena: dto.contrasena,
+        dispositivo: req.headers['user-agent'] ?? null,
+        ip: req.ip ?? null,
+      },
     });
 
     return presentar(remision);

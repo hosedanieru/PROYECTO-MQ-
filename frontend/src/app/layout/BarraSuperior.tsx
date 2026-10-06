@@ -1,135 +1,95 @@
-import { useEffect, useState } from 'react'
+import { NavLink } from 'react-router-dom'
 
 import { BotonIdioma } from '../../components/BotonIdioma'
 import { BotonTema } from '../../components/BotonTema'
-import { IconoCalendario, IconoMenu, IconoPlanta, IconoSalir } from '../../components/Iconos'
+import { IconoCerrar, IconoMenu } from '../../components/Iconos'
+import { Logo } from '../../components/Logo'
 import { useSesion } from '../../modules/auth/useSesion'
-import { localeDeFormato } from '../../shared/idioma/locale'
 import { useTextos } from '../../shared/idioma/useTextos'
-import { fechaCorta, fechaOperativaDe } from '../../shared/utils/fechas'
-
-/**
- * Planta donde opera el área. Hoy el catálogo tiene un solo lugar
- * (MAQUILA PEPSICO SANTO DOMINGO), así que se muestra como dato, no
- * como selector: un desplegable de un solo elemento solo estorba.
- * Cuando haya más de una sede se convierte en selector.
- */
-const PLANTA = { nombre: 'Maquila PepsiCo', sede: 'Santo Domingo, Mosquera' }
-
-function horaBogota(instante: Date): string {
-  return new Intl.DateTimeFormat(localeDeFormato(), {
-    timeZone: 'America/Bogota',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(instante)
-}
-
-/**
- * La fecha operativa es solo día (sin hora): se formatea en UTC. En zona
- * Bogotá retrocedería un día, igual que en el PDF y en el Excel.
- *
- * El formateador se construye en cada llamada, y no una vez fuera del
- * componente, porque el idioma puede cambiar mientras la aplicación
- * está abierta.
- */
-function diaLargo(fechaOperativa: string): string {
-  return new Intl.DateTimeFormat(localeDeFormato(), {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date(`${fechaOperativa}T00:00:00.000Z`))
-}
+import { ChipDiaOperativo } from './ChipDiaOperativo'
+import { MenuCuenta } from './MenuCuenta'
+import { MenuMovil } from './MenuMovil'
+import { MenuPrincipal } from './MenuPrincipal'
+import { navegacionVisible } from './navegacion'
 
 interface Props {
-  abrirMenu: () => void
+  menuAbierto: boolean
+  alternarMenu: () => void
+  cerrarMenu: () => void
 }
 
 /**
- * Barra superior: dónde estás, en qué día productivo estás y quién eres.
+ * BARRA SUPERIOR — toda la navegación arriba
+ * ==========================================
  *
- * El día operativo se muestra siempre porque NO es el día del
- * calendario: entre las 00:00 y las 06:00 la fecha operativa es la del
- * día anterior. Tenerlo a la vista evita registrar en el día equivocado.
+ * Decisión del usuario (2026-10-05): la barra lateral se quitaba 256 px
+ * de ancho a todas las pantallas. Ahora todo va arriba, en una sola
+ * franja marina (oscura en los dos temas, como era la lateral):
+ *
+ *   [logo] Inicio · Remisiones · Producción ▾ · Averías · Inventario · Administración ▾   [día operativo · hora] [ES] [☾] [cuenta ▾]
+ *
+ * Para que quepa sin barra de desplazamiento, sin quitar nada:
+ * - los enlaces que van juntos se agrupan en desplegables (ver `navegacion.ts`);
+ * - planta, nombre, rol, salir y el eslogan pasan al menú de la cuenta;
+ * - día operativo + turno en curso + hora se reúnen en un solo chip;
+ * - lo que se escribe crece con el ancho: por debajo de 1280 px, logo solo
+ *   con el símbolo y fecha corta; desde 1280 px, logo completo y
+ *   "Día operativo …"; desde 1536 px, además los íconos del menú, el día
+ *   de la semana e idioma/tema sueltos (por debajo viven en el menú de la
+ *   cuenta). Medido sin solapes en 390, 1024, 1280, 1440 y 1536 px;
+ * - por debajo de 1024 px, el menú se abre como panel desde la barra.
  */
-export function BarraSuperior({ abrirMenu }: Props) {
-  const { usuario, cerrarSesion } = useSesion()
+export function BarraSuperior({ menuAbierto, alternarMenu, cerrarMenu }: Props) {
+  const { tienePermiso } = useSesion()
   const { t } = useTextos()
-  const [ahora, setAhora] = useState(() => new Date())
-
-  useEffect(() => {
-    // Cada 30 s: suficiente para que el minuto nunca se vea atrasado.
-    const temporizador = window.setInterval(() => setAhora(new Date()), 30_000)
-    return () => window.clearInterval(temporizador)
-  }, [])
-
-  const fecha = fechaOperativaDe(ahora)
-  const inicial = usuario?.nombre?.slice(0, 1).toUpperCase() ?? '?'
+  const elementos = navegacionVisible(tienePermiso)
 
   return (
-    <header className="sticky top-0 z-20 border-b border-borde bg-base/85 backdrop-blur">
-      <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 sm:px-6">
+    <header className="sticky top-0 z-40 isolate bg-marina text-white shadow-[0_8px_24px_-12px_rgb(0_0_0/0.5)]">
+      {/*
+        Halo de luz detrás del logo (decoración, como en la antigua barra
+        lateral). Va en su propio recorte: si se recortara la barra entera,
+        también se cortarían los menús desplegables.
+      */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <span className="luz -left-16 -top-28 h-48 w-48 bg-marca opacity-40" />
+      </div>
+      <div className="mx-auto flex h-16 max-w-[96rem] items-center gap-3 px-4 sm:px-6">
         <button
           type="button"
-          onClick={abrirMenu}
-          aria-label={t('nav.abrirMenu')}
-          className="rounded-lg p-2 text-tinta-suave transition hover:bg-velo lg:hidden"
+          onClick={alternarMenu}
+          aria-label={menuAbierto ? t('nav.cerrarMenu') : t('nav.abrirMenu')}
+          aria-expanded={menuAbierto}
+          className="grid h-10 w-10 place-items-center rounded-lg text-white/90 transition hover:bg-white/10 hover:text-white lg:hidden"
         >
-          <IconoMenu />
+          {menuAbierto ? <IconoCerrar /> : <IconoMenu />}
         </button>
 
-        <span className="hidden items-center gap-2.5 rounded-xl border border-borde px-3 py-1.5 lg:inline-flex">
-          <IconoPlanta className="h-5 w-5 text-marca" />
-          <span className="leading-tight">
-            <span className="block text-sm font-semibold text-tinta">{PLANTA.nombre}</span>
-            <span className="block text-xs text-tinta-suave">{PLANTA.sede}</span>
+        <NavLink to="/" onClick={cerrarMenu} aria-label={t('nav.irAlInicio')} className="shrink-0">
+          {/* Por debajo de 1280 px, solo el símbolo: el nombre completo no deja espacio al menú. */}
+          <span className="xl:hidden">
+            <Logo variante="claro" soloIsotipo />
           </span>
-        </span>
-
-        <span
-          className="inline-flex items-center gap-2.5 rounded-xl border border-borde px-3 py-1.5"
-          title={t('barra.explicacionDia')}
-        >
-          <IconoCalendario className="h-5 w-5 text-marca" />
-          <span className="leading-tight">
-            <span className="block text-sm font-semibold capitalize text-tinta">{diaLargo(fecha)}</span>
-            <span className="cifra block text-xs text-tinta-suave">
-              {t('barra.diaOperativo', { fecha: fechaCorta(fecha) })}
-            </span>
+          <span className="hidden xl:block">
+            <Logo variante="claro" />
           </span>
-        </span>
+        </NavLink>
 
-        <span className="ml-auto hidden items-center gap-2 rounded-full border border-exito/30 bg-exito-claro px-3 py-1.5 text-xs font-semibold text-exito md:inline-flex">
-          <span className="h-2 w-2 rounded-full bg-exito" aria-hidden="true" />
-          {t('barra.turnoEnCurso')}
-          <span className="cifra text-tinta-suave">{horaBogota(ahora)}</span>
-        </span>
+        <div className="ml-2 min-w-0 flex-1">
+          <MenuPrincipal elementos={elementos} />
+        </div>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0 md:gap-3">
-          <BotonIdioma />
-          <BotonTema />
-
-          <span className="flex items-center gap-2.5 rounded-xl border border-borde py-1.5 pl-1.5 pr-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-marca-claro text-sm font-bold text-marca-texto">
-              {inicial}
-            </span>
-            <span className="hidden leading-tight lg:block">
-              <span className="block text-sm font-semibold text-tinta">{usuario?.nombre}</span>
-              <span className="block text-xs text-tinta-suave">{usuario?.rolCodigo}</span>
-            </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <ChipDiaOperativo />
+          <span className="hidden items-center gap-2 2xl:flex">
+            <BotonIdioma sobreOscuro />
+            <BotonTema sobreOscuro />
           </span>
-
-          <button
-            type="button"
-            onClick={cerrarSesion}
-            aria-label={t('barra.cerrarSesion')}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-borde text-tinta-suave transition hover:border-critico/40 hover:bg-critico-claro hover:text-critico"
-          >
-            <IconoSalir />
-          </button>
+          <MenuCuenta />
         </div>
       </div>
+
+      <MenuMovil abierto={menuAbierto} cerrar={cerrarMenu} elementos={elementos} />
     </header>
   )
 }

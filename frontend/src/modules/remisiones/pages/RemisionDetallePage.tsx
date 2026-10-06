@@ -5,32 +5,36 @@
  * Datos completos, historial de estado y botones de acción según el
  * estado y los permisos. El documento se lee como se firmó: el producto
  * mostrado es el snapshot, no el catálogo actual.
+ *
+ * Sin cajas (usuario, 2026-10-05): cifras de lo que se entrega, recorrido
+ * del documento en pasos, ficha de registro, firmas e historial, cada uno
+ * como sección abierta.
  */
 
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
+import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
 import { abrirPdf } from '../../../services/archivos'
+import { Dato } from '../../../components/Dato'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { EstadoBadge } from '../../../components/EstadoBadge'
+import { Ficha } from '../../../components/Ficha'
+import { IconoRemision } from '../../../components/Iconos'
 import { PantallaCargando } from '../../../components/PantallaCargando'
+import { Seccion } from '../../../components/Seccion'
 import { comoErrorApi } from '../../../services/http'
-import { fechaCorta, fechaHora } from '../../../shared/utils/fechas'
+import { fechaCorta } from '../../../shared/utils/fechas'
+import { miles } from '../../../shared/utils/numeros'
 import { useSesion } from '../../auth/useSesion'
 import { useGrupos, useTurnos } from '../../catalogo/hooks/useCatalogos'
 import { AccionesRemision } from '../components/AccionesRemision'
+import { FirmasRemision } from '../components/FirmasRemision'
 import { HistorialRemision } from '../components/HistorialRemision'
+import { RecorridoRemision } from '../components/RecorridoRemision'
 import { useRemision } from '../hooks/useRemisiones'
-
-function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase text-tinta-suave">{etiqueta}</dt>
-      <dd className="text-sm text-tinta">{children ?? '—'}</dd>
-    </div>
-  )
-}
 
 export function RemisionDetallePage() {
   const { id } = useParams<{ id: string }>()
@@ -52,28 +56,27 @@ export function RemisionDetallePage() {
 
   return (
     <section className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link to="/remisiones" className="text-sm text-tinta-suave hover:underline">
-            ← Remisiones
-          </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-tinta">
-            Remisión {r.consecutivo}
-            {r.version > 1 && (
-              <span className="ml-2 text-base font-normal text-tinta-suave">versión {r.version}</span>
-            )}
-          </h1>
-          <div className="mt-1 flex items-center gap-2">
+      <EncabezadoPagina
+        Icono={IconoRemision}
+        escena="remision"
+        volver={{ a: '/remisiones', texto: 'Remisiones' }}
+        titulo={`Remisión ${r.consecutivo}`}
+        insignia={
+          <>
             <EstadoBadge estado={r.estado} />
-            {r.estaPendienteDeConciliar && (
-              <span className="text-xs text-alerta">Aprobada por PepsiCo, pendiente de conciliar</span>
+            {r.version > 1 && (
+              <span className="text-base font-medium text-white/90">versión {r.version}</span>
             )}
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
+            {r.estaPendienteDeConciliar && (
+              <Badge tono="alerta">Aprobada por PepsiCo, pendiente de conciliar</Badge>
+            )}
+          </>
+        }
+        descripcion={`PT ${r.producto.codigo} · ${r.producto.descripcion}`}
+        acciones={
+          <>
             <Boton
-              variante="secundario"
+              variante="vidrio"
               cargando={imprimiendo}
               onClick={async () => {
                 setErrorPdf(null)
@@ -90,17 +93,18 @@ export function RemisionDetallePage() {
               Imprimir PDF
             </Boton>
             {r.esEditable && tienePermiso('remision.editar') && (
-              <Link
-                to={`/remisiones/${r.id}/editar`}
-                className="rounded-md border border-borde bg-base px-4 py-2 text-sm font-medium text-tinta hover:bg-velo"
-              >
-                Editar datos
+              <Link to={`/remisiones/${r.id}/editar`}>
+                <Boton variante="claro">Editar datos</Boton>
               </Link>
             )}
-          </div>
-          <AccionesRemision remision={r} />
-        </div>
-      </header>
+          </>
+        }
+      />
+
+      {/* Las acciones del flujo (entregar, aprobar…) van fuera de la banda: sus botones son azules y se perderían en ella. */}
+      <div className="flex justify-end">
+        <AccionesRemision remision={r} />
+      </div>
 
       {errorPdf && <Alerta tipo="error">{errorPdf}</Alerta>}
 
@@ -110,63 +114,46 @@ export function RemisionDetallePage() {
         </Alerta>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <dl className="grid grid-cols-2 gap-4 rounded-lg bg-base p-5 shadow-sm">
-          <Dato etiqueta="Fecha operativa">{fechaCorta(r.fechaOperativa)}</Dato>
-          <Dato etiqueta="Registrada">{fechaHora(r.fechaHoraRegistro)}</Dato>
-          <Dato etiqueta="Turno">{turno ? `${turno.codigo} · ${turno.nombre}` : '—'}</Dato>
-          <Dato etiqueta="Grupo">{grupo?.nombre}</Dato>
-          <div className="col-span-2">
-            <Dato etiqueta="PT (como se firmó)">
-              <span className="cifra text-xs text-tinta-suave">{r.producto.codigo}</span>
-              <br />
-              {r.producto.descripcion}
-            </Dato>
-          </div>
-          <Dato etiqueta="Vencimiento">{fechaCorta(r.fechaVencimiento)}</Dato>
-          <Dato etiqueta="Cajas / Unidades">
-            {r.cantidadCajas} / {r.cantidadUnidades}
-          </Dato>
-          <Dato etiqueta="Estibas">{r.descripcionEstibas}</Dato>
-          <Dato etiqueta="Números de estiba">
-            {r.numerosEstiba.length ? r.numerosEstiba.join(', ') : '—'}
-          </Dato>
-          <div className="col-span-2">
-            <Dato etiqueta="Observaciones">{r.observaciones}</Dato>
-          </div>
-          {r.extraoficial && (
-            <div className="col-span-2 rounded-md border border-amber-200 bg-alerta-claro p-3">
-              <Dato etiqueta="Pedido de emergencia (extraoficial, fuera del MFR)">{r.motivoExtraoficial}</Dato>
-            </div>
-          )}
-        </dl>
+      {/*
+        Rediseño (usuario, 2026-10-05: fuera las tarjetas). Arriba, lo que
+        se entrega en cifras grandes; luego el recorrido del documento como
+        pasos; después los datos de registro en una ficha abierta.
+      */}
+      <Ficha>
+        <Dato etiqueta="Cajas" valor={miles(r.cantidadCajas)} destacado />
+        <Dato etiqueta="Unidades" valor={miles(r.cantidadUnidades)} destacado />
+        <Dato etiqueta="Estibas" valor={r.descripcionEstibas} destacado />
+        <Dato etiqueta="Vencimiento" valor={fechaCorta(r.fechaVencimiento)} destacado />
+      </Ficha>
 
-        <dl className="space-y-4 rounded-lg bg-base p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-tinta">Trazabilidad</h2>
-          <Dato etiqueta="Entrega al OPA">
-            {r.entrega.fecha ? fechaHora(r.entrega.fecha) : 'Pendiente'}
-          </Dato>
-          <Dato etiqueta="Aprobación de PepsiCo">
-            {r.aprobacion.fecha ? (
-              <>
-                {fechaHora(r.aprobacion.fecha)} · {r.aprobacion.opaNombre}
-                {r.aprobacion.opaCargo && ` (${r.aprobacion.opaCargo})`}
-              </>
-            ) : (
-              'Pendiente'
-            )}
-          </Dato>
-          <Dato etiqueta="Validación interna">
-            {r.validacion.fecha ? (
-              <>
-                {fechaHora(r.validacion.fecha)} · conciliado con {r.validacion.conciliadoCon}
-              </>
-            ) : (
-              'Pendiente'
-            )}
-          </Dato>
-        </dl>
-      </div>
+      {r.extraoficial && (
+        <Alerta tipo="advertencia">
+          <strong>Pedido de emergencia (extraoficial, fuera del MFR):</strong> {r.motivoExtraoficial}
+        </Alerta>
+      )}
+
+      <Seccion titulo="Recorrido del documento" tono={r.estado === 'RECHAZADA' || r.estado === 'EN_RECTIFICACION' ? 'critico' : 'marca'}>
+        <div className="border-y border-borde py-6">
+          <RecorridoRemision remision={r} />
+        </div>
+      </Seccion>
+
+      <Seccion titulo="Datos de registro">
+        <Ficha>
+          <Dato etiqueta="Fecha operativa" valor={fechaCorta(r.fechaOperativa)} />
+          <Dato etiqueta="Turno" valor={turno ? `${turno.codigo} · ${turno.nombre}` : '—'} />
+          <Dato etiqueta="Grupo" valor={grupo?.nombre ?? '—'} />
+          <Dato etiqueta="Números de estiba" valor={r.numerosEstiba.length ? r.numerosEstiba.join(', ') : '—'} />
+          <Dato etiqueta="PT (como se firmó)" valor={r.producto.codigo} nota={r.producto.descripcion} />
+        </Ficha>
+        {r.observaciones && (
+          <p className="text-sm text-tinta-suave">
+            <span className="font-semibold text-tinta">Observaciones:</span> {r.observaciones}
+          </p>
+        )}
+      </Seccion>
+
+      <FirmasRemision remision={r} />
 
       <HistorialRemision remisionId={r.id} />
     </section>

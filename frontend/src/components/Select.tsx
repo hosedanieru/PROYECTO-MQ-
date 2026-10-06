@@ -19,7 +19,7 @@ export function Select({ etiqueta, error, id, className = '', children, ...resto
       <select
         id={idCampo}
         aria-invalid={error ? true : undefined}
-        className={`block w-full rounded-lg border bg-base px-3 py-2 text-sm text-tinta shadow-sm transition outline-none focus:border-marca focus:ring-2 focus:ring-marca/30 ${
+        className={`block w-full rounded-lg border bg-base px-3 py-2 text-sm text-tinta shadow-sm transition pointer-coarse:min-h-11 outline-none focus:border-marca focus:ring-2 focus:ring-marca/30 ${
           error ? 'border-critico' : 'border-borde'
         } ${className}`}
         {...resto}

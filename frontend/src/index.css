@@ -53,6 +53,20 @@
   /* Pastilla suave (fondo) y su texto. */
   --marca-claro: #dbeafe;
   --marca-texto: #1e3a8a;
+  /*
+   * Relleno azul que lleva TEXTO BLANCO encima (botones, opción activa).
+   * Va aparte de --marca porque en oscuro --marca se aclara y el blanco
+   * deja de leerse (3,7:1). Aquí el blanco da 6,7:1 en los dos temas.
+   */
+  --marca-relleno: #1d4ed8;
+  --marca-relleno-hover: #1e3a8a;
+  /*
+   * Final del degradado de la banda (hero). Un paso más profundo que la
+   * marca: con --marca el texto blanco caía a 3,1–4,9:1 en ese extremo
+   * (medido el 2026-10-05); con este, el blanco da 8,7:1 y el blanco al
+   * 90 % sobre los recuadros de vidrio, 5,9:1.
+   */
+  --hero-final: #1e40af;
 
   /* --- Semánticos: significado, no decoración ------------------------ */
   --exito: #15a34a;
@@ -70,6 +84,16 @@
    * fondo (3:1 mínimo).
    */
   --neutro: #64748b;
+
+  /*
+   * Materiales de la figura 3D (empaque flotante de `shared/visual3d`).
+   * Pura decoración, iguales en los dos temas: un cartón o un metalizado
+   * no cambian de color con la luz de la pantalla. No usarlos en texto.
+   */
+  --carton: #b9814a;
+  --plata: #cbd5e1;
+  --madera: #a9784a;
+  --papel: #f8fafc;
 
   --sombra-tarjeta: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.18);
   --sombra-elevada: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 36px -16px rgb(15 23 42 / 0.28);
@@ -90,6 +114,10 @@
   --marca-hover: #60a5fa;
   --marca-claro: #1c3566;
   --marca-texto: #bfdbfe;
+  /* Iguales en los dos temas: el blanco encima necesita el azul profundo. */
+  --marca-relleno: #1d4ed8;
+  --marca-relleno-hover: #1e40af;
+  --hero-final: #1e40af;
 
   --exito: #16a34a;
   --exito-claro: #0f2e1f;
@@ -130,6 +158,8 @@
   --color-marca-hover: var(--marca-hover);
   --color-marca-claro: var(--marca-claro);
   --color-marca-texto: var(--marca-texto);
+  --color-marca-relleno: var(--marca-relleno);
+  --color-marca-relleno-hover: var(--marca-relleno-hover);
 
   --color-exito: var(--exito);
   --color-exito-claro: var(--exito-claro);
@@ -209,6 +239,126 @@ textarea:focus-visible {
 }
 
 /*
+ * ============================================================
+ * EFECTOS VISUALES (rediseño "boom visual", usuario 2026-10-05)
+ * ============================================================
+ *
+ * Todo sale de los tokens de arriba con `color-mix`: un halo "azul" es
+ * el --marca del tema activo mezclado con transparente. Así el tema
+ * oscuro brilla con su propio azul sin escribir un solo color nuevo.
+ */
+
+/*
+ * Lienzo de la aplicación: dos halos de luz fijos detrás del contenido
+ * (azul arriba a la derecha, morado abajo a la izquierda). Fijos con
+ * `background-attachment` para que no se muevan al desplazarse.
+ */
+.lienzo {
+  background-color: var(--fondo);
+  background-image:
+    radial-gradient(55rem 38rem at 100% -8%, color-mix(in srgb, var(--marca) 14%, transparent), transparent 62%),
+    radial-gradient(45rem 32rem at -8% 108%, color-mix(in srgb, var(--acento) 11%, transparent), transparent 62%);
+  background-attachment: fixed;
+}
+
+/*
+ * Banda "hero" de cada módulo: degradado marina → azul. La rejilla
+ * técnica de fondo es un SVG en línea (sin archivo aparte) y se
+ * desvanece hacia abajo con una máscara.
+ */
+.hero {
+  background-image: linear-gradient(
+    125deg,
+    var(--marina) 0%,
+    color-mix(in srgb, var(--marina) 55%, var(--hero-final)) 55%,
+    var(--hero-final) 100%
+  );
+}
+
+/*
+ * REGLA DE LEGIBILIDAD (usuario, 2026-10-05: "las letras deberían ser
+ * más visibles sobre los fondos"):
+ *   · sobre la banda o el vidrio: texto principal en blanco y el
+ *     secundario como mínimo en blanco al 90 % (nunca /55, /70, /75);
+ *   · ningún texto por debajo de 12 px (`text-xs`);
+ *   · relleno azul con texto blanco → `bg-marca-relleno`, no `bg-marca`.
+ */
+
+.hero-rejilla {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black 10%, transparent 95%);
+}
+
+/* Luces que derivan despacio dentro del hero. */
+@keyframes derivar {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, 25px) scale(1.15); }
+}
+
+.luz {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+  animation: derivar 14s ease-in-out infinite;
+}
+
+/*
+ * Destello: una franja de luz que cruza el elemento al pasar el cursor.
+ * Requiere `position: relative` y `overflow: hidden` en el elemento.
+ */
+.destello {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.destello::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 700ms ease;
+}
+
+.destello:hover::after {
+  transform: translateX(120%);
+}
+
+/* Vidrio: superficie translúcida sobre fondos oscuros (hero, barras). */
+.vidrio {
+  background-color: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  backdrop-filter: blur(12px);
+}
+
+/* Flotar: para ilustraciones de estados vacíos. */
+@keyframes flotar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.flotar {
+  animation: flotar 3.5s ease-in-out infinite;
+}
+
+/* Entrada con rebote desde abajo: barras flotantes. */
+@keyframes subir-rebote {
+  0% { opacity: 0; transform: translateY(40px) scale(0.96); }
+  60% { opacity: 1; transform: translateY(-6px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.subir-rebote {
+  animation: subir-rebote 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/*
  * Animación de entrada en CSS. anime.js cubre lo que necesita
  * secuencia, cálculo o interacción (ver `shared/animacion/`); esto
  * cubre el caso simple de "que la pantalla aparezca" sin JavaScript.
@@ -216,6 +366,12 @@ textarea:focus-visible {
 @keyframes aparecer-arriba {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Paneles que bajan desde la barra de navegación (menús desplegables y el panel del celular). */
+@keyframes desplegar {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .animar-entrada {
@@ -230,6 +386,8 @@ textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;
+    /* Sin esto, una animación infinita a 1 ms parpadearía sin parar. */
+    animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
 }

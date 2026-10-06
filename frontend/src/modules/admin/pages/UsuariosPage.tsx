@@ -2,7 +2,8 @@
  * ADMINISTRACIÓN DE USUARIOS
  * ==========================
  *
- * Tabla + diálogo único para crear o editar. Al editar, la contraseña
+ * Lista de personas (filas con iniciales y rol; sin tabla ni tarjeta,
+ * usuario 2026-10-05) + diálogo único para crear o editar. Al editar, la contraseña
  * es opcional (solo si se quiere restablecer). No hay "eliminar": se
  * desactiva.
  */
@@ -14,7 +15,13 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { Alerta } from '../../../components/Alerta'
+import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
+import { Iniciales } from '../../../components/Iniciales'
+import { FilaRegistro, ListaRegistros, MetaDato } from '../../../components/ListaRegistros'
+import { Seccion } from '../../../components/Seccion'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoUsuario } from '../../../components/Iconos'
 import { Campo } from '../../../components/Campo'
 import { Dialogo } from '../../../components/Dialogo'
 import { Select } from '../../../components/Select'
@@ -36,16 +43,31 @@ type Formulario = z.infer<typeof esquema>
 export function UsuariosPage() {
   const qc = useQueryClient()
   const { usuario: actual } = useSesion()
-  const usuarios = useQuery({ queryKey: ['usuarios'], queryFn: usuariosApi.listar })
+  const usuarios = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: usuariosApi.listar,
+  })
   const roles = useRoles()
   const [editando, setEditando] = useState<PerfilUsuario | 'nuevo' | null>(null)
+  const inactivos = (usuarios.data ?? []).filter((u) => !u.activo).length
 
   const form = useForm<Formulario>({ resolver: zodResolver(esquema) })
-  const { register, handleSubmit, reset, formState: { errors } } = form
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form
 
   useEffect(() => {
     if (editando === 'nuevo') {
-      reset({ documento: '', nombre: '', email: '', rolId: '', contrasena: '' })
+      reset({
+        documento: '',
+        nombre: '',
+        email: '',
+        rolId: '',
+        contrasena: '',
+      })
     } else if (editando) {
       reset({
         documento: editando.documento,
@@ -60,7 +82,12 @@ export function UsuariosPage() {
   const guardar = useMutation({
     mutationFn: (datos: Formulario) => {
       if (editando === 'nuevo') {
-        if (!datos.contrasena) throw { estado: 400, codigo: 'FORM', mensaje: 'La contraseña es obligatoria al crear.' }
+        if (!datos.contrasena)
+          throw {
+            estado: 400,
+            codigo: 'FORM',
+            mensaje: 'La contraseña es obligatoria al crear.',
+          }
         return usuariosApi.crear({
           documento: datos.documento,
           nombre: datos.nombre,
@@ -89,59 +116,74 @@ export function UsuariosPage() {
 
   return (
     <section className="space-y-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-tinta">Usuarios</h1>
-        <Boton onClick={() => setEditando('nuevo')}>Nuevo usuario</Boton>
-      </header>
+      <EncabezadoPagina
+        Icono={IconoUsuario}
+        escena="personas"
+        titulo="Usuarios"
+        descripcion="Quién entra al aplicativo y con qué rol. Un usuario no se borra: se desactiva."
+        acciones={
+          <Boton variante="claro" onClick={() => setEditando('nuevo')}>
+            + Nuevo usuario
+          </Boton>
+        }
+      />
 
       {usuarios.isError && <Alerta tipo="error">{comoErrorApi(usuarios.error).mensaje}</Alerta>}
       {cambiarActivo.isError && <Alerta tipo="error">{comoErrorApi(cambiarActivo.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-            <tr>
-              <th className="px-4 py-2">Documento</th>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Correo</th>
-              <th className="px-4 py-2">Rol</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-borde">
-            {usuarios.data?.map((u) => (
-              <tr key={u.id} className={u.activo ? '' : 'text-tinta-suave'}>
-                <td className="px-4 py-2 cifra">{u.documento}</td>
-                <td className="px-4 py-2">{u.nombre}</td>
-                <td className="px-4 py-2">{u.email ?? '—'}</td>
-                <td className="px-4 py-2">{u.rolCodigo}</td>
-                <td className="px-4 py-2">{u.activo ? 'Activo' : 'Inactivo'}</td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
-                  <button className="text-marca hover:underline" onClick={() => setEditando(u)}>
+      <Seccion
+        titulo="Personas con acceso"
+        contador={usuarios.data?.length}
+        accion={inactivos > 0 && <Badge tono="neutro">{inactivos} inactivos</Badge>}
+      >
+        <ListaRegistros cargando={usuarios.isLoading}>
+          {usuarios.data?.map((u) => (
+            <FilaRegistro
+              key={u.id}
+              tono={u.activo ? 'marca' : undefined}
+              apagada={!u.activo}
+              etiqueta={
+                <>
+                  <Iniciales nombre={u.nombre} activo={u.activo} />
+                  <Badge tono="acento">{u.rolCodigo}</Badge>
+                  {!u.activo && <Badge tono="neutro">Inactivo</Badge>}
+                  {u.id === actual?.id && <Badge tono="exito">Usted</Badge>}
+                </>
+              }
+              titulo={u.nombre}
+              meta={
+                <>
+                  <MetaDato etiqueta="Documento">{u.documento}</MetaDato>
+                  <MetaDato etiqueta="Correo">{u.email ?? '—'}</MetaDato>
+                </>
+              }
+              acciones={
+                <>
+                  <Boton variante="secundario" tamano="sm" onClick={() => setEditando(u)}>
                     Editar
-                  </button>
+                  </Boton>
                   {u.id !== actual?.id && (
-                    <button
-                      className="ml-3 text-tinta-suave hover:underline"
-                      onClick={() => cambiarActivo.mutate(u)}
-                    >
+                    <Boton variante="sutil" tamano="sm" onClick={() => cambiarActivo.mutate(u)}>
                       {u.activo ? 'Desactivar' : 'Activar'}
-                    </button>
+                    </Boton>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </>
+              }
+            />
+          ))}
+        </ListaRegistros>
+      </Seccion>
 
       <Dialogo
         abierto={editando !== null}
         titulo={editando === 'nuevo' ? 'Nuevo usuario' : 'Editar usuario'}
         onCerrar={() => setEditando(null)}
       >
-        <form onSubmit={(e) => void handleSubmit((d) => guardar.mutate(d))(e)} noValidate className="space-y-4">
+        <form
+          onSubmit={(e) => void handleSubmit((d) => guardar.mutate(d))(e)}
+          noValidate
+          className="space-y-4"
+        >
           <Campo
             etiqueta="Documento"
             error={errors.documento?.message}
@@ -149,11 +191,18 @@ export function UsuariosPage() {
             {...register('documento')}
           />
           <Campo etiqueta="Nombre" error={errors.nombre?.message} {...register('nombre')} />
-          <Campo etiqueta="Correo (opcional)" type="email" error={errors.email?.message} {...register('email')} />
+          <Campo
+            etiqueta="Correo (opcional)"
+            type="email"
+            error={errors.email?.message}
+            {...register('email')}
+          />
           <Select etiqueta="Rol" error={errors.rolId?.message} {...register('rolId')}>
             <option value="">Seleccione…</option>
             {roles.data?.map((r) => (
-              <option key={r.id} value={r.id}>{r.nombre}</option>
+              <option key={r.id} value={r.id}>
+                {r.nombre}
+              </option>
             ))}
           </Select>
           <Campo
@@ -165,8 +214,12 @@ export function UsuariosPage() {
           />
           {guardar.isError && <Alerta tipo="error">{comoErrorApi(guardar.error).mensaje}</Alerta>}
           <div className="flex justify-end gap-2">
-            <Boton type="button" variante="secundario" onClick={() => setEditando(null)}>Cancelar</Boton>
-            <Boton type="submit" cargando={guardar.isPending}>Guardar</Boton>
+            <Boton type="button" variante="secundario" onClick={() => setEditando(null)}>
+              Cancelar
+            </Boton>
+            <Boton type="submit" cargando={guardar.isPending}>
+              Guardar
+            </Boton>
           </div>
         </form>
       </Dialogo>

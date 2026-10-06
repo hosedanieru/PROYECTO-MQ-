@@ -54,7 +54,7 @@ function enHoraBogota(instante: Date | null | undefined): Date | null {
 
 @Injectable()
 export class ExceljsExportadorService implements ExportadorExcelRemision {
-  async generar(remisiones: RemisionParaImprimir[]): Promise<Buffer> {
+  async generar(remisiones: Array<Omit<RemisionParaImprimir, 'firmas'>>): Promise<Buffer> {
     const libro = new ExcelJS.Workbook();
     libro.creator = 'Aplicativo MQ — Inlotrans';
     libro.created = new Date();

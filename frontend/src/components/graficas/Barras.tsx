@@ -54,7 +54,7 @@ export function Barras({ datos, maximo, meta, sufijo = '', altura = 150 }: Props
             className="pointer-events-none absolute inset-x-0 border-t border-dashed border-tinta-suave/40"
             style={{ bottom: alto(meta) }}
           >
-            <span className="absolute -top-2.5 right-0 bg-base px-1 text-[10px] font-semibold text-tinta-suave">
+            <span className="absolute -top-2.5 right-0 bg-base px-1 text-xs font-semibold text-tinta-suave">
               meta {meta}
               {sufijo}
             </span>

@@ -8,10 +8,17 @@
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
+import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
-import { Tarjeta } from '../../../components/Tarjeta'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoCaja } from '../../../components/Iconos'
+import { LineaTiempo, type GrupoTiempo } from '../../../components/LineaTiempo'
+import { MetaDato } from '../../../components/ListaRegistros'
+import { PantallaCargando } from '../../../components/PantallaCargando'
+import { Seccion } from '../../../components/Seccion'
 import { comoErrorApi } from '../../../services/http'
-import { fechaCorta, fechaHora, fechaOperativaDe } from '../../../shared/utils/fechas'
+import { agruparEnOrden } from '../../../shared/utils/agrupar'
+import { diaLargo, fechaOperativaDe, hora } from '../../../shared/utils/fechas'
 import { useSesion } from '../../auth/useSesion'
 import { useTurnos } from '../../catalogo/hooks/useCatalogos'
 import { useEntradas } from '../hooks/useInventario'
@@ -40,57 +47,73 @@ export function EntradasPage() {
     setParams(siguiente, { replace: true })
   }
 
-  return (
-    <section className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave">Lo que ha llegado a la planta, por documento de soporte.</p>
-        {tienePermiso('inventario.registrar') && (
-          <Link to="/inventario/entradas/nueva" className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-marca-hover">
-            + Nueva entrada
+  const lista = entradas.data ?? []
+  const grupos: GrupoTiempo[] = agruparEnOrden(lista, (e) => e.fechaOperativa.slice(0, 10)).map((g): GrupoTiempo => ({
+    clave: g.clave,
+    titulo: diaLargo(g.clave),
+    resumen: `${g.elementos.length} ${g.elementos.length === 1 ? 'entrada' : 'entradas'}`,
+    eventos: g.elementos.map((e) => ({
+      clave: e.id,
+      tono: 'exito',
+      contenido: (
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+          <div className="min-w-0 flex-1 basis-64">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="cifra text-sm font-bold text-tinta">{hora(e.fechaHoraRegistro)}</span>
+              <span className="text-base font-bold text-tinta">{e.documento}</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
+              <MetaDato etiqueta="Turno">{turnos.data?.find((t) => t.id === e.turnoId)?.codigo ?? '—'}</MetaDato>
+              <MetaDato etiqueta="Entregó">{e.remitente ?? '—'}</MetaDato>
+              <MetaDato etiqueta="Recibió">{e.usuarioNombre}</MetaDato>
+            </div>
+          </div>
+          <Link to={`/inventario/entradas/${e.id}`}>
+            <Boton variante="sutil" tamano="sm">
+              Ver detalle →
+            </Boton>
           </Link>
-        )}
-      </header>
+        </div>
+      ),
+    })),
+  }))
 
-      <Tarjeta>
-        <div className="grid gap-3 sm:grid-cols-2">
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="w-44">
           <Campo etiqueta="Desde (día operativo)" type="date" value={desde} onChange={(e) => cambiar('desde', e.target.value)} />
+        </div>
+        <div className="w-44">
           <Campo etiqueta="Hasta" type="date" value={hasta} onChange={(e) => cambiar('hasta', e.target.value)} />
         </div>
-      </Tarjeta>
+        <div className="flex-1" />
+        {tienePermiso('inventario.registrar') && (
+          <Link to="/inventario/entradas/nueva">
+            <Boton>+ Nueva entrada</Boton>
+          </Link>
+        )}
+      </div>
 
       {entradas.isError && <Alerta tipo="error">{comoErrorApi(entradas.error).mensaje}</Alerta>}
 
-      <Tarjeta sinRelleno>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-              <tr>
-                <th className="px-4 py-2">Fecha y hora</th>
-                <th className="px-4 py-2">Día op.</th>
-                <th className="px-4 py-2">Turno</th>
-                <th className="px-4 py-2">Documento</th>
-                <th className="px-4 py-2">Quién entrega</th>
-                <th className="px-4 py-2">Recibió</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-borde">
-              {entradas.data?.map((e) => (
-                <tr key={e.id} className="hover:bg-velo/60">
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    <Link to={`/inventario/entradas/${e.id}`} className="font-medium text-marca hover:underline">{fechaHora(e.fechaHoraRegistro)}</Link>
-                  </td>
-                  <td className="px-4 py-2 cifra">{fechaCorta(e.fechaOperativa)}</td>
-                  <td className="px-4 py-2">{turnos.data?.find((t) => t.id === e.turnoId)?.codigo ?? '—'}</td>
-                  <td className="px-4 py-2 font-medium">{e.documento}</td>
-                  <td className="px-4 py-2">{e.remitente ?? '—'}</td>
-                  <td className="px-4 py-2">{e.usuarioNombre}</td>
-                </tr>
-              ))}
-              {entradas.data?.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-tinta-suave">No hay entradas en este rango.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </Tarjeta>
+      <Seccion
+        titulo="Entradas de mercancía"
+        contador={entradas.data ? lista.length : undefined}
+        descripcion="Lo que ha llegado a la planta, por documento de soporte, día por día."
+      >
+        {entradas.isLoading ? (
+          <PantallaCargando />
+        ) : lista.length === 0 ? (
+          <EstadoVacio
+            Icono={IconoCaja}
+            titulo="No hay entradas en este rango"
+            texto="Amplíe las fechas, o registre la mercancía que acaba de llegar."
+          />
+        ) : (
+          <LineaTiempo grupos={grupos} />
+        )}
+      </Seccion>
     </section>
   )
 }

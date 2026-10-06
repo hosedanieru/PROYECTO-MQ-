@@ -15,6 +15,7 @@
 
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
+import { FieldValue } from 'firebase-admin/firestore';
 
 import { COLECCION } from './cliente-firestore.js';
 import { FirestoreService } from './firestore.service.js';
@@ -145,6 +146,26 @@ async function sembrarAdministradorInicial(): Promise<void> {
   console.log(`  Administrador inicial: creado (${documento})`);
 }
 
+/**
+ * Personas esperadas por turno (2026-10-03): los grupos con el campo viejo
+ * `personasEsperadas` (un solo número) pasan a `esperadasPorTurno`, copiando
+ * ese número a cada turno, igual que la migración de PostgreSQL. Idempotente:
+ * un grupo ya convertido no se toca.
+ */
+async function convertirEsperadasPorTurno(): Promise<void> {
+  const turnos = await db.collection(COLECCION.turnos).get();
+  let convertidos = 0;
+  for (const grupo of (await db.collection(COLECCION.grupos).get()).docs) {
+    const d = grupo.data();
+    if (d.esperadasPorTurno !== undefined && d.personasEsperadas === undefined) continue;
+    const viejo = typeof d.personasEsperadas === 'number' && d.personasEsperadas > 0 ? d.personasEsperadas : null;
+    const esperadasPorTurno = d.esperadasPorTurno ?? (viejo ? Object.fromEntries(turnos.docs.map((t) => [t.id, viejo])) : {});
+    await grupo.ref.update({ esperadasPorTurno, personasEsperadas: FieldValue.delete() });
+    convertidos += 1;
+  }
+  console.log(`  grupos convertidos a esperadas por turno: ${convertidos}`);
+}
+
 async function main(): Promise<void> {
   console.log('Sembrando datos base del aplicativo MQ en Firestore...\n');
   await sembrarPermisos();
@@ -154,9 +175,10 @@ async function main(): Promise<void> {
   // Grupos: solo se asegura que existan (descripción y personas esperadas las mantiene el administrador).
   for (const grupo of GRUPOS) {
     const ref = db.collection(COLECCION.grupos).doc(grupo.codigo);
-    if (!(await ref.get()).exists) await ref.set({ ...grupo, activo: true });
+    if (!(await ref.get()).exists) await ref.set({ ...grupo, esperadasPorTurno: {}, activo: true });
   }
   console.log(`  grupos: ${GRUPOS.length}`);
+  await convertirEsperadasPorTurno();
   await sembrarLineas();
   // Causales de avería: solo se asegura que existan (las mantiene el administrador).
   for (const causal of CAUSALES_AVERIA) {

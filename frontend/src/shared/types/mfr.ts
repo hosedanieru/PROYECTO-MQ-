@@ -91,13 +91,22 @@ export interface MfrPorProducto {
 /** Comparación de lo que llegó contra lo que el grupo debía enviar. */
 export type EstadoPersonal = 'A_FIN' | 'AFECTADA' | 'SIN_DATO'
 
+/** De dónde salen las esperadas: ajuste del día, fijas del turno (en el grupo) o sin dato. */
+export type OrigenEsperadas = 'AJUSTE' | 'FIJA' | 'SIN_DATO'
+
 export interface PersonalGrupo {
   grupoId: string
   codigo: string
   nombre: string
   esperadas: number | null
+  origenEsperadas: OrigenEsperadas
+  motivoAjuste: string | null
+  /** false = se espera en el turno pero aún no se registró cuántos llegaron. */
+  registrado: boolean
   llegaron: number
   faltante: number
+  /** Personas por encima de las esperadas (registradas con observación). */
+  deMas: number
   /** Σ personas del grupo asignadas a líneas en el turno. */
   asignadas: number | null
   observacion: string | null
@@ -141,13 +150,18 @@ export interface PersonalTurno {
   estado: EstadoPersonal
 }
 
-/** Personal del día contra el DPP (solo turnos ya evaluados). */
+/** Personal del día: contra el DPP (solo turnos ya evaluados) y total contra los grupos. */
 export interface PersonalDia {
   requeridasDpp: number
   llegaron: number
   faltanteDpp: number
   coberturaDpp: number | null
   estado: EstadoPersonal
+  /** Σ esperadas de los grupos en todos los turnos del día. */
+  esperadasDia: number
+  /** Σ personas que llegaron en todos los turnos. */
+  llegaronDia: number
+  porGrupo: Array<{ grupoId: string; codigo: string; nombre: string; esperadas: number; llegaron: number; deMas: number; faltante: number }>
 }
 
 /** Asignación de un grupo a una línea en un turno (lo que devuelve /mfr/asignaciones). */
@@ -327,3 +341,31 @@ export interface ResultadoPeriodo {
   totalBloquesCreados: number
   diasCargados: number
 }
+
+// ---------- Resumen del turno / del día (foto tomada al cerrar el turno) ----------
+
+export interface ReferenciaResumen {
+  id: string
+  /** RT-2026-0007 (turno) o RD-2026-0003 (día). */
+  consecutivo: string
+}
+
+export interface ResultadoCierreTurno {
+  bloques: BloqueCalculado[]
+  resumenTurno: ReferenciaResumen
+  /** Solo si este cierre terminó el día operativo. */
+  resumenDia: ReferenciaResumen | null
+}
+
+export interface ResumenGuardado extends ReferenciaResumen {
+  tipo: 'TURNO' | 'DIA'
+  fechaOperativa: string
+  turnoId: string | null
+  titulo: string
+  cerradoPorNombre: string
+  fechaHora: string
+}
+
+/** Lo mismo que valida el backend (`validarNovedades`). */
+export const MINIMO_NOVEDADES = 10
+export const MAXIMO_NOVEDADES = 4000

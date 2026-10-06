@@ -103,6 +103,10 @@ model Usuario {
   entradasMercancia     EntradaMercancia[]
   recetasCreadas        Receta[]
   cierresInventario     CierreInventario[]
+  enviosCorreo          EnvioCorreo[]
+  resumenesTurno        ResumenTurno[]
+  firmasRemision        FirmaRemision[]
+  ajustesEsperadas      AjusteEsperadas[]
 
   @@map("usuario")
 }
@@ -166,16 +170,51 @@ model Grupo {
   id                String  @id @default(uuid())
   codigo            String  @unique
   descripcion       String?
-  personasEsperadas Int?    @map("personas_esperadas")
   nombre            String
   activo            Boolean @default(true)
 
-  remisiones   Remision[]
-  asistencias  AsistenciaTurno[]
-  asignaciones AsignacionLinea[]
-  averias      ReporteAveria[]
+  remisiones        Remision[]
+  asistencias       AsistenciaTurno[]
+  asignaciones      AsignacionLinea[]
+  averias           ReporteAveria[]
+  esperadasPorTurno GrupoEsperadasTurno[]
+  ajustesEsperadas  AjusteEsperadas[]
 
   @@map("grupo")
+}
+
+/// Personas que un grupo debería enviar a cada turno (usuario, 2026-10-03;
+/// antes era un solo número por grupo). Sin fila = no se espera en ese turno.
+model GrupoEsperadasTurno {
+  grupoId  String @map("grupo_id")
+  grupo    Grupo  @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  turnoId  String @map("turno_id")
+  turno    Turno  @relation(fields: [turnoId], references: [id])
+  personas Int
+
+  @@id([grupoId, turnoId])
+  @@map("grupo_esperadas_turno")
+}
+
+/// Ajuste de un día puntual a las esperadas de un grupo en un turno, con
+/// motivo (festivo, pedido especial). Manda sobre lo fijo del grupo.
+model AjusteEsperadas {
+  id             String   @id @default(uuid())
+  fechaOperativa DateTime @map("fecha_operativa") @db.Date
+  turnoId        String   @map("turno_id")
+  turno          Turno    @relation(fields: [turnoId], references: [id])
+  grupoId        String   @map("grupo_id")
+  grupo          Grupo    @relation(fields: [grupoId], references: [id])
+  /// 0 = ese día el grupo no se espera en el turno.
+  personas       Int
+  motivo         String
+  usuarioId      String   @map("usuario_id")
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  fechaRegistro  DateTime @map("fecha_registro") @db.Timestamptz(3)
+
+  @@unique([fechaOperativa, turnoId, grupoId])
+  @@index([fechaOperativa])
+  @@map("ajuste_esperadas")
 }
 
 /// Catálogo de productos. Administrable desde el panel.
@@ -232,6 +271,10 @@ model Turno {
   averias               ReporteAveria[]
   movimientosInventario MovimientoInventario[]
   entradasMercancia     EntradaMercancia[]
+  listasDistribucion    ListaDistribucion[]
+  resumenes             ResumenTurno[]
+  esperadasGrupos       GrupoEsperadasTurno[]
+  ajustesEsperadas      AjusteEsperadas[]
 
   @@map("turno")
 }
@@ -351,6 +394,7 @@ model Remision {
 
   estibas   RemisionEstiba[]
   versiones RemisionVersion[]
+  firmas    FirmaRemision[]
   /// PI e insumos que descontó al aprobarse (cajas × receta vigente).
   consumos  MovimientoInventario[]
 
@@ -877,6 +921,103 @@ model EntradaMercancia {
 
   @@index([fechaOperativa])
   @@map("entrada_mercancia")
+}
+
+/// Lista de distribución de correo (usuario, 2026-10-03): "Jefes",
+/// "PepsiCo", "Turno T2"… La mantiene el administrador. Una lista de un
+/// turno va en el envío automático cuando ese turno es el siguiente; una
+/// general va en todos si `incluir_en_cierres`.
+model ListaDistribucion {
+  id               String   @id @default(uuid())
+  nombre           String
+  turnoId          String?  @map("turno_id")
+  turno            Turno?   @relation(fields: [turnoId], references: [id])
+  incluirEnCierres Boolean  @default(false) @map("incluir_en_cierres")
+  /// Qué recibe al cerrar el turno: REMISIONES (PepsiCo…), RESUMEN (jefes,
+  /// coordinadores) o AMBOS (usuario, 2026-10-03).
+  recibe           String   @default("REMISIONES")
+  correos          String[]
+  activo           Boolean  @default(true)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  @@map("lista_distribucion")
+}
+
+/// Cada envío de remisiones por correo: a quién, qué remisiones y si el
+/// servidor lo aceptó (ENVIADO) o no (FALLIDO, con el error). Trazabilidad.
+model EnvioCorreo {
+  id             String   @id @default(uuid())
+  origen         String // MANUAL | CIERRE_TURNO
+  fechaHora      DateTime @map("fecha_hora") @db.Timestamptz(3)
+  fechaOperativa DateTime @map("fecha_operativa") @db.Date
+  turnoId        String?  @map("turno_id")
+  destinatarios  String[]
+  remisionIds    String[] @map("remision_ids")
+  asunto         String
+  estado         String // ENVIADO | FALLIDO
+  error          String?
+  usuarioId      String   @map("usuario_id")
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioNombre  String   @map("usuario_nombre")
+
+  @@index([fechaOperativa])
+  @@map("envio_correo")
+}
+
+/// Firma electrónica de una casilla del formato de la remisión (usuario,
+/// 2026-10-03). Una por casilla y versión; nunca se borra ni se edita.
+/// `huella` = SHA-256 del contenido firmado; nombre, documento, rol y
+/// declaración son copias congeladas.
+model FirmaRemision {
+  id               String   @id @default(uuid())
+  remisionId       String   @map("remision_id")
+  remision         Remision @relation(fields: [remisionId], references: [id])
+  version          Int
+  tipo             String // INLOTRANS | VERIFICADOR | RECIBE | VALIDACION
+  usuarioId        String   @map("usuario_id")
+  usuario          Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioNombre    String   @map("usuario_nombre")
+  usuarioDocumento String   @map("usuario_documento")
+  usuarioRol       String   @map("usuario_rol")
+  declaracion      String
+  huella           String
+  /// PNG del trazo como data URL.
+  trazo            String
+  dispositivo      String?
+  ip               String?
+  fechaHora        DateTime @map("fecha_hora") @db.Timestamptz(3)
+
+  @@unique([remisionId, version, tipo])
+  @@index([remisionId])
+  @@map("firma_remision")
+}
+
+/// Resumen del turno (RT) o del día (RD) que se toma al cerrar el turno
+/// (usuario, 2026-10-03). Es una FOTO: `datos` se guarda tal cual y no se
+/// edita; el PDF siempre muestra lo mismo. Consecutivo propio por tipo y
+/// año (tabla `consecutivo`, tipos RESUMEN_TURNO / RESUMEN_DIA).
+model ResumenTurno {
+  id               String   @id @default(uuid())
+  tipo             String // TURNO | DIA
+  anio             Int
+  numero           Int
+  fechaOperativa   DateTime @map("fecha_operativa") @db.Date
+  turnoId          String?  @map("turno_id")
+  turno            Turno?   @relation(fields: [turnoId], references: [id])
+  formatoCodigo    String?  @map("formato_codigo")
+  formatoVersion   String?  @map("formato_version")
+  formatoVigencia  String?  @map("formato_vigencia")
+  datos            Json
+  cerradoPorId     String   @map("cerrado_por_id")
+  cerradoPor       Usuario  @relation(fields: [cerradoPorId], references: [id])
+  cerradoPorNombre String   @map("cerrado_por_nombre")
+  fechaHora        DateTime @map("fecha_hora") @db.Timestamptz(3)
+
+  @@unique([tipo, anio, numero])
+  @@index([fechaOperativa])
+  @@map("resumen_turno")
 }
 
 /// Cierre del día operativo (usuario, 2026-10-01): conteo físico de los

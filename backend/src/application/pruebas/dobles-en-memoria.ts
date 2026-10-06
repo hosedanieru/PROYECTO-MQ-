@@ -41,6 +41,7 @@ import type {
 import { Usuario } from '../../domain/usuario/usuario.entity.js';
 import type { UsuarioRepository } from '../../domain/usuario/usuario.repository.js';
 import {
+  AjusteEsperadasRepositorioFalso,
   AsignacionRepositorioFalso,
   AsistenciaRepositorioFalso,
   BloqueRepositorioFalso,
@@ -49,6 +50,9 @@ import {
   LineaRepositorioFalso,
 } from './dobles-mfr.js';
 import { CausalRepositorioFalso, ReporteAveriaRepositorioFalso } from './dobles-averia.js';
+import { EnvioCorreoRepositorioFalso, ListaDistribucionRepositorioFalso } from './dobles-correo.js';
+import { ResumenTurnoRepositorioFalso } from './dobles-resumen.js';
+import { FirmaRemisionRepositorioFalso } from './dobles-firma.js';
 import {
   EntradaMercanciaRepositorioFalso,
   ItemInventarioRepositorioFalso,
@@ -215,6 +219,7 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
   constructor(parcial: Partial<ContextoTransaccional> = {}) {
     this.contexto = {
       remisiones: REMISIONES_SIN_USO,
+      firmasRemision: new FirmaRemisionRepositorioFalso(),
       usuarios: new UsuarioRepositorioFalso(),
       productos: new ProductoRepositorioFalso(),
       grupos: new GrupoRepositorioFalso(),
@@ -224,6 +229,7 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
       estandares: new EstandarRepositorioFalso(),
       asistencias: new AsistenciaRepositorioFalso(),
       asignaciones: new AsignacionRepositorioFalso(),
+      ajustesEsperadas: new AjusteEsperadasRepositorioFalso(),
       causales: new CausalRepositorioFalso(),
       reportesAveria: new ReporteAveriaRepositorioFalso(),
       itemsInventario: new ItemInventarioRepositorioFalso(),
@@ -233,6 +239,9 @@ export class UnidadDeTrabajoFalsa implements UnidadDeTrabajo {
       unidadesMedida: new UnidadMedidaRepositorioFalso(),
       recetas: new RecetaRepositorioFalso(),
       cierresInventario: new CierreInventarioRepositorioFalso(),
+      listasDistribucion: new ListaDistribucionRepositorioFalso(),
+      enviosCorreo: new EnvioCorreoRepositorioFalso(),
+      resumenesTurno: new ResumenTurnoRepositorioFalso(),
       ...parcial,
     };
   }

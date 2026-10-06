@@ -28,7 +28,7 @@ const TITULO: Record<Tono, string> = {
 
 const DESCRIPCION: Record<Tono, string> = {
   claro: 'text-tinta-suave',
-  marino: 'text-white/70',
+  marino: 'text-white/90',
 }
 
 /**

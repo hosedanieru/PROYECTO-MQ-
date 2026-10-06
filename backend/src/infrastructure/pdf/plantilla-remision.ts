@@ -20,6 +20,11 @@
  *   Nº ESTIBAS    → "estibasCompletas,cajasSueltas" (PENDIENTE DE CONFIRMAR)
  *   OBSERVACIONES → observaciones + "EST: 7,8,9,10"
  *
+ * Firmas electrónicas (2026-10-05): cada casilla firmada lleva el trazo
+ * sobre la línea, nombre, cargo y lo que se declaró; abajo, la constancia
+ * con documento, fecha/hora y la huella SHA-256 (y "PILOTO" mientras no
+ * haya aval de PepsiCo y del área legal: FIRMA_ELECTRONICA_PILOTO).
+ *
  * Si la remisión no está aprobada lleva una marca de agua con su estado,
  * y si es una versión rectificada se indica: ambas cosas fuera del
  * cuadro, para no alterar el formato aprobado.
@@ -32,8 +37,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { RemisionParaImprimir } from '../../domain/remision/generador-pdf.js';
+import type { FirmaRemision, TipoFirma } from '../../domain/remision/firma-remision.js';
+import { escapar, fechaDia, fechaRegistro, horaRegistro } from './formato.js';
 
-const ZONA = 'America/Bogota';
 const RUTA_LOGO = path.resolve(process.cwd(), 'recursos', 'logo-inlotrans.png');
 
 let logoCache: string | null | undefined;
@@ -48,33 +54,6 @@ function logo(): string | null {
   return logoCache;
 }
 
-function escapar(texto: string | null | undefined): string {
-  return String(texto ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/** Fechas de solo día (operativa, vencimiento): en UTC, no retroceden. */
-function fechaDia(d: Date, anioCorto = false): string {
-  return new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'UTC',
-    day: '2-digit',
-    month: '2-digit',
-    year: anioCorto ? '2-digit' : 'numeric',
-  }).format(d);
-}
-
-/** Instantes reales: en hora de Colombia. */
-function fechaRegistro(d: Date): string {
-  return new Intl.DateTimeFormat('es-CO', { timeZone: ZONA, day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
-}
-
-function horaRegistro(d: Date): string {
-  return new Intl.DateTimeFormat('es-CO', { timeZone: ZONA, hour: 'numeric', minute: '2-digit', hour12: false }).format(d);
-}
-
 const ETIQUETA_ESTADO: Record<string, string> = {
   BORRADOR: 'BORRADOR',
   ENTREGADA: 'SIN APROBAR',
@@ -82,8 +61,45 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   EN_RECTIFICACION: 'EN RECTIFICACIÓN',
 };
 
-function bloqueRemision({ remision, turno, lugar }: RemisionParaImprimir): string {
+/** El cargo impreso en la casilla: el nombre del rol, no su código. */
+const CARGO_DE_ROL: Record<string, string> = {
+  ADMINISTRADOR: 'Administrador',
+  COORDINADOR_MQ: 'Coordinador MQ',
+  PATINADOR: 'Patinador',
+  OPA_PEPSICO: 'OPA PepsiCo',
+};
+const cargo = (f: FirmaRemision | undefined) => (f ? CARGO_DE_ROL[f.usuarioRol] ?? f.usuarioRol : undefined);
+
+/** El trazo va encima de la línea de su casilla. */
+function trazo(f: FirmaRemision | undefined): string {
+  return f ? `<img class="trazo" src="${f.trazo}" alt="Firma de ${escapar(f.usuarioNombre)}">` : '';
+}
+
+/** Lo que el firmante declaró (copia guardada en la firma). */
+function declaracion(f: FirmaRemision | undefined): string {
+  return f ? `<div class="declaracion">${escapar(f.declaracion)}</div>` : '';
+}
+
+/**
+ * Constancia de firma electrónica: quién, cuándo y la huella del
+ * contenido firmado. Mientras PepsiCo y el área legal no den el aval
+ * (PENDIENTE), se marca como PILOTO.
+ */
+function constancia(firmas: FirmaRemision[], piloto: boolean): string {
+  if (firmas.length === 0) return '';
+  const lista = firmas
+    .map((f) => `${escapar(f.tipo)}: ${escapar(f.usuarioNombre)} (doc. ${escapar(f.usuarioDocumento)}) ${fechaRegistro(f.fechaHora)} ${horaRegistro(f.fechaHora)}`)
+    .join(' · ');
+  return `<div class="constancia">
+    ${piloto ? '<b>PILOTO — conserve también la remisión firmada en papel.</b> ' : ''}
+    Firmado electrónicamente con usuario y contraseña (Ley 527 de 1999): ${lista}.
+    Huella SHA-256 del documento firmado: ${escapar(firmas[0].huella)}
+  </div>`;
+}
+
+function bloqueRemision({ remision, turno, lugar, firmas }: RemisionParaImprimir, piloto: boolean): string {
   const d = remision.aObjeto();
+  const firma = (tipo: TipoFirma) => firmas.find((f) => f.tipo === tipo);
   const marca = ETIQUETA_ESTADO[d.estado];
   const observaciones = [d.observaciones, d.numerosEstiba.length ? `EST: ${d.numerosEstiba.join(',')}` : null]
     .filter(Boolean)
@@ -147,36 +163,42 @@ function bloqueRemision({ remision, turno, lugar }: RemisionParaImprimir): strin
     <div class="espacio-firma"></div>
     <div class="firmas">
       <div class="firma">
+        ${trazo(firma('RECIBE'))}
         <div class="linea-firma">FIRMA QUIEN RECIBE</div>
-        <div><b>Nombre:</b> ${escapar(d.opaNombre)}</div>
-        <div><b>Cargo:</b> ${escapar(d.opaCargo)}</div>
+        <div><b>Nombre:</b> ${escapar(firma('RECIBE')?.usuarioNombre ?? d.opaNombre)}</div>
+        <div><b>Cargo:</b> ${escapar(cargo(firma('RECIBE')) ?? d.opaCargo)}</div>
         <div><b>Cliente:</b></div>
       </div>
       <div class="firma">
+        ${trazo(firma('INLOTRANS'))}
         <div class="linea-firma">FIRMA INLOTRANS</div>
-        <div><b>Nombre:</b></div>
-        <div><b>Cargo:</b></div>
+        <div><b>Nombre:</b> ${escapar(firma('INLOTRANS')?.usuarioNombre)}</div>
+        <div><b>Cargo:</b> ${escapar(cargo(firma('INLOTRANS')))}</div>
+        ${declaracion(firma('INLOTRANS'))}
       </div>
     </div>
     <div class="espacio-firma"></div>
     <div class="firmas">
       <div class="firma">
+        ${trazo(firma('VERIFICADOR'))}
         <div class="linea-firma">FIRMA VERIFICADOR</div>
-        <div><b>Nombre:</b></div>
-        <div><b>Cargo:</b></div>
+        <div><b>Nombre:</b> ${escapar(firma('VERIFICADOR')?.usuarioNombre)}</div>
+        <div><b>Cargo:</b> ${escapar(cargo(firma('VERIFICADOR')))}</div>
         <div><b>Cliente:</b></div>
+        ${declaracion(firma('VERIFICADOR'))}
       </div>
       <div class="firma"></div>
     </div>
+    ${constancia(firmas, piloto)}
   </section>`;
 }
 
 /** Documento completo: hojas carta verticales con dos remisiones cada una. */
-export function plantillaRemisiones(remisiones: RemisionParaImprimir[]): string {
+export function plantillaRemisiones(remisiones: RemisionParaImprimir[], opciones: { pilotoFirmas: boolean } = { pilotoFirmas: true }): string {
   const hojas: string[] = [];
   for (let i = 0; i < remisiones.length; i += 2) {
     const par = remisiones.slice(i, i + 2);
-    hojas.push(`<div class="hoja">${par.map(bloqueRemision).join('<div class="corte"></div>')}</div>`);
+    hojas.push(`<div class="hoja">${par.map((r) => bloqueRemision(r, opciones.pilotoFirmas)).join('<div class="corte"></div>')}</div>`);
   }
 
   return `<!doctype html>
@@ -228,6 +250,10 @@ export function plantillaRemisiones(remisiones: RemisionParaImprimir[]): string 
   .firma { flex: 1; }
   .linea-firma { border-top: 1.5px solid #000; padding-top: 0.5mm; text-align: center; font-size: 7.5pt; margin-bottom: 1mm; }
   .firma div b { font-weight: bold; }
+  /* Firma electrónica: el trazo sobre la línea, la declaración y la constancia. */
+  .trazo { display: block; height: 10mm; max-width: 55mm; margin: 0 auto -1mm; object-fit: contain; }
+  .declaracion { font-size: 6pt; font-style: italic; color: #333; }
+  .constancia { margin-top: 1mm; font-size: 5.5pt; line-height: 1.25; color: #333; word-break: break-all; }
 
   /* Avisos fuera del formato */
   .marca {

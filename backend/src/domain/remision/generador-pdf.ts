@@ -11,6 +11,7 @@
  * consultar catálogos.
  */
 
+import type { FirmaRemision } from './firma-remision.js';
 import type { Remision } from './remision.entity.js';
 
 export interface RemisionParaImprimir {
@@ -18,6 +19,8 @@ export interface RemisionParaImprimir {
   turno: string;
   grupo: string;
   lugar: string;
+  /** Firmas VIGENTES de la versión actual (las de versiones viejas no se imprimen). */
+  firmas: FirmaRemision[];
 }
 
 export interface GeneradorPdfRemision {

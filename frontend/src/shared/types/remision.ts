@@ -127,3 +127,39 @@ export type EditarRemisionDatos = Partial<Omit<CrearRemisionDatos, 'observacione
   observaciones?: string | null
   motivoExtraoficial?: string | null
 }
+
+// ---------- Firma electrónica (2026-10-05) ----------
+
+/** Casillas del formato. RECIBE va con "Aprobar y firmar" (OPA) y VALIDACION con "Validar y firmar". */
+export type TipoFirma = 'INLOTRANS' | 'VERIFICADOR' | 'RECIBE' | 'VALIDACION'
+
+export interface FirmaRemision {
+  id: string
+  remisionId: string
+  version: number
+  tipo: TipoFirma
+  usuarioNombre: string
+  usuarioDocumento: string
+  usuarioRol: string
+  declaracion: string
+  /** SHA-256 del contenido firmado. */
+  huella: string
+  /** PNG del trazo (data URL). */
+  trazo: string
+  dispositivo: string | null
+  ip: string | null
+  fechaHora: string
+  /** false = de otra versión o el documento cambió: ya no respalda la remisión actual. */
+  vigente: boolean
+}
+
+/** PILOTO: firmas opcionales (respaldo en papel). OBLIGATORIA: fin del piloto, no se aprueba ni valida sin firmar. */
+export type ModoFirma = 'PILOTO' | 'OBLIGATORIA'
+
+export interface FirmasRemision {
+  modo: ModoFirma
+  version: number
+  huellaActual: string
+  casillas: Array<{ tipo: TipoFirma; declaracion: string; firma: FirmaRemision | null }>
+  historial: FirmaRemision[]
+}

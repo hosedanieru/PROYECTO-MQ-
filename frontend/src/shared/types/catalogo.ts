@@ -14,8 +14,8 @@ export interface Grupo {
   nombre: string
   /** Texto libre: aquí se escribe el proveedor real. */
   descripcion: string | null
-  /** Personas que el grupo debería enviar por turno; null = sin definir. */
-  personasEsperadas: number | null
+  /** Personas que el grupo debería enviar a cada turno: { turnoId: personas }. Sin turno = no se espera. */
+  esperadasPorTurno: Record<string, number>
   activo: boolean
 }
 
@@ -23,7 +23,8 @@ export interface DatosGrupo {
   codigo: string
   nombre: string
   descripcion: string | null
-  personasEsperadas: number | null
+  /** Reemplaza todas las esperadas del grupo. */
+  esperadasPorTurno: Array<{ turnoId: string; personas: number }>
 }
 
 export const PROCESOS_PRODUCTO = ['MANUAL', 'AUTOMATICA'] as const

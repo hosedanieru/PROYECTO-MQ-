@@ -10,6 +10,8 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoRemision } from '../../../components/Iconos'
 import { EstadoBadge } from '../../../components/EstadoBadge'
 import { PantallaCargando } from '../../../components/PantallaCargando'
 import { comoErrorApi } from '../../../services/http'
@@ -33,31 +35,40 @@ export function EditarRemisionPage() {
   if (!r.esEditable) {
     return (
       <Alerta tipo="info">
-        La remisión {r.consecutivo} está en estado <EstadoBadge estado={r.estado} /> y ya no se
-        puede editar. <Link to={`/remisiones/${r.id}`} className="underline">Volver al detalle</Link>.
+        La remisión {r.consecutivo} está en estado <EstadoBadge estado={r.estado} /> y ya no se puede editar.{' '}
+        <Link to={`/remisiones/${r.id}`} className="underline">
+          Volver al detalle
+        </Link>
+        .
       </Alerta>
     )
   }
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <Link to={`/remisiones/${r.id}`} className="text-sm text-tinta-suave hover:underline">
-          ← Remisión {r.consecutivo}
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-tinta">
-          Editar remisión {r.consecutivo}
-          {r.version > 1 && <span className="ml-2 text-base font-normal text-tinta-suave">versión {r.version}</span>}
-        </h1>
-        <p className="text-sm text-tinta-suave">
-          Día operativo <strong>{fechaCorta(r.fechaOperativa)}</strong> (no cambia al editar).
-        </p>
-        {motivoRechazo && (
-          <Alerta tipo="error">
-            <strong>Motivo del rechazo del OPA:</strong> {motivoRechazo}
-          </Alerta>
-        )}
-      </header>
+      <EncabezadoPagina
+        Icono={IconoRemision}
+        escena="remision"
+        volver={{
+          a: `/remisiones/${r.id}`,
+          texto: `Remisión ${r.consecutivo}`,
+        }}
+        titulo={`Editar remisión ${r.consecutivo}`}
+        insignia={
+          r.version > 1 && <span className="text-base font-medium text-white/90">versión {r.version}</span>
+        }
+        descripcion={
+          <>
+            Día operativo <strong className="font-semibold text-white">{fechaCorta(r.fechaOperativa)}</strong>{' '}
+            (no cambia al editar).
+          </>
+        }
+      />
+      {motivoRechazo && (
+        <Alerta tipo="error">
+          <strong>Motivo del rechazo del OPA:</strong> {motivoRechazo}
+        </Alerta>
+      )}
 
       <RemisionForm
         fechaOperativa={r.fechaOperativa}
@@ -67,7 +78,11 @@ export function EditarRemisionPage() {
         error={editar.error}
         onEnviar={async (datos) => {
           // `null` explícito: quitar la marca extraoficial también borra su motivo.
-          await editar.mutateAsync({ ...datos, observaciones: datos.observaciones ?? null, motivoExtraoficial: datos.motivoExtraoficial ?? null })
+          await editar.mutateAsync({
+            ...datos,
+            observaciones: datos.observaciones ?? null,
+            motivoExtraoficial: datos.motivoExtraoficial ?? null,
+          })
           navegar(`/remisiones/${r.id}`)
         }}
         onCancelar={() => navegar(`/remisiones/${r.id}`)}

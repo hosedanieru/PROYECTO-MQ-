@@ -27,15 +27,32 @@ import type {
   GeneradorPdfRemision,
   RemisionParaImprimir,
 } from '../../domain/remision/generador-pdf.js';
+import type { GeneradorPdfResumen, ResumenTurno } from '../../domain/resumen/resumen-turno.js';
 import { plantillaRemisiones } from './plantilla-remision.js';
+import { plantillaResumen } from './plantilla-resumen.js';
 
+/**
+ * Un solo servicio (y un solo Chromium) para todos los PDF: remisiones y
+ * resumen del turno. Lo entrega `PdfModule` con los dos tokens.
+ */
 @Injectable()
-export class PuppeteerPdfService implements GeneradorPdfRemision, OnModuleDestroy {
+export class PuppeteerPdfService implements OnModuleDestroy {
   private readonly logger = new Logger(PuppeteerPdfService.name);
   private navegador: Promise<Browser> | null = null;
 
-  async generar(remisiones: RemisionParaImprimir[]): Promise<Buffer> {
-    const html = plantillaRemisiones(remisiones);
+  /** Puerto de las remisiones. */
+  readonly remisiones: GeneradorPdfRemision = {
+    // Mientras no haya aval de PepsiCo y del área legal, las firmas se marcan como piloto.
+    generar: (remisiones: RemisionParaImprimir[]) =>
+      this.html(plantillaRemisiones(remisiones, { pilotoFirmas: process.env.FIRMA_ELECTRONICA_PILOTO !== 'false' })),
+  };
+
+  /** Puerto del resumen del turno / del día. */
+  readonly resumen: GeneradorPdfResumen = {
+    generar: (resumen: ResumenTurno) => this.html(plantillaResumen(resumen)),
+  };
+
+  private async html(html: string): Promise<Buffer> {
     try {
       return await this.imprimir(html);
     } catch (error) {

@@ -115,14 +115,14 @@ Estado 2026-09-19: el catálogo se completó a mano en el panel; la simulación 
 
 ## Personal del turno: grupos y asistencia (área, 2026-09-21)
 
-Los antiguos "proveedores" pasaron a llamarse **grupos** en todo el sistema. Cada grupo tiene `personasEsperadas` (número fijo de personas que debería enviar por turno) y una `descripcion` donde se escribe a mano a qué proveedor corresponde. Ambos los edita el administrador en `/admin/grupos`.
+Los antiguos "proveedores" pasaron a llamarse **grupos** en todo el sistema. Cada grupo tiene sus **personas esperadas por turno** (`esperadasPorTurno`; hasta el 2026-10-03 era un solo número para todos los turnos), ajustables por un día con motivo, y una `descripcion` donde se escribe a mano a qué proveedor corresponde. Ambos los edita el administrador en `/admin/grupos`.
 
 En la programación del día, por turno, el coordinador registra cuántas personas de cada grupo **llegaron** (varios grupos por turno). Registrar de nuevo el mismo (fecha, turno, grupo) corrige el valor y se audita con el anterior.
 
 **Cambio del usuario (2026-09-30): el personal debe ser proporcional a lo que pide el DPP.** El turno se compara **dos veces** (`domain/mfr/asistencia-turno.ts`) y queda `AFECTADA` si falla **cualquiera**:
 
 1. **Contra el DPP** (`estadoDpp`): llegaron (todos los grupos) vs `requeridasDpp` = Σ por línea del **máximo** de personas de sus bloques en el turno (`personasAsignadas` del bloque, que por defecto toma la "línea ideal" `personasIdeal` del producto). Máximo y no promedio: la gente llega para todo el turno y la línea debe cubrir el pico. Se reporta `faltanteDpp` y la **cobertura %** (`coberturaDpp` = llegaron ÷ requeridas), base del indicador de afectación.
-2. **Contra los grupos** (`estadoGrupos`): cada grupo contra sus `personasEsperadas` (llegar de más en un grupo no compensa a otro).
+2. **Contra los grupos** (`estadoGrupos`): cada grupo contra sus esperadas de ESE turno ese día (`esperadasDe`: ajuste del día → fijo del turno); llegar de más en un grupo no compensa a otro y exige observación.
 
 `SIN_DATO` mientras no haya asistencia registrada en el turno. Las líneas con bloques sin personas definidas se cuentan en `lineasSinDato` y generan una advertencia: lo que pide el DPP queda corto. El tablero trae además `personal` del **día** (`resumirPersonalDia`): suma solo los turnos ya evaluados, para que un turno que aún no empieza no baje la cobertura.
 
@@ -149,7 +149,7 @@ La pantalla refleja la regla: el selector de grupo solo muestra grupos con asist
 ## Gobierno
 
 1. **Motivo obligatorio** al corregir o eliminar un bloque existente; se audita con valor anterior y nuevo.
-2. **Cerrar turno** (`POST /mfr/turno/cerrar`): congela sus bloques; después no se editan ni eliminan (409 `MFR_TURNO_CERRADO`). Irreversible.
+2. **Cerrar turno** (`POST /mfr/turno/cerrar`): congela sus bloques; después no se editan ni eliminan (409 `MFR_TURNO_CERRADO`). Irreversible. Exige las **novedades** del coordinador y guarda en la misma transacción el **resumen del turno** (RT-AAAA-NNNN) y, si era el último turno abierto del día, el **del día** (RD-AAAA-NNNN). Ver "Resumen del turno" en `docs/api.md`.
 3. **Reemplazar un día** (importar o copiar sobre un día con bloques): exige `reemplazar: true` + motivo; falla si hay bloques cerrados.
 4. **Sin solapamientos** en la misma línea (409 `MFR_BLOQUES_SOLAPADOS`); el bloque debe caber en el día operativo 06:00→06:00.
 5. **Estándares** (`cajas_por_hora`, `peso_neto_kg` en `producto`): se pueden dar **al crear** el producto (valor inicial, sin motivo); después solo `catalogo.editar_estandares` (administrador), siempre con motivo.
@@ -162,7 +162,8 @@ La pantalla refleja la regla: el selector de grupo solo muestra grupos con asist
 | `linea_produccion` / `lineasProduccion` | `codigo`, `nombre` (como PepsiCo), `tipo` MULTIPACK·MANUAL, `capacidad_kg_hora`, `orden`, `activo` | 9 líneas sembradas: L1–L4, **L5**, MANUAL-1, MANUAL-2, REEMPAQU-2, REEMPAQUES |
 | `bloque_programacion` / `bloquesProgramacion` | `fecha_operativa`, `linea_id`, `turno_id` (derivado), `producto_id`, `hora_inicio`, `hora_fin`, `cajas_por_hora`, `eficiencia_porcentaje` (1–100), `loop`, `personas_asignadas`, `origen` MANUAL·DPP·COPIA, `creado_por_id`, `cerrado_en`, `cerrado_por_id` | Id aleatorio; la regla de no solapamiento la aplica el caso de uso en la transacción |
 | `producto` | `cajas_por_hora` (Decimal 8,2), `peso_neto_kg` (Decimal 8,3), `personas_ideal` (Int), `subdescripcion` (texto ≤ 40, en mayúsculas) | Estándar y datos de la hoja TIEMPOS |
-| `grupo` / `grupos` | `codigo`, `nombre`, `descripcion`, `personas_esperadas`, `activo` | Antes `proveedor`; `remision.grupo_id` |
+| `grupo` / `grupos` | `codigo`, `nombre`, `descripcion`, `activo` + `grupo_esperadas_turno` | Antes `proveedor`; `remision.grupo_id` |
+| `ajuste_esperadas` / `ajustesEsperadas` | fecha, turno, grupo, personas, motivo | Ajuste de un día a las esperadas |
 | `asistencia_turno` / `asistenciasTurno` | `fecha_operativa`, `turno_id`, `grupo_id`, `personas_llegaron`, `observacion`, `registrada_por_id`, `fecha_registro` | Única por (fecha, turno, grupo); en Firestore el id es `{fecha}_{turno}_{grupo}` |
 | `asignacion_linea` / `asignacionesLinea` | `fecha_operativa`, `turno_id`, `linea_id`, `grupo_id`, `personas`, `registrada_por_id`, `fecha_registro` | Única por (fecha, turno, línea, grupo); en Firestore el id es `{fecha}_{turno}_{linea}_{grupo}` |
 
@@ -180,12 +181,13 @@ Migraciones Prisma: `20260918140000_mfr_bloques_dpp_pepsico` (elimina `programac
 | `POST /mfr/bloques/periodo` | `mfr.cargar_programacion` | Carga N días: cada bloque trae su `fechaOperativa`; una transacción por día |
 | `POST /mfr/bloques/copiar` | `mfr.cargar_programacion` | `{ desde, hacia, reemplazar, motivo }` |
 | `POST /mfr/dpp/analizar` (multipart `archivo`) | `mfr.cargar_programacion` | PDF → propuesta cruzada con el catálogo; no escribe |
-| `POST /mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante? }` (400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes` si hay SKU bajo target) |
+| `POST /mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante?, novedades }` (400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes` si hay SKU bajo target) |
 | `GET /mfr/asistencia?fecha=` | `mfr.consultar` | Asistencia registrada del día (turno, grupo, personas) |
-| `PUT /mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige (409 `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS` si baja de lo asignado en líneas) |
+| `PUT /mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige (409 `MFR_ASISTENCIA_MENOR_QUE_ASIGNADAS` si baja de lo asignado en líneas; 400 si llegan de más sin observación) |
+| `PUT /mfr/esperadas-dia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personas, motivo }`: ajuste del día |
 | `GET /mfr/asignaciones?fecha=` | `mfr.consultar` | Grupos asignados a líneas por turno |
 | `PUT /mfr/asignaciones` · `DELETE /mfr/asignaciones/:id` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, lineaId, grupoId, personas }`; crea o corrige / quita (404 `MFR_ASIGNACION_NO_ENCONTRADA`; 409 `MFR_ASIGNACION_SIN_ASISTENCIA` / `MFR_ASIGNACION_EXCEDE_ASISTENCIA`) |
-| `GET/POST/PATCH /api/grupos` | `catalogo.consultar` / `catalogo.editar` | Catálogo de grupos (`descripcion`, `personasEsperadas`) |
+| `GET/POST/PATCH /api/grupos` | `catalogo.consultar` / `catalogo.editar` | Catálogo de grupos (`descripcion`, `esperadasPorTurno`) |
 | `GET/POST/PATCH /mfr/lineas` | `mfr.consultar` / `catalogo.editar` | Catálogo de líneas |
 | `GET /mfr/estandares` · `PUT /mfr/estandares/:productoId` | `mfr.consultar` / `catalogo.editar_estandares` | Incluye `pesoSugeridoKg`; `{ cajasPorHora, pesoNetoKg, motivo }` |
 | `PUT /mfr/estandares` | `catalogo.editar_estandares` | Carga en lote: `{ cambios[], motivo }`, máx. 100 productos, una sola transacción |
@@ -226,10 +228,34 @@ Pruebas: 19 del dominio (cálculo, entidad, horas, peso sugerido), 6 del lector 
 
 Los archivos del diseño anterior (`programacion.ts`, `config-turno.ts`, sus casos de uso y `ConfigTurnoPage.tsx`) se eliminaron el 2026-09-22.
 
+## Indicadores nuevos — levantamiento (usuario, 2026-10-06)
+
+Pedido del usuario: "modelar MFR, FR, OTIF, cantidad de averías vs lo fabricado, el surtido con más y menos producción, las variables del personal con una visual por hora (retrasados, adelantados o en línea) teniendo en cuenta las horas productivas, la efectividad por línea en % y en cajas, y el % de cumplimiento esperado según las personas que llegaron, con medida visual por cajas". Respuestas del usuario:
+
+| Indicador | Definición acordada | Necesita la línea en la remisión |
+|---|---|---|
+| **MFR** | Ya existe: aprobado ÷ T, cada SKU aporta como máximo su T | No |
+| **FR** | **Total aprobado ÷ total programado (T) del día, sin tope por SKU**: lo que sobra en un SKU compensa lo que falta en otro. El "pedido" es lo programado en el DPP (no hay pedidos aparte) | No |
+| **OTIF** | Por SKU del DPP: **completo** si lo aprobado ≥ su T del día; **a tiempo** si eso quedó aprobado antes del **fin de su último bloque** del día. OTIF = SKU a tiempo y completos ÷ SKU programados | No |
+| **Averías vs lo fabricado** | Unidades averiadas ÷ (unidades aprobadas + unidades averiadas). El % contra el DPP con el límite del 1 % se mantiene aparte | No |
+| **PT con más y menos producción** | Ranking por **PT (SKU)**, en cajas | No |
+| **Ritmo del personal por hora** | Lo producido hasta esa hora (por la **hora de creación de la remisión**) contra lo esperado a esa hora (T de cada bloque repartida en parejo en sus horas). **En línea = ±5 %**; por encima, adelantado; por debajo, retrasado | Por turno: no · por línea: sí |
+| **Horas productivas** | **Las 7,5 h del turno son productivas**: sin pausas, lo esperado sube parejo | — |
+| **Efectividad por línea** | **Producido ÷ T** de la línea, en % y en cajas (faltan / sobran) | Sí |
+| **Cumplimiento esperado según personas** | **Proporcional por línea**: meta ajustada = T de la línea × (personas asignadas ÷ línea ideal), máximo 100 %. Resuelve el `PENDIENTE` de "Grupos por línea" | Sí |
+| (ya levantado) Productividad | Cajas por persona-hora = aprobadas ÷ (llegaron × 7,5 h), por turno, grupo, línea y PT | Por línea y PT: sí |
+
+**Orden acordado:** Fase 1, lo que no necesita la línea (FR, OTIF, averías vs fabricado, ranking de PT, ritmo y productividad por turno). Fase 2, la línea en la remisión (con bocetos del formulario antes). Fase 3, todo lo de por línea.
+
+**Confirmado por el usuario (2026-10-06, "sí a las tres"):**
+1. Ritmo: cuentan **todas las remisiones creadas, en cualquier estado, sin las extraoficiales** (el ritmo mide producción; la aprobación llega después).
+2. Ranking "el de menos producción": **entre todos los PT programados del periodo, incluidos los que sacaron 0**.
+3. Periodos del ranking, FR, OTIF y averías: **día, últimos 7 días y mes**.
+
 ## Pendiente
 
 - Registrar el **peso neto por caja** de los productos del DPP. La herramienta ya está (`/admin/pesos`, carga en lote); falta que el administrador confirme los valores. Sin peso no hay kilos.
 - "Instant Kilograms" real por hora: requeriría la hora de producción de cada remisión; hoy la producción real se muestra por turno.
 - Cierre automático del turno al terminar su hora (hoy es manual).
 - Estadística histórica por línea: los bloques quedan guardados; falta la vista.
-- Valores reales de `descripcion` y `personasEsperadas` de los 4 grupos sembrados: los carga el administrador en `/admin/grupos` (hoy están vacíos).
+- Valores reales de `descripcion` y de las personas esperadas por turno de los 4 grupos sembrados: los carga el administrador en `/admin/grupos` (hoy están vacíos).

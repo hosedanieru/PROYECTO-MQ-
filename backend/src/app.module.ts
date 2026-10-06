@@ -5,6 +5,7 @@ import { RegistroPeticionesMiddleware } from './infrastructure/http/registro-pet
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AveriaModule } from './modules/averia/averia.module.js';
 import { CatalogoModule } from './modules/catalogo/catalogo.module.js';
+import { CorreoModule } from './modules/correo/correo.module.js';
 import { InventarioModule } from './modules/inventario/inventario.module.js';
 import { MfrModule } from './modules/mfr/mfr.module.js';
 import { RemisionModule } from './modules/remision/remision.module.js';
@@ -42,6 +43,7 @@ const modulosOpcionales = observeHabilitado
     MfrModule,
     AveriaModule,
     InventarioModule,
+    CorreoModule,
     ...modulosOpcionales,
   ],
   controllers: [AppController],

@@ -29,6 +29,10 @@ import { FirestoreService } from '../src/infrastructure/firestore/firestore.serv
 import { AsignacionFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asignacion.firestore.repository.js';
 import { AsistenciaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/asistencia.firestore.repository.js';
 import { CatalogoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/catalogo.firestore.repository.js';
+import { AjusteEsperadasFirestoreRepository } from '../src/infrastructure/firestore/repositorios/ajuste-esperadas.firestore.repository.js';
+import { FirmaRemisionFirestoreRepository } from '../src/infrastructure/firestore/repositorios/firma-remision.firestore.repository.js';
+import { ResumenTurnoFirestoreRepository } from '../src/infrastructure/firestore/repositorios/resumen-turno.firestore.repository.js';
+import { EnvioCorreoFirestoreRepository, ListaDistribucionFirestoreRepository } from '../src/infrastructure/firestore/repositorios/correo.firestore.repositories.js';
 import { CausalAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/causal-averia.firestore.repository.js';
 import { ReporteAveriaFirestoreRepository } from '../src/infrastructure/firestore/repositorios/reporte-averia.firestore.repository.js';
 import {
@@ -166,6 +170,11 @@ describe('atomicidad', () => {
           unidadesMedida: new UnidadMedidaFirestoreRepository(c),
           recetas: new RecetaFirestoreRepository(c),
           cierresInventario: new CierreInventarioFirestoreRepository(c),
+          listasDistribucion: new ListaDistribucionFirestoreRepository(c),
+          enviosCorreo: new EnvioCorreoFirestoreRepository(c),
+          resumenesTurno: new ResumenTurnoFirestoreRepository(c),
+          firmasRemision: new FirmaRemisionFirestoreRepository(c),
+          ajustesEsperadas: new AjusteEsperadasFirestoreRepository(c),
         });
       }),
   };

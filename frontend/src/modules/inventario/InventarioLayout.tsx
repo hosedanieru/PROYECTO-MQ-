@@ -18,16 +18,45 @@
 
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { EncabezadoPagina } from '../../components/EncabezadoPagina'
+import { IconoInventario } from '../../components/Iconos'
+
 import { useSesion } from '../auth/useSesion'
 
 const PESTANAS = [
-  { a: '/inventario', texto: 'Existencias', permiso: 'inventario.consultar', exacta: true },
-  { a: '/inventario/alertas', texto: 'Alertas', permiso: 'inventario.consultar' },
-  { a: '/inventario/entradas', texto: 'Entradas de mercancía', permiso: 'inventario.consultar' },
+  {
+    a: '/inventario',
+    texto: 'Existencias',
+    permiso: 'inventario.consultar',
+    exacta: true,
+  },
+  {
+    a: '/inventario/alertas',
+    texto: 'Alertas',
+    permiso: 'inventario.consultar',
+  },
+  {
+    a: '/inventario/entradas',
+    texto: 'Entradas de mercancía',
+    permiso: 'inventario.consultar',
+  },
+  {
+    a: '/inventario/cierre',
+    texto: 'Cierre del día',
+    permiso: 'inventario.consultar',
+  },
   { a: '/inventario/pt', texto: 'PT', permiso: 'catalogo.editar' },
   { a: '/inventario/pi', texto: 'PI', permiso: 'inventario.catalogo' },
-  { a: '/inventario/insumos', texto: 'Insumos', permiso: 'inventario.catalogo' },
-  { a: '/inventario/unidades', texto: 'Unidades', permiso: 'inventario.catalogo' },
+  {
+    a: '/inventario/insumos',
+    texto: 'Insumos',
+    permiso: 'inventario.catalogo',
+  },
+  {
+    a: '/inventario/unidades',
+    texto: 'Unidades',
+    permiso: 'inventario.catalogo',
+  },
 ]
 
 export function InventarioLayout() {
@@ -36,10 +65,12 @@ export function InventarioLayout() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header>
-        <h1 className="text-2xl font-semibold text-tinta">Inventario</h1>
-        <p className="text-sm text-tinta-suave">PT, PI e insumos: catálogo, entradas, existencias y kardex en un solo lugar.</p>
-      </header>
+      <EncabezadoPagina
+        Icono={IconoInventario}
+        escena="inventario"
+        titulo="Inventario"
+        descripcion="PT, PI e insumos: catálogo, entradas, existencias y kardex en un solo lugar."
+      />
 
       <nav className="flex gap-1 overflow-x-auto border-b border-borde" aria-label="Secciones de inventario">
         {visibles.map((p) => (

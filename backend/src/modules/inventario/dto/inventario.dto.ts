@@ -20,6 +20,7 @@ import {
 } from 'class-validator';
 
 import { DECIMALES_CANTIDAD } from '../../../domain/inventario/cantidad.js';
+import { MAXIMO_LINEAS_CIERRE } from '../../../domain/inventario/cierre-inventario.js';
 import { MAXIMO_LINEAS_ENTRADA } from '../../../domain/inventario/entrada-mercancia.js';
 import { TIPOS_ITEM, type TipoItem } from '../../../domain/inventario/item-inventario.js';
 import { MAXIMO_COMPONENTES_RECETA } from '../../../domain/inventario/receta.js';
@@ -315,6 +316,41 @@ export class GuardarRecetaDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(MAXIMO_COMPONENTES_RECETA)
   componentes!: ComponenteRecetaDto[];
+}
+
+// ---------- Cierre del día (conteo físico y merma) ----------
+
+/** Lo contado de un material: cantidad en su medida (puede ser 0) o conteo como viene. */
+export class LineaCierreDto {
+  @IsString()
+  @MinLength(1)
+  itemId!: string;
+
+  @ValidateIf(sinConteo)
+  @IsNumber({ maxDecimalPlaces: DECIMALES_CANTIDAD })
+  @Min(0)
+  cantidad?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConteoDto)
+  conteo?: ConteoDto;
+}
+
+export class RegistrarCierreDto {
+  @Matches(FECHA, { message: 'fechaOperativa: formato YYYY-MM-DD' })
+  fechaOperativa!: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => LineaCierreDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAXIMO_LINEAS_CIERRE)
+  lineas!: LineaCierreDto[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  observacion?: string;
 }
 
 /** Día operativo de las alertas. */

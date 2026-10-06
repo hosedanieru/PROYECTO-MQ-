@@ -12,8 +12,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
 import { Badge } from '../../../components/Badge'
+import { BarraProporcion } from '../../../components/BarraProporcion'
+import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
-import { Tarjeta } from '../../../components/Tarjeta'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoInventario } from '../../../components/Iconos'
+import { FilaRegistro, ListaRegistros, MetaDato } from '../../../components/ListaRegistros'
+import { PantallaCargando } from '../../../components/PantallaCargando'
+import { Seccion } from '../../../components/Seccion'
 import { comoErrorApi } from '../../../services/http'
 import type { AlertaInventario, TipoAlertaInventario } from '../../../shared/types/inventario'
 import { fechaCorta, fechaOperativaDe } from '../../../shared/utils/fechas'
@@ -38,57 +44,98 @@ export function AlertasPage() {
   const criticas = alertas.filter((a) => a.gravedad === 'CRITICA').length
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <p className="max-w-2xl text-sm text-tinta-suave">
-          Se calculan en el momento con las existencias, las recetas vigentes y el DPP del día operativo {fechaCorta(fecha)}. Se actualizan solas.
-        </p>
+    <section className="space-y-7">
+      {/* Marcador: el total y las críticas en grande, la fecha a la mano. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b border-borde pb-5">
+        <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
+          <Marcador valor={consulta.data ? alertas.length : null} etiqueta="alertas" color="text-tinta" />
+          <Marcador valor={consulta.data ? criticas : null} etiqueta="críticas" color={criticas > 0 ? 'text-critico' : 'text-tinta-suave'} />
+          <p className="max-w-md pb-1 text-sm text-tinta-suave">
+            Calculadas en el momento con las existencias, las recetas vigentes y el DPP del {fechaCorta(fecha)}. Se actualizan solas.
+          </p>
+        </div>
         <div className="w-44">
           <Campo etiqueta="Día operativo" type="date" value={fecha} onChange={(e) => e.target.value && setParams({ fecha: e.target.value }, { replace: true })} />
         </div>
-      </header>
+      </div>
 
       {consulta.isError && <Alerta tipo="error">{comoErrorApi(consulta.error).mensaje}</Alerta>}
       {consulta.data && !consulta.data.hayDpp && (
         <Alerta tipo="advertencia">Este día no tiene DPP cargado: no se puede calcular qué falta producir ni qué PT urgen.</Alerta>
       )}
-      {consulta.data && alertas.length === 0 && <Alerta tipo="exito">Sin alertas de inventario para este día.</Alerta>}
-      {alertas.length > 0 && (
-        <p className="text-sm text-tinta">
-          <strong>{alertas.length}</strong> alerta(s), <strong className="text-critico">{criticas}</strong> crítica(s).
-        </p>
+      {consulta.isLoading && <PantallaCargando />}
+      {consulta.data && alertas.length === 0 && (
+        <EstadoVacio Icono={IconoInventario} titulo="Sin alertas de inventario" texto="Para este día no hay agotados, PT sin receta ni faltantes frente al DPP." />
       )}
 
       {GRUPOS.map((g) => {
         const delGrupo = alertas.filter((a) => a.tipo === g.tipo)
         if (delGrupo.length === 0) return null
+        const hayCritica = delGrupo.some((a) => a.gravedad === 'CRITICA')
         return (
-          <Tarjeta key={g.tipo} titulo={`${g.titulo} (${delGrupo.length})`} descripcion={g.descripcion} sinRelleno>
-            <ul className="divide-y divide-borde">
-              {delGrupo.map((a) => (
-                <li key={`${a.tipo}-${a.itemId}-${a.mensaje}`} className="flex flex-wrap items-start gap-3 px-5 py-3 text-sm">
-                  <Badge tono={a.gravedad === 'CRITICA' ? 'critico' : 'alerta'}>{a.gravedad === 'CRITICA' ? 'Crítica' : 'Advertencia'}</Badge>
-                  <div className="min-w-0 flex-1">
-                    <p>
-                      <span className="cifra font-medium text-tinta">{a.codigo}</span> <span className="text-tinta-suave">{a.descripcion}</span>
-                    </p>
-                    <p className="text-tinta-suave">{a.mensaje}</p>
-                    {a.falta !== undefined && (
-                      <p className="mt-1 text-xs text-tinta-suave">
-                        Necesita <span className="cifra">{cantidad(a.necesita!)}</span> · hay <span className="cifra">{cantidad(a.hay!)}</span> ·{' '}
-                        <span className="cifra font-semibold text-critico">faltan {cantidad(a.falta)} {a.unidad}</span>
-                      </p>
-                    )}
-                  </div>
-                  <Link to={destino(a)} className="whitespace-nowrap text-marca hover:underline">
-                    {a.tipo === 'PT_SIN_RECETA' || a.tipo === 'COMPONENTE_INACTIVO' ? 'Ir a la receta' : 'Ver kardex'}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Tarjeta>
+          <Seccion key={g.tipo} titulo={g.titulo} contador={delGrupo.length} descripcion={g.descripcion} tono={hayCritica ? 'critico' : 'alerta'}>
+            <ListaRegistros>
+              {delGrupo.map((a) => {
+                const critica = a.gravedad === 'CRITICA'
+                return (
+                  <FilaRegistro
+                    key={`${a.tipo}-${a.itemId}-${a.mensaje}`}
+                    tono={critica ? 'critico' : 'alerta'}
+                    etiqueta={<Badge tono={critica ? 'critico' : 'alerta'}>{critica ? 'Crítica' : 'Advertencia'}</Badge>}
+                    titulo={a.descripcion}
+                    detalle={
+                      <>
+                        <span className="cifra">{a.codigo}</span> · {a.mensaje}
+                      </>
+                    }
+                    meta={
+                      a.falta !== undefined && (
+                        <>
+                          <MetaDato etiqueta="Necesita">{cantidad(a.necesita!)}</MetaDato>
+                          <MetaDato etiqueta="Hay">{cantidad(a.hay!)}</MetaDato>
+                        </>
+                      )
+                    }
+                    pie={
+                      a.falta !== undefined && (
+                        <BarraProporcion
+                          valor={a.hay!}
+                          total={a.necesita!}
+                          tono={critica ? 'critico' : 'alerta'}
+                          descripcion={`Hay ${cantidad(a.hay!)} de ${cantidad(a.necesita!)} necesarios`}
+                        />
+                      )
+                    }
+                    cifra={a.falta !== undefined ? cantidad(a.falta) : undefined}
+                    unidad={a.falta !== undefined ? a.unidad : undefined}
+                    notaCifra={a.falta !== undefined ? 'faltan' : undefined}
+                    colorCifra="text-critico"
+                    acciones={
+                      <Link to={destino(a)}>
+                        <Boton variante="sutil" tamano="sm">
+                          {a.tipo === 'PT_SIN_RECETA' || a.tipo === 'COMPONENTE_INACTIVO' ? 'Ir a la receta →' : 'Ver kardex →'}
+                        </Boton>
+                      </Link>
+                    }
+                  />
+                )
+              })}
+            </ListaRegistros>
+          </Seccion>
         )
       })}
     </section>
+  )
+}
+
+/** Cifra grande del marcador superior. `null` = todavía no hay dato: se escribe "—", no un cero. */
+function Marcador({ valor, etiqueta, color }: { valor: number | null; etiqueta: string; color: string }) {
+  return (
+    <p className="flex items-baseline gap-2">
+      <span className={`cifra text-5xl font-black leading-none tracking-tight ${valor === null ? 'text-tinta-suave' : color}`}>
+        {valor ?? '—'}
+      </span>
+      <span className="text-sm font-bold uppercase tracking-wider text-tinta-suave">{etiqueta}</span>
+    </p>
   )
 }

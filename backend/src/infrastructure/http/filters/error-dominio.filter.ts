@@ -76,6 +76,16 @@ import {
   ItemInventarioDuplicadoError,
   ItemInventarioNoEncontradoError,
 } from '../../../domain/inventario/inventario.errors.js';
+import { CierreYaRegistradoError } from '../../../domain/inventario/cierre-inventario.js';
+import { CorreoNoEnviadoError, DatosCorreoInvalidosError, ListaNoEncontradaError } from '../../../domain/correo/correo.js';
+import { NovedadesObligatoriasError, ResumenNoEncontradoError } from '../../../domain/resumen/resumen-turno.js';
+import {
+  ContrasenaFirmaIncorrectaError,
+  FirmaFueraDeTiempoError,
+  FirmaInvalidaError,
+  FirmasIncompletasError,
+  FirmaYaRegistradaError,
+} from '../../../domain/remision/firma-remision.js';
 import { ConsumoInsuficienteError, PtSinRecetaError } from '../../../domain/inventario/consumo.js';
 import { ErrorDominio, SinTurnoConfiguradoError } from '../../../domain/shared/errores.js';
 import { RangoFechasInvalidoError } from '../../../domain/shared/rango-fechas.js';
@@ -167,6 +177,20 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   // Aprobar una remisión descuenta su receta: sin receta o sin existencia, se bloquea.
   [PtSinRecetaError, HttpStatus.CONFLICT],
   [ConsumoInsuficienteError, HttpStatus.CONFLICT],
+  // Un cierre por día operativo.
+  [CierreYaRegistradoError, HttpStatus.CONFLICT],
+  // Correo: el servidor externo rechazó el envío (queda registrado como FALLIDO).
+  [DatosCorreoInvalidosError, HttpStatus.BAD_REQUEST],
+  [ListaNoEncontradaError, HttpStatus.NOT_FOUND],
+  [CorreoNoEnviadoError, HttpStatus.BAD_GATEWAY],
+  [NovedadesObligatoriasError, HttpStatus.BAD_REQUEST],
+  [FirmaInvalidaError, HttpStatus.BAD_REQUEST],
+  // No es 401: la sesión sigue válida (un 401 cerraría la sesión en el frontend).
+  [ContrasenaFirmaIncorrectaError, HttpStatus.BAD_REQUEST],
+  [FirmaYaRegistradaError, HttpStatus.CONFLICT],
+  [FirmaFueraDeTiempoError, HttpStatus.CONFLICT],
+  [FirmasIncompletasError, HttpStatus.CONFLICT],
+  [ResumenNoEncontradoError, HttpStatus.NOT_FOUND],
   [ItemInventarioNoEncontradoError, HttpStatus.NOT_FOUND],
   [EntradaMercanciaNoEncontradaError, HttpStatus.NOT_FOUND],
   [CatalogoInventarioNoEncontradoError, HttpStatus.NOT_FOUND],

@@ -2,7 +2,10 @@ import { http } from '../../../services/http'
 import {
   RUTA_MATERIAL,
   type AlertasInventarioDia,
+  type CierreInventario,
+  type CierrePreparado,
   type ComponenteReceta,
+  type DatosCierre,
   type DatosAjuste,
   type DatosEntrada,
   type DatosMaterial,
@@ -45,6 +48,10 @@ export const inventarioApi = {
     http.post<Material>(`/inventario/catalogo/${RUTA_MATERIAL[tipo]}`, datos).then((r) => r.data),
   actualizarMaterial: (tipo: TipoMaterial, id: string, cambios: Partial<DatosMaterial> & { activo?: boolean }) =>
     http.patch<Material>(`/inventario/catalogo/${RUTA_MATERIAL[tipo]}/${id}`, cambios).then((r) => r.data),
+
+  // Cierre del día: conteo físico y merma
+  prepararCierre: (fecha: string) => http.get<CierrePreparado>('/inventario/cierres/preparar', { params: { fecha } }).then((r) => r.data),
+  registrarCierre: (datos: DatosCierre) => http.post<CierreInventario>('/inventario/cierres', datos).then((r) => r.data),
 
   // Alertas del día (fase D)
   alertas: (fecha: string) => http.get<AlertasInventarioDia>('/inventario/alertas', { params: { fecha } }).then((r) => r.data),

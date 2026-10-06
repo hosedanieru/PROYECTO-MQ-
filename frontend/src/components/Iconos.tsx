@@ -71,6 +71,16 @@ export function IconoInventario(props: Props) {
   )
 }
 
+/** Sobre: correo (listas de distribución y envíos). */
+export function IconoCorreo(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M3 6h18v12H3z" />
+      <path d="m3 7 9 6 9-6" />
+    </Base>
+  )
+}
+
 /** Lista con viñetas: catálogos simples (causales). */
 export function IconoLista(props: Props) {
   return (

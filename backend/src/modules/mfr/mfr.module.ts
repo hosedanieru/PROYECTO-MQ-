@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AnalizarDppUseCase } from '../../application/mfr/analizar-dpp.use-case.js';
 import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from '../../application/mfr/asignacion.use-cases.js';
-import { RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
+import { AjustarEsperadasUseCase, RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
 import {
   CargarDiaUseCase,
   CargarPeriodoUseCase,
@@ -26,6 +26,7 @@ import { ASISTENCIA_REPOSITORY, type AsistenciaRepository } from '../../domain/m
 import { BLOQUE_REPOSITORY, type BloqueRepository } from '../../domain/mfr/bloque-programacion.js';
 import { ESTANDAR_REPOSITORY, type EstandarRepository } from '../../domain/mfr/estandar-produccion.js';
 import { HORARIO_REPOSITORY, type HorarioRepository } from '../../domain/mfr/horas-turno.js';
+import { AJUSTE_ESPERADAS_REPOSITORY, type AjusteEsperadasRepository } from '../../domain/mfr/esperadas-personal.js';
 import { LINEA_REPOSITORY, type LineaRepository } from '../../domain/mfr/linea-produccion.js';
 import { PRODUCTO_REPOSITORY, type ProductoRepository } from '../../domain/producto/producto.repository.js';
 import { REMISION_REPOSITORY, type RemisionRepository } from '../../domain/remision/remision.repository.js';
@@ -33,6 +34,9 @@ import { UNIDAD_DE_TRABAJO, type UnidadDeTrabajo } from '../../domain/shared/uni
 import { LectorPdfService } from '../../infrastructure/dpp/lector-pdf.js';
 import { PersistenciaModule } from '../../infrastructure/persistence/persistencia.module.js';
 import { RelojSistema } from '../../infrastructure/shared/reloj-sistema.js';
+import { ArmadorDeResumen } from '../../application/resumen/armar-resumen.js';
+import type { FormatoDocumento } from '../../domain/resumen/resumen-turno.js';
+import { FORMATO_RESUMEN, ResumenModule } from '../resumen/resumen.module.js';
 import { MfrController } from './mfr.controller.js';
 
 /**
@@ -40,7 +44,7 @@ import { MfrController } from './mfr.controller.js';
  * aquí solo se arman los casos de uso.
  */
 @Module({
-  imports: [PersistenciaModule],
+  imports: [PersistenciaModule, ResumenModule],
   controllers: [MfrController],
   providers: [
     { provide: RELOJ, useClass: RelojSistema },
@@ -49,17 +53,23 @@ import { MfrController } from './mfr.controller.js';
       provide: IndicadoresDiaUseCase,
       inject: [
         BLOQUE_REPOSITORY, LINEA_REPOSITORY, ESTANDAR_REPOSITORY, HORARIO_REPOSITORY,
-        REMISION_REPOSITORY, CATALOGO_REPOSITORY, ASISTENCIA_REPOSITORY, GRUPO_REPOSITORY, ASIGNACION_REPOSITORY,
+        REMISION_REPOSITORY, CATALOGO_REPOSITORY, ASISTENCIA_REPOSITORY, GRUPO_REPOSITORY, ASIGNACION_REPOSITORY, AJUSTE_ESPERADAS_REPOSITORY,
       ],
       useFactory: (
         b: BloqueRepository, l: LineaRepository, e: EstandarRepository, h: HorarioRepository,
         r: RemisionRepository, cat: CatalogoRepository, a: AsistenciaRepository, g: GrupoRepository, asig: AsignacionRepository,
-      ) => new IndicadoresDiaUseCase(b, l, e, h, r, cat, a, g, asig),
+        aj: AjusteEsperadasRepository,
+      ) => new IndicadoresDiaUseCase(b, l, e, h, r, cat, a, g, asig, aj),
     },
     {
       provide: RegistrarAsistenciaUseCase,
       inject: [UNIDAD_DE_TRABAJO, RELOJ],
       useFactory: (uow: UnidadDeTrabajo, reloj: Reloj) => new RegistrarAsistenciaUseCase(uow, reloj),
+    },
+    {
+      provide: AjustarEsperadasUseCase,
+      inject: [UNIDAD_DE_TRABAJO, RELOJ],
+      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj) => new AjustarEsperadasUseCase(uow, reloj),
     },
     {
       provide: AsignarGrupoLineaUseCase,
@@ -90,7 +100,12 @@ import { MfrController } from './mfr.controller.js';
       inject: [CargarDiaUseCase, BLOQUE_REPOSITORY],
       useFactory: (cargar: CargarDiaUseCase, bloques: BloqueRepository) => new CopiarDiaUseCase(cargar, bloques),
     },
-    { provide: CerrarTurnoUseCase, inject: [UNIDAD_DE_TRABAJO, RELOJ], useFactory: (uow: UnidadDeTrabajo, reloj: Reloj) => new CerrarTurnoUseCase(uow, reloj) },
+    {
+      provide: CerrarTurnoUseCase,
+      inject: [UNIDAD_DE_TRABAJO, RELOJ, ArmadorDeResumen, FORMATO_RESUMEN],
+      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj, armador: ArmadorDeResumen, formato: FormatoDocumento) =>
+        new CerrarTurnoUseCase(uow, reloj, { armador, formato }),
+    },
     {
       provide: AnalizarDppUseCase,
       inject: [LINEA_REPOSITORY, ESTANDAR_REPOSITORY],

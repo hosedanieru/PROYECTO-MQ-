@@ -15,7 +15,8 @@
 import type { RemisionParaImprimir } from './generador-pdf.js';
 
 export interface ExportadorExcelRemision {
-  generar(remisiones: RemisionParaImprimir[]): Promise<Buffer>;
+  /** El Excel no lleva firmas. */
+  generar(remisiones: Array<Omit<RemisionParaImprimir, 'firmas'>>): Promise<Buffer>;
 }
 
 export const EXPORTADOR_EXCEL_REMISION = Symbol('ExportadorExcelRemision');

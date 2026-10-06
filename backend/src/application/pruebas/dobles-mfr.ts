@@ -23,6 +23,7 @@ import type {
   EstandarRepository,
 } from '../../domain/mfr/estandar-produccion.js';
 import type { DatosGrupo, Grupo, GrupoRepository } from '../../domain/grupo/grupo.repository.js';
+import type { AjusteEsperadas, AjusteEsperadasRepository, DatosAjusteEsperadas } from '../../domain/mfr/esperadas-personal.js';
 import type { HorarioRepository, HorarioTurno } from '../../domain/mfr/horas-turno.js';
 import type {
   DatosLinea,
@@ -225,6 +226,24 @@ export class AsistenciaRepositorioFalso implements AsistenciaRepository {
     if (anterior) this.items[this.items.indexOf(anterior)] = guardada;
     else this.items.push(guardada);
     return guardada;
+  }
+}
+
+export class AjusteEsperadasRepositorioFalso implements AjusteEsperadasRepository {
+  readonly items: AjusteEsperadas[] = [];
+
+  listarPorFecha(fechaOperativa: Date): Promise<AjusteEsperadas[]> {
+    return Promise.resolve(this.items.filter((a) => mismaFecha(a.fechaOperativa, fechaOperativa)));
+  }
+
+  guardar(datos: DatosAjusteEsperadas, usuarioId: string, momento: Date): Promise<AjusteEsperadas> {
+    const indice = this.items.findIndex(
+      (a) => mismaFecha(a.fechaOperativa, datos.fechaOperativa) && a.turnoId === datos.turnoId && a.grupoId === datos.grupoId,
+    );
+    const guardado: AjusteEsperadas = { id: `ajuste-${indice >= 0 ? indice + 1 : this.items.length + 1}`, ...datos, usuarioId, fechaRegistro: momento };
+    if (indice >= 0) this.items[indice] = guardado;
+    else this.items.push(guardado);
+    return Promise.resolve(guardado);
   }
 }
 

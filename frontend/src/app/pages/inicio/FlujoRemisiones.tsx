@@ -68,7 +68,7 @@ export function FlujoRemisiones({ porEstado, total, fecha }: Props) {
                   style={{ backgroundColor: COLOR_TONO[paso.tono] }}
                   aria-hidden="true"
                 >
-                  <span className="text-[11px] font-bold text-white">{indice + 1}</span>
+                  <span className="text-xs font-bold text-white">{indice + 1}</span>
                 </span>
 
                 <span className="min-w-0 flex-1">

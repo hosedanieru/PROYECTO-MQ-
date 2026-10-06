@@ -12,6 +12,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { CrearProductoUseCase } from '../src/application/catalogo/producto.use-cases.js';
 import { CrearMaterialUseCase } from '../src/application/inventario/catalogo-inventario.use-cases.js';
+import { RegistrarCierreUseCase } from '../src/application/inventario/cierre-inventario.use-cases.js';
+import { GuardarRecetaUseCase } from '../src/application/inventario/receta.use-cases.js';
 import {
   RegistrarEntradaMercanciaUseCase,
   RegistrarMovimientoUseCase,
@@ -171,6 +173,26 @@ describe('inventario contra PostgreSQL', () => {
     // Dos guardados simultáneos calcularían la misma versión: la base deja pasar solo uno.
     await expect(nueva(1, 2)).rejects.toThrow(/Unique constraint|receta_producto_id_version_key/);
     await expect(nueva(2, 0)).rejects.toThrow(/receta_componente_cantidad_positiva/);
+  });
+
+  it('cierre del día: merma contra lo contado, ajuste en el kardex y un solo cierre por día', async () => {
+    const cinta = await crear('INSUMO', 'CINTA-CIERRE');
+    // El producto base de las pruebas no pasa por el caso de uso: su ítem de PT se crea a mano.
+    await prisma.itemInventario.create({ data: { tipo: 'PT', productoId: base.productoId } });
+    await new GuardarRecetaUseCase(uow, RELOJ).ejecutar({ productoId: base.productoId, componentes: [{ itemId: cinta, cantidad: 1.8 }], usuarioId: base.adminId });
+    await registrar.ejecutar({ itemId: cinta, tipo: 'ENTRADA', cantidad: 500, referencia: null, observacion: null, motivo: null, usuarioId: base.adminId });
+
+    const cerrar = new RegistrarCierreUseCase(uow, horarios, RELOJ);
+    const fecha = new Date('2026-09-29T00:00:00.000Z');
+    const cierre = await cerrar.ejecutar({ fechaOperativa: fecha, lineas: [{ itemId: cinta, cantidad: 487.5 }], observacion: 'Conteo de prueba', usuarioId: base.adminId });
+
+    expect(cierre.lineas).toEqual([expect.objectContaining({ esperado: 500, contado: 487.5, merma: 12.5 })]);
+    expect(Number((await prisma.itemInventario.findUniqueOrThrow({ where: { id: cinta } })).existencia)).toBe(487.5);
+    expect(await prisma.movimientoInventario.count({ where: { cierreId: cierre.id, tipo: 'AJUSTE' } })).toBe(1);
+    // La base no deja un segundo cierre del mismo día, aunque el caso de uso lo dejara pasar.
+    await expect(
+      prisma.cierreInventario.create({ data: { fechaOperativa: fecha, fechaHoraRegistro: new Date(), usuarioId: base.adminId, usuarioNombre: 'X' } }),
+    ).rejects.toThrow(/Unique constraint|cierre_inventario_fecha_operativa_key/);
   });
 
   it('regla de la base: un ítem apunta exactamente a lo que dice su tipo', async () => {

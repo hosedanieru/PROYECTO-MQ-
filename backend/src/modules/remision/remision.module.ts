@@ -48,7 +48,7 @@ import {
   type RemisionRepository,
 } from '../../domain/remision/remision.repository.js';
 import { ExceljsExportadorService } from '../../infrastructure/excel/exceljs-exportador.service.js';
-import { PuppeteerPdfService } from '../../infrastructure/pdf/puppeteer-pdf.service.js';
+import { PdfModule } from '../../infrastructure/pdf/pdf.module.js';
 import {
   AprobarRemisionUseCase,
   EntregarRemisionUseCase,
@@ -68,6 +68,19 @@ import {
 import { PersistenciaModule } from '../../infrastructure/persistence/persistencia.module.js';
 import { RelojSistema } from '../../infrastructure/shared/reloj-sistema.js';
 import { RemisionController } from './remision.controller.js';
+import { ConsultarFirmasUseCase, FirmaDeRemision, FirmarRemisionUseCase } from '../../application/remision/firma-remision.use-cases.js';
+import {
+  CALCULADOR_HUELLA,
+  CONFIGURACION_FIRMA,
+  FIRMA_REMISION_REPOSITORY,
+  type CalculadorHuella,
+  type ConfiguracionFirma,
+  type FirmaRemisionRepository,
+} from '../../domain/remision/firma-remision.js';
+import { HASH_CONTRASENA, type HashContrasena } from '../../domain/usuario/contrasena.js';
+import { USUARIO_REPOSITORY, type UsuarioRepository } from '../../domain/usuario/usuario.repository.js';
+import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service.js';
+import { CalculadorHuellaSha256 } from '../../infrastructure/shared/calculador-huella.js';
 
 /**
  * Los casos de uso del flujo comparten la misma firma
@@ -77,7 +90,6 @@ const casosUsoFlujo = [
   EntregarRemisionUseCase,
   RechazarRemisionUseCase,
   RectificarRemisionUseCase,
-  ValidarRemisionUseCase,
 ].map((CasoUso) => ({
   provide: CasoUso,
   inject: [UNIDAD_DE_TRABAJO, RELOJ],
@@ -86,21 +98,54 @@ const casosUsoFlujo = [
 }));
 
 @Module({
-  imports: [PersistenciaModule],
+  imports: [PersistenciaModule, PdfModule],
   controllers: [RemisionController],
   providers: [
     { provide: RELOJ, useClass: RelojSistema },
-    { provide: GENERADOR_PDF_REMISION, useClass: PuppeteerPdfService },
     { provide: EXPORTADOR_EXCEL_REMISION, useClass: ExceljsExportadorService },
     {
       provide: ImprimirRemisionesUseCase,
-      inject: [REMISION_REPOSITORY, CATALOGO_REPOSITORY, GRUPO_REPOSITORY, GENERADOR_PDF_REMISION],
+      inject: [REMISION_REPOSITORY, CATALOGO_REPOSITORY, GRUPO_REPOSITORY, GENERADOR_PDF_REMISION, FIRMA_REMISION_REPOSITORY, CALCULADOR_HUELLA],
       useFactory: (
         remisiones: RemisionRepository,
         catalogos: CatalogoRepository,
         grupos: GrupoRepository,
         generador: GeneradorPdfRemision,
-      ) => new ImprimirRemisionesUseCase(remisiones, { catalogos, grupos }, generador),
+        firmas: FirmaRemisionRepository,
+        huella: CalculadorHuella,
+      ) => new ImprimirRemisionesUseCase(remisiones, { catalogos, grupos }, generador, firmas, huella),
+    },
+    // Firma electrónica (2026-10-05): la contraseña se verifica con el mismo hash del login.
+    { provide: HASH_CONTRASENA, useClass: BcryptHashService },
+    { provide: CALCULADOR_HUELLA, useClass: CalculadorHuellaSha256 },
+    {
+      provide: FirmaDeRemision,
+      inject: [USUARIO_REPOSITORY, HASH_CONTRASENA, CALCULADOR_HUELLA, RELOJ],
+      useFactory: (usuarios: UsuarioRepository, hash: HashContrasena, huella: CalculadorHuella, reloj: Reloj) =>
+        new FirmaDeRemision(usuarios, hash, huella, reloj),
+    },
+    {
+      // Fin del piloto = FIRMA_ELECTRONICA_PILOTO="false" (solo con el aval de PepsiCo y del área legal):
+      // las firmas pasan a ser obligatorias para aprobar y validar.
+      provide: CONFIGURACION_FIRMA,
+      useFactory: (): ConfiguracionFirma => ({ modo: process.env.FIRMA_ELECTRONICA_PILOTO === 'false' ? 'OBLIGATORIA' : 'PILOTO' }),
+    },
+    {
+      provide: ValidarRemisionUseCase,
+      inject: [UNIDAD_DE_TRABAJO, RELOJ, FirmaDeRemision, CONFIGURACION_FIRMA],
+      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj, firma: FirmaDeRemision, configuracion: ConfiguracionFirma) =>
+        new ValidarRemisionUseCase(uow, reloj, firma, configuracion),
+    },
+    {
+      provide: FirmarRemisionUseCase,
+      inject: [UNIDAD_DE_TRABAJO, FirmaDeRemision],
+      useFactory: (uow: UnidadDeTrabajo, firma: FirmaDeRemision) => new FirmarRemisionUseCase(uow, firma),
+    },
+    {
+      provide: ConsultarFirmasUseCase,
+      inject: [REMISION_REPOSITORY, FIRMA_REMISION_REPOSITORY, CALCULADOR_HUELLA, CONFIGURACION_FIRMA],
+      useFactory: (remisiones: RemisionRepository, firmas: FirmaRemisionRepository, huella: CalculadorHuella, configuracion: ConfiguracionFirma) =>
+        new ConsultarFirmasUseCase(remisiones, firmas, huella, configuracion),
     },
     {
       provide: ExportarRemisionesUseCase,
@@ -129,12 +174,15 @@ const casosUsoFlujo = [
     },
     ...casosUsoFlujo,
     {
-      // Aprobar también descuenta PI e insumos: necesita el turno del momento.
+      // Aprobar también descuenta PI e insumos (necesita el turno del momento)
+      // y, si el OPA aprueba firmando, registra su firma en la misma transacción.
       provide: AprobarRemisionUseCase,
-      inject: [UNIDAD_DE_TRABAJO, RELOJ, HORARIO_REPOSITORY],
-      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj, horarios: HorarioRepository) =>
-        new AprobarRemisionUseCase(uow, reloj, horarios),
+      inject: [UNIDAD_DE_TRABAJO, RELOJ, HORARIO_REPOSITORY, FirmaDeRemision, CONFIGURACION_FIRMA],
+      useFactory: (uow: UnidadDeTrabajo, reloj: Reloj, horarios: HorarioRepository, firma: FirmaDeRemision, configuracion: ConfiguracionFirma) =>
+        new AprobarRemisionUseCase(uow, reloj, horarios, firma, configuracion),
     },
   ],
+  // El correo adjunta el mismo PDF que se imprime.
+  exports: [ImprimirRemisionesUseCase],
 })
 export class RemisionModule {}

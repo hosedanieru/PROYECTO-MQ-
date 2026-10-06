@@ -7,11 +7,12 @@
  * APOYOS MAXI, MIX) pasa a llamarse GRUPO, sin excepción. El proveedor
  * real se escribe a mano en la descripción.
  *
- *   personasEsperadas   cuántas personas debería enviar el grupo a un
- *                       turno. Se compara con las que llegaron (módulo
- *                       de asistencia) para saber si la productividad
- *                       del turno queda "a fin" o afectada. `null` =
- *                       sin definir: no se compara.
+ *   esperadasPorTurno   cuántas personas debería enviar el grupo a CADA
+ *                       turno (usuario, 2026-10-03: antes era un solo
+ *                       número para todos). { turnoId: personas }; un
+ *                       turno que no aparece = el grupo no se espera ahí.
+ *                       Un día puntual se ajusta con motivo
+ *                       (`mfr/esperadas-personal.ts`).
  *
  * Se administra desde el panel (crear y editar). No se elimina: un
  * grupo con remisiones se desactiva.
@@ -25,15 +26,21 @@ export interface Grupo {
   nombre: string;
   /** Texto libre: aquí se escribe el proveedor, contacto, etc. */
   descripcion: string | null;
-  personasEsperadas: number | null;
+  esperadasPorTurno: EsperadasPorTurno;
   activo: boolean;
 }
+
+/** { turnoId: personas esperadas }. Solo los turnos donde se espera al grupo. */
+export type EsperadasPorTurno = Record<string, number>;
+
+/** Tope de sensatez: un grupo no manda miles de personas a un turno (evita errores de digitación). */
+export const MAXIMO_PERSONAS_GRUPO = 500;
 
 export interface DatosGrupo {
   codigo: string;
   nombre: string;
   descripcion: string | null;
-  personasEsperadas: number | null;
+  esperadasPorTurno: EsperadasPorTurno;
 }
 
 export function validarDatosGrupo(datos: DatosGrupo): DatosGrupo {
@@ -50,14 +57,17 @@ export function validarDatosGrupo(datos: DatosGrupo): DatosGrupo {
   const descripcion = datos.descripcion?.trim() || null;
   exigir(descripcion === null || descripcion.length <= 500, 'La descripción no puede superar 500 caracteres.');
 
-  if (datos.personasEsperadas !== null) {
+  const esperadasPorTurno: EsperadasPorTurno = {};
+  for (const [turnoId, personas] of Object.entries(datos.esperadasPorTurno ?? {})) {
+    exigir(turnoId.trim().length > 0, 'Cada valor de personas esperadas debe indicar su turno.');
     exigir(
-      Number.isInteger(datos.personasEsperadas) && datos.personasEsperadas > 0,
-      'Las personas esperadas deben ser un entero mayor que cero.',
+      Number.isInteger(personas) && personas > 0 && personas <= MAXIMO_PERSONAS_GRUPO,
+      `Las personas esperadas por turno deben ser un entero entre 1 y ${MAXIMO_PERSONAS_GRUPO}.`,
     );
+    esperadasPorTurno[turnoId.trim()] = personas;
   }
 
-  return { codigo, nombre, descripcion, personasEsperadas: datos.personasEsperadas };
+  return { codigo, nombre, descripcion, esperadasPorTurno };
 }
 
 export interface GrupoRepository {

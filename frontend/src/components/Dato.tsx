@@ -31,7 +31,7 @@ export function Dato({ etiqueta, sigla, valor, unidad, nota, destacado = false }
         {etiqueta}
         {sigla && (
           <span
-            className="codigo rounded bg-velo px-1 text-[10px] font-semibold text-tinta-suave"
+            className="codigo rounded bg-velo px-1 text-xs font-semibold text-tinta-suave"
             title={`En el DPP de PepsiCo aparece como "${sigla}"`}
           >
             {sigla}

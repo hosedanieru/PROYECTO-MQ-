@@ -24,12 +24,18 @@ export const es = {
   'nav.grupos': 'Grupos',
   'nav.averias': 'Averías',
   'nav.causales': 'Causales de avería',
+  'nav.correos': 'Correos',
   'nav.inventario': 'Inventario',
   'nav.usuarios': 'Usuarios',
   'nav.abrirMenu': 'Abrir menú',
   'nav.cerrarMenu': 'Cerrar menú',
   'nav.irAlInicio': 'Ir al inicio',
   'nav.eslogan': 'Juntos llevamos más lejos cada producto',
+  'nav.produccion': 'Producción',
+  'nav.navegacionPrincipal': 'Navegación principal',
+  'nav.menuCuenta': 'Menú de la cuenta',
+  'nav.planta': 'Planta',
+  'nav.preferencias': 'Idioma y tema',
 
   // ---------- Barra superior ----------
   'barra.diaOperativo': 'Día operativo {fecha}',
@@ -97,6 +103,13 @@ export const es = {
   'inicio.ultimasDescripcion': 'Lo último registrado en el día operativo.',
   'inicio.verTodas': 'Ver todas',
   'inicio.accesosRapidos': 'Accesos rápidos',
+  'inicio.vistas': 'Vistas del inicio',
+  'inicio.vistaLineas': 'Líneas en vivo',
+  'inicio.vistaRemisiones': 'Remisiones de hoy',
+  'inicio.vistaTurnos': 'Turnos y kilos',
+  'inicio.resumenLineas': 'Qué corre en cada plataforma',
+  'inicio.resumenRemisiones': '{n} registradas hoy',
+  'inicio.resumenTurnos': 'Meta {meta} %',
 
   // ---------- Estados de remisión ----------
   'estado.BORRADOR': 'Borrador',

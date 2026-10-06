@@ -33,7 +33,8 @@ firebase emulators:start
 | `roles` | código (`ADMINISTRADOR`…) | codigo, nombre, descripcion, activo, **permisos[]** (códigos embebidos) |
 | `permisos` | código | modulo, descripcion |
 | `turnos` | código (`T1`…) | codigo, nombre, activo, **horarios[]** embebidos |
-| `grupos` | código | codigo, nombre, descripcion (proveedor escrito a mano), personasEsperadas, activo |
+| `grupos` | código | codigo, nombre, descripcion (proveedor escrito a mano), esperadasPorTurno { turnoId: personas }, activo. `seed:firestore` convierte el campo viejo `personasEsperadas` |
+| `ajustesEsperadas` | `{fecha}_{turnoId}_{grupoId}` | fechaOperativa, fechaOperativaTexto, turnoId, grupoId, personas, motivo, usuarioId, fechaRegistro |
 | `lugares` | código | codigo, nombre, activo |
 | `productos` | generado | codigo, descripcion, subdescripcion, proceso, unidadesPorCaja, cajasPorEstiba, personasIdeal, cajasPorHora, pesoNetoKg, activo |
 | `remisiones` | generado | todos los campos de la entidad + `numerosEstiba[]`, `fechaOperativaTexto` (YYYY-MM-DD), `anioNumero` (2026-0001) |
@@ -49,8 +50,13 @@ firebase emulators:start
 | `unidadesMedida` | generado | codigo, nombre, activo |
 | `pis` / `insumos` | generado | codigo, descripcion, unidadBaseId, presentacionId, contenidoPresentacion, unidadesPorCaja, cajasPorEstiba, activo |
 | `itemsInventario` | generado | tipo (`PT`/`PI`/`INSUMO`), **una** referencia (`productoId` / `piId` / `insumoId`), existencia. El resto se lee del catálogo |
-| `movimientosInventario` | generado | kardex (tipo, cantidad con signo, saldo, fecha operativa, turno, usuario, entradaId, remisionId, conteoTexto…) |
+| `movimientosInventario` | generado | kardex (tipo, cantidad con signo, saldo, fecha operativa, turno, usuario, entradaId, remisionId, conteoTexto, cierreId…) |
 | `recetas` | `{productoId}_v{version}` (se crea con `create`, que falla si ya existe) | productoId, version, vigenteDesde, creadaPorId, creadaPorNombre, **componentes[]** `{ itemId, cantidad }` (cantidad por caja, decimal) |
+| `cierresInventario` | `YYYY-MM-DD` (se crea con `create`: un cierre por día) | fechaOperativa, fechaOperativaTexto, fechaHoraRegistro, usuarioId, usuarioNombre, observacion, **lineas[]** (sistema, enTransito, esperado, contado, merma, consumoTeorico, mermaPorcentaje, conteoTexto) |
+| `listasDistribucion` | generado | nombre, recibe (REMISIONES por defecto), turnoId, incluirEnCierres, correos[], activo |
+| `firmasRemision` | `{remisionId}_v{version}_{tipo}` | remisionId, version, tipo, usuarioId, usuarioNombre, usuarioDocumento, usuarioRol, declaracion, huella, trazo, dispositivo, ip, fechaHora (se crea con `create`: una por casilla y versión) |
+| `resumenesTurno` | generado | tipo (TURNO/DIA), anio, numero, fechaOperativa, fechaOperativaTexto, turnoId, formato {codigo, version, vigencia}, datos (la foto), cerradoPorId, cerradoPorNombre, fechaHora. Consecutivo en `consecutivos/RESUMEN_TURNO-{anio}` y `RESUMEN_DIA-{anio}` |
+| `enviosCorreo` | generado | origen, fechaHora, fechaOperativa, fechaOperativaTexto, turnoId, destinatarios[], remisionIds[], asunto, estado, error, usuarioId, usuarioNombre |
 | `entradasMercancia` | generado | encabezado de la entrada de mercancía; sus líneas son los movimientos con su entradaId |
 
 Colecciones sin uso (diseño anterior; se pueden borrar desde la consola): `programaciones`, `configTurnos` (desde 2026-09-18) y `proveedores` (renombrada a `grupos` el 2026-09-21; los 4 documentos ya están copiados).

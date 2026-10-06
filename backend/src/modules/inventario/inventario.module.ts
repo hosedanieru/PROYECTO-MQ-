@@ -11,6 +11,9 @@ import {
   RegistrarMovimientoUseCase,
 } from '../../application/inventario/inventario.use-cases.js';
 import { AlertasInventarioUseCase } from '../../application/inventario/alertas-inventario.use-case.js';
+import { PrepararCierreUseCase, RegistrarCierreUseCase } from '../../application/inventario/cierre-inventario.use-cases.js';
+import { CIERRE_INVENTARIO_REPOSITORY, type CierreInventarioRepository } from '../../domain/inventario/cierre-inventario.js';
+import { MOVIMIENTO_INVENTARIO_REPOSITORY, type MovimientoInventarioRepository } from '../../domain/inventario/movimiento-inventario.js';
 import { ConsultarRecetaUseCase, GuardarRecetaUseCase } from '../../application/inventario/receta.use-cases.js';
 import { BLOQUE_REPOSITORY, type BloqueRepository } from '../../domain/mfr/bloque-programacion.js';
 import { ESTANDAR_REPOSITORY, type EstandarRepository } from '../../domain/mfr/estandar-produccion.js';
@@ -44,6 +47,23 @@ const conUow = <T>(Clase: new (uow: UnidadDeTrabajo) => T) => ({
       provide: GuardarRecetaUseCase,
       inject: [UNIDAD_DE_TRABAJO, RELOJ],
       useFactory: (uow: UnidadDeTrabajo, reloj: Reloj) => new GuardarRecetaUseCase(uow, reloj),
+    },
+    {
+      // Solo lee: con los repositorios de lectura, que tienen los mismos nombres que en la transacción.
+      provide: PrepararCierreUseCase,
+      inject: [ITEM_INVENTARIO_REPOSITORY, RECETA_REPOSITORY, REMISION_REPOSITORY, MOVIMIENTO_INVENTARIO_REPOSITORY, CIERRE_INVENTARIO_REPOSITORY],
+      useFactory: (
+        itemsInventario: ItemInventarioRepository,
+        recetas: RecetaRepository,
+        remisiones: RemisionRepository,
+        movimientosInventario: MovimientoInventarioRepository,
+        cierresInventario: CierreInventarioRepository,
+      ) => new PrepararCierreUseCase({ itemsInventario, recetas, remisiones, movimientosInventario, cierresInventario }),
+    },
+    {
+      provide: RegistrarCierreUseCase,
+      inject: [UNIDAD_DE_TRABAJO, HORARIO_REPOSITORY, RELOJ],
+      useFactory: (uow: UnidadDeTrabajo, h: HorarioRepository, reloj: Reloj) => new RegistrarCierreUseCase(uow, h, reloj),
     },
     {
       provide: AlertasInventarioUseCase,

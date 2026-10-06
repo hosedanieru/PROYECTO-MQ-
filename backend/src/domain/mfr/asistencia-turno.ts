@@ -2,8 +2,9 @@
  * ASISTENCIA DEL TURNO — personal que llegó por grupo
  * ===================================================
  *
- * Decisión del área (2026-09-21): cada grupo tiene un número fijo de
- * personas que debería enviar (`Grupo.personasEsperadas`). El
+ * Decisión del área (2026-09-21): cada grupo tiene personas que debería
+ * enviar; desde el 2026-10-03, fijas POR TURNO y ajustables por día con
+ * motivo (`esperadas-personal.ts`). El
  * coordinador registra cuántas llegaron realmente a cada turno y el
  * sistema dice si la productividad del turno queda "a fin" o afectada.
  *
@@ -24,8 +25,10 @@
  *     corrige el valor (se audita con el anterior).
  */
 
+import type { Grupo } from '../grupo/grupo.repository.js';
 import { DatosMfrInvalidosError } from './mfr.errors.js';
 import type { BloqueCalculado } from './calculo-mfr.js';
+import { esperadasDe, type AjusteEsperadas, type OrigenEsperadas } from './esperadas-personal.js';
 
 export interface DatosAsistencia {
   fechaOperativa: Date;
@@ -75,8 +78,15 @@ export type EstadoPersonal = 'A_FIN' | 'AFECTADA' | 'SIN_DATO';
 export interface PersonalGrupo {
   grupoId: string;
   esperadas: number | null;
+  /** De dónde salen las esperadas: ajuste del día, fijas del turno o sin dato. */
+  origenEsperadas: OrigenEsperadas;
+  motivoAjuste: string | null;
+  /** false = el grupo se espera en el turno pero aún no se registró cuántos llegaron. */
+  registrado: boolean;
   llegaron: number;
   faltante: number;
+  /** Personas por encima de las esperadas (se registró con observación). */
+  deMas: number;
   /** Σ personas del grupo asignadas a líneas en el turno (`asignacion-linea.ts`); null si no se pasó. */
   asignadas: number | null;
   observacion: string | null;
@@ -86,7 +96,7 @@ export interface PersonalGrupo {
 
 export interface PersonalTurno {
   grupos: PersonalGrupo[];
-  /** Σ personas esperadas de los grupos registrados. */
+  /** Σ personas esperadas en el turno: todos los grupos esperados, registrados o no. */
   esperadas: number;
   llegaron: number;
   /** Faltante contra lo esperado de cada grupo (de más en un grupo no compensa a otro). */
@@ -115,23 +125,45 @@ export interface PersonalDia {
   coberturaDpp: number | null;
   /** AFECTADA si algún turno quedó afectado (por el DPP o por un grupo). */
   estado: EstadoPersonal;
+  /** Total del día contra los grupos (usuario, 2026-10-03): Σ esperadas de todos los turnos. */
+  esperadasDia: number;
+  /** Σ personas que llegaron en todos los turnos (con o sin DPP). */
+  llegaronDia: number;
+  /** Por grupo, sumando los turnos del día. */
+  porGrupo: Array<{ grupoId: string; esperadas: number; llegaron: number; deMas: number; faltante: number }>;
 }
 
 /**
- * Personal del día: suma los turnos YA evaluados contra el DPP. Un turno
- * que todavía no registra asistencia (el T3 a media mañana) no cuenta:
- * si no, la cobertura del día bajaría por gente que aún no debía llegar.
+ * Personal del día. Contra el DPP suma solo los turnos YA evaluados: un
+ * turno que todavía no registra asistencia (el T3 a media mañana) no
+ * cuenta, si no la cobertura bajaría por gente que aún no debía llegar.
+ * Contra los grupos da el total del día: esperadas de todos los turnos
+ * frente a las que llegaron.
  */
 export function resumirPersonalDia(turnos: PersonalTurno[]): PersonalDia {
   const evaluados = turnos.filter((t) => t.estadoDpp !== 'SIN_DATO');
   const requeridasDpp = evaluados.reduce((s, t) => s + t.requeridasDpp, 0);
   const llegaron = evaluados.reduce((s, t) => s + t.llegaron, 0);
+
+  const porGrupo = new Map<string, PersonalDia['porGrupo'][number]>();
+  for (const g of turnos.flatMap((t) => t.grupos)) {
+    const acumulado = porGrupo.get(g.grupoId) ?? { grupoId: g.grupoId, esperadas: 0, llegaron: 0, deMas: 0, faltante: 0 };
+    acumulado.esperadas += g.esperadas ?? 0;
+    acumulado.llegaron += g.llegaron;
+    acumulado.deMas += g.deMas;
+    acumulado.faltante += g.faltante;
+    porGrupo.set(g.grupoId, acumulado);
+  }
+
   return {
     requeridasDpp,
     llegaron,
     faltanteDpp: evaluados.reduce((s, t) => s + t.faltanteDpp, 0),
     coberturaDpp: requeridasDpp === 0 ? null : Math.round((llegaron / requeridasDpp) * 1000) / 10,
     estado: combinar(...turnos.map((t) => t.estado)),
+    esperadasDia: turnos.reduce((s, t) => s + t.esperadas, 0),
+    llegaronDia: turnos.reduce((s, t) => s + t.llegaron, 0),
+    porGrupo: [...porGrupo.values()],
   };
 }
 
@@ -144,27 +176,54 @@ function combinar(...estados: EstadoPersonal[]): EstadoPersonal {
 export function evaluarPersonalTurno(
   turnoId: string,
   asistencias: AsistenciaTurno[],
-  grupos: Array<{ id: string; personasEsperadas: number | null }>,
+  grupos: Array<Pick<Grupo, 'id' | 'esperadasPorTurno' | 'activo'>>,
   bloques: BloqueCalculado[],
   asignadasPorGrupo: Map<string, number> | null = null,
+  ajustes: AjusteEsperadas[] = [],
 ): PersonalTurno {
-  const esperadasDe = new Map(grupos.map((g) => [g.id, g.personasEsperadas]));
+  const grupoDe = new Map(grupos.map((g) => [g.id, g]));
+  const delTurno = asistencias.filter((a) => a.turnoId === turnoId);
+  const asignadas = (grupoId: string) => (asignadasPorGrupo ? (asignadasPorGrupo.get(grupoId) ?? 0) : null);
 
-  const porGrupo: PersonalGrupo[] = asistencias
-    .filter((a) => a.turnoId === turnoId)
-    .map((a) => {
-      const esperadas = esperadasDe.get(a.grupoId) ?? null;
-      const faltante = esperadas === null ? 0 : Math.max(0, esperadas - a.personasLlegaron);
-      return {
-        grupoId: a.grupoId,
-        esperadas,
-        llegaron: a.personasLlegaron,
-        faltante,
-        asignadas: asignadasPorGrupo ? (asignadasPorGrupo.get(a.grupoId) ?? 0) : null,
-        observacion: a.observacion,
-        estado: esperadas === null ? 'SIN_DATO' : faltante > 0 ? 'AFECTADA' : 'A_FIN',
-      };
-    });
+  const registrados: PersonalGrupo[] = delTurno.map((a) => {
+    const e = esperadasDe(grupoDe.get(a.grupoId), turnoId, ajustes);
+    const esperadas = e.personas;
+    const faltante = esperadas === null ? 0 : Math.max(0, esperadas - a.personasLlegaron);
+    return {
+      grupoId: a.grupoId,
+      esperadas,
+      origenEsperadas: e.origen,
+      motivoAjuste: e.motivo,
+      registrado: true,
+      llegaron: a.personasLlegaron,
+      faltante,
+      deMas: esperadas === null ? 0 : Math.max(0, a.personasLlegaron - esperadas),
+      asignadas: asignadas(a.grupoId),
+      observacion: a.observacion,
+      estado: esperadas === null ? 'SIN_DATO' : faltante > 0 ? 'AFECTADA' : 'A_FIN',
+    };
+  });
+
+  // Grupos activos que se esperan en el turno y todavía no registran: aparecen
+  // como pendientes (SIN_DATO), sin faltante: aún no se sabe quién llegó.
+  const pendientes: PersonalGrupo[] = grupos
+    .filter((g) => g.activo && !delTurno.some((a) => a.grupoId === g.id))
+    .map((g) => ({ g, e: esperadasDe(g, turnoId, ajustes) }))
+    .filter(({ e }) => (e.personas ?? 0) > 0)
+    .map(({ g, e }) => ({
+      grupoId: g.id,
+      esperadas: e.personas,
+      origenEsperadas: e.origen,
+      motivoAjuste: e.motivo,
+      registrado: false,
+      llegaron: 0,
+      faltante: 0,
+      deMas: 0,
+      asignadas: asignadas(g.id),
+      observacion: null,
+      estado: 'SIN_DATO',
+    }));
+  const porGrupo = [...registrados, ...pendientes];
 
   // Lo que pide el DPP: por línea, el máximo de personas de sus bloques en el turno.
   const maxPorLinea = new Map<string, number>();
@@ -175,7 +234,7 @@ export function evaluarPersonalTurno(
   }
   const requeridasDpp = [...maxPorLinea.values()].reduce((s, v) => s + v, 0);
   const llegaron = porGrupo.reduce((s, g) => s + g.llegaron, 0);
-  const hayAsistencia = porGrupo.length > 0;
+  const hayAsistencia = registrados.length > 0;
 
   // Sin asistencia registrada no se evalúa (todavía no se sabe quién llegó).
   const estadoDpp: EstadoPersonal = !hayAsistencia || requeridasDpp === 0 ? 'SIN_DATO' : llegaron < requeridasDpp ? 'AFECTADA' : 'A_FIN';

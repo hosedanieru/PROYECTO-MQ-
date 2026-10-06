@@ -27,6 +27,10 @@ import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
 import { Dialogo } from '../../../components/Dialogo'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoCaja } from '../../../components/Iconos'
+import { FilaRegistro, ListaRegistros, MetaDato } from '../../../components/ListaRegistros'
+import { Seccion } from '../../../components/Seccion'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
 import { PROCESOS_PRODUCTO, type Producto } from '../../../shared/types/catalogo'
@@ -100,6 +104,7 @@ export function ProductosPage() {
   const [recetaDe, setRecetaDe] = useState<Producto | null>(null)
   const resumenRecetas = useResumenRecetas()
   const recetaVigente = useMemo(() => new Map((resumenRecetas.data ?? []).map((r) => [r.productoId, r])), [resumenRecetas.data])
+  const sinReceta = resumenRecetas.data ? (productos.data ?? []).filter((p) => p.activo && !recetaVigente.has(p.id)).length : 0
   const abrirNuevo = () => {
     setRecetaNueva([])
     setEditando('nuevo')
@@ -190,86 +195,109 @@ export function ProductosPage() {
   })
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave">Catálogo de PT: el mismo de remisiones y del DPP. Cada PT tiene su existencia en la pestaña Existencias.</p>
-        <div className="flex items-center gap-3">
-          {tienePermiso('catalogo.editar_estandares') && (
-            <Link to="/admin/pesos" className="text-sm text-marca hover:underline">
-              Pesos por caja en lote
-            </Link>
-          )}
-          <Boton onClick={abrirNuevo}>Nuevo PT</Boton>
+    <section className="space-y-6">
+      {/* Barra de herramientas: búsqueda y acciones a la vista, sin caja. */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-60 flex-1">
+          <Campo etiqueta="Buscar por código o descripción" value={texto} onChange={(e) => setTexto(e.target.value)} />
         </div>
-      </header>
-
-      <Campo
-        etiqueta="Buscar por código o descripción"
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-      />
+        {tienePermiso('catalogo.editar_estandares') && (
+          <Link to="/admin/pesos">
+            <Boton variante="secundario">Pesos por caja en lote</Boton>
+          </Link>
+        )}
+        <Boton onClick={abrirNuevo}>+ Nuevo PT</Boton>
+      </div>
 
       {productos.isError && <Alerta tipo="error">{comoErrorApi(productos.error).mensaje}</Alerta>}
       {cambiarActivo.isError && <Alerta tipo="error">{comoErrorApi(cambiarActivo.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-            <tr>
-              <th className="px-4 py-2">Código</th>
-              <th className="px-4 py-2">Descripción</th>
-              <th className="px-4 py-2">Proceso</th>
-              <th className="px-4 py-2">Familia</th>
-              <th className="px-4 py-2 text-right">Unid/caja</th>
-              <th className="px-4 py-2 text-right">Cajas/estiba</th>
-              <th className="px-4 py-2 text-right" title="Línea ideal: personas necesarias">Pers.</th>
-              <th className="px-4 py-2 text-right">Cajas/h</th>
-              <th className="px-4 py-2 text-right">Kg/caja</th>
-              <th className="px-4 py-2">Receta</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-borde">
-            {productos.data?.length === 0 && (
-              <tr><td colSpan={12} className="px-4 py-6 text-center text-tinta-suave">Sin PT.</td></tr>
-            )}
-            {productos.data?.map((p) => (
-              <tr key={p.id} className={p.activo ? '' : 'text-tinta-suave'}>
-                <td className="px-4 py-2 cifra">{p.codigo}</td>
-                <td className="px-4 py-2">{p.descripcion}</td>
-                <td className="px-4 py-2">{p.proceso ?? '—'}</td>
-                <td className="px-4 py-2 text-xs">{p.subdescripcion ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{p.unidadesPorCaja ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{p.cajasPorEstiba ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{p.personasIdeal ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{p.cajasPorHora ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{p.pesoNetoKg ?? '—'}</td>
-                <td className="px-4 py-2 whitespace-nowrap">
-                  {recetaVigente.has(p.id) ? (
-                    <span className="text-xs text-tinta-suave">v{recetaVigente.get(p.id)!.version} · {recetaVigente.get(p.id)!.componentes} comp.</span>
-                  ) : (
-                    resumenRecetas.data && <Badge tono="alerta">Sin receta</Badge>
-                  )}
-                </td>
-                <td className="px-4 py-2">{p.activo ? 'Activo' : 'Inactivo'}</td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
-                  {tienePermiso('inventario.consultar') && (
-                    <button className="mr-3 text-marca hover:underline" onClick={() => setRecetaDe(p)}>Receta</button>
-                  )}
-                  {tienePermiso('catalogo.editar_estandares') && (
-                    <button className="mr-3 text-tinta-suave hover:underline" onClick={() => abrirEstandar(p)}>Estándar</button>
-                  )}
-                  <button className="text-marca hover:underline" onClick={() => setEditando(p)}>Editar</button>
-                  <button className="ml-3 text-tinta-suave hover:underline" onClick={() => cambiarActivo.mutate(p)}>
-                    {p.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/*
+        Rediseño (usuario, 2026-10-05): eran 12 columnas en una tabla
+        dentro de una caja. Ahora cada PT es una fila: la descripción se lee
+        completa, los estándares bajan a una línea de datos y la receta
+        queda como insignia (la falta de receta salta a la vista en ámbar).
+      */}
+      <Seccion
+        titulo="Catálogo de PT"
+        contador={productos.data?.length}
+        descripcion="El mismo de remisiones y del DPP. Cada PT tiene su existencia en la pestaña Existencias."
+        accion={sinReceta > 0 && <Badge tono="alerta">{sinReceta} sin receta</Badge>}
+      >
+        <ListaRegistros
+          cargando={productos.isLoading}
+          estaVacia={productos.data?.length === 0}
+          claveAnimacion={texto}
+          vacio={
+            <EstadoVacio
+              Icono={IconoCaja}
+              titulo={texto ? 'Ningún PT coincide con la búsqueda' : 'Todavía no hay PT'}
+              texto={texto ? 'Pruebe con otra parte del código o de la descripción.' : 'Cree el primero con su receta.'}
+            />
+          }
+        >
+          {productos.data?.map((p) => {
+            const receta = recetaVigente.get(p.id)
+            const faltaReceta = !receta && Boolean(resumenRecetas.data)
+            return (
+              <FilaRegistro
+                key={p.id}
+                tono={!p.activo ? undefined : faltaReceta ? 'alerta' : 'marca'}
+                apagada={!p.activo}
+                etiqueta={
+                  <>
+                    {!p.activo && <Badge tono="neutro">Inactivo</Badge>}
+                    {p.proceso && <Badge tono="marca">{p.proceso}</Badge>}
+                    {p.subdescripcion && <Badge tono="acento">{p.subdescripcion}</Badge>}
+                  </>
+                }
+                titulo={p.descripcion}
+                detalle={
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="cifra">{p.codigo}</span>
+                    {receta ? (
+                      <span className="text-xs">
+                        Receta v{receta.version} · {receta.componentes} componentes
+                      </span>
+                    ) : (
+                      faltaReceta && <Badge tono="alerta">Sin receta</Badge>
+                    )}
+                  </span>
+                }
+                meta={
+                  <>
+                    <MetaDato etiqueta="Unid/caja">{p.unidadesPorCaja ?? '—'}</MetaDato>
+                    <MetaDato etiqueta="Cajas/estiba">{p.cajasPorEstiba ?? '—'}</MetaDato>
+                    <MetaDato etiqueta="Línea ideal">{p.personasIdeal ?? '—'} pers.</MetaDato>
+                    <MetaDato etiqueta="Cajas/h">{p.cajasPorHora ?? '—'}</MetaDato>
+                    <MetaDato etiqueta="Kg/caja">{p.pesoNetoKg ?? '—'}</MetaDato>
+                  </>
+                }
+                acciones={
+                  <>
+                    {tienePermiso('inventario.consultar') && (
+                      <Boton variante={faltaReceta ? 'primario' : 'secundario'} tamano="sm" onClick={() => setRecetaDe(p)}>
+                        Receta
+                      </Boton>
+                    )}
+                    {tienePermiso('catalogo.editar_estandares') && (
+                      <Boton variante="secundario" tamano="sm" onClick={() => abrirEstandar(p)}>
+                        Estándar
+                      </Boton>
+                    )}
+                    <Boton variante="secundario" tamano="sm" onClick={() => setEditando(p)}>
+                      Editar
+                    </Boton>
+                    <Boton variante="sutil" tamano="sm" onClick={() => cambiarActivo.mutate(p)}>
+                      {p.activo ? 'Desactivar' : 'Activar'}
+                    </Boton>
+                  </>
+                }
+              />
+            )
+          })}
+        </ListaRegistros>
+      </Seccion>
 
       <Dialogo
         abierto={editando !== null}

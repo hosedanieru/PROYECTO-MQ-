@@ -139,6 +139,58 @@ export interface ResumenReceta {
 
 export const MAXIMO_COMPONENTES_RECETA = 30
 
+/**
+ * Cierre del día (2026-10-01): conteo físico de los materiales de las
+ * recetas. esperado = sistema − en tránsito; merma = esperado − contado
+ * (negativa = sobrante).
+ */
+export interface LineaCierre {
+  itemId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  existenciaSistema: number
+  enTransito: number
+  esperado: number
+  contado: number
+  merma: number
+  consumoTeorico: number
+  mermaPorcentaje: number | null
+  conteoTexto: string | null
+}
+
+export interface CierreInventario {
+  id: string
+  fechaOperativa: string
+  fechaHoraRegistro: string
+  usuarioNombre: string
+  observacion: string | null
+  lineas: LineaCierre[]
+}
+
+/** Lo que hay que contar ese día, o el cierre ya registrado. */
+export interface CierrePreparado {
+  fechaOperativa: string
+  cierre: CierreInventario | null
+  materiales: Array<{
+    itemId: string
+    codigo: string
+    descripcion: string
+    unidad: string
+    equivalencias: Equivalencias | null
+    existenciaSistema: number
+    enTransito: number
+    esperado: number
+    consumoTeorico: number
+  }>
+}
+
+export interface DatosCierre {
+  fechaOperativa: string
+  lineas: Array<{ itemId: string } & ({ conteo: Conteo } | { cantidad: number })>
+  observacion?: string
+}
+
 /** Fase D. Se calculan en el momento con existencias, recetas, DPP y aprobadas del día. */
 export type TipoAlertaInventario = 'PT_SIN_RECETA' | 'COMPONENTE_INACTIVO' | 'AGOTADO' | 'NO_ALCANZA_DPP'
 

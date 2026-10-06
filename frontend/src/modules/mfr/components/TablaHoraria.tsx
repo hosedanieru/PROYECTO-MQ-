@@ -64,8 +64,9 @@ export function TablaHoraria({
   }
 
   return (
-    <div className="overflow-x-auto rounded-tarjeta border border-borde bg-base shadow-tarjeta">
-      <table className="min-w-full text-[11px]">
+    // Sin caja (decisión 2026-10-05): solo una línea arriba y otra abajo, a todo el ancho de la vista.
+    <div className="overflow-x-auto border-y border-borde bg-base">
+      <table className="min-w-full text-xs">
         <thead>
           <tr className="border-b border-borde text-tinta-suave">
             <th className="sticky left-0 z-10 bg-base px-3 py-2 text-left font-semibold">
@@ -123,7 +124,7 @@ export function TablaHoraria({
         </tbody>
       </table>
 
-      <p className="flex flex-wrap items-center gap-2 border-t border-borde px-3 py-2 text-[11px] text-tinta-suave">
+      <p className="flex flex-wrap items-center gap-2 border-t border-borde px-3 py-2 text-xs text-tinta-suave">
         <span>Más color, más {unidad}:</span>
         <span className="flex items-center gap-0.5" aria-hidden="true">
           {[0.08, 0.16, 0.24, 0.32, 0.38].map((n) => (

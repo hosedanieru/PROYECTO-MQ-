@@ -17,5 +17,7 @@ coverage/
 backend/informes/
 # Fotos de las averías (almacén en disco): son datos, no código
 backend/evidencias/
+# Correos guardados como .eml cuando no hay servidor SMTP configurado (pueden llevar remisiones)
+backend/correos-salida/
 # Scripts temporales del asistente
 backend/*.tmp.mjs

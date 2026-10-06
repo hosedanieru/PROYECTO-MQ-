@@ -33,7 +33,9 @@ Convención: modelos en PascalCase, campos en camelCase, tablas y columnas en sn
 |---|---|
 | `producto` | Ítem: código único, descripción, proceso (`MANUAL`/`AUTOMATICA`), unidades por caja, cajas por estiba, `personas_ideal` (LINEA IDEAL de la hoja TIEMPOS), `subdescripcion` (familia), estándares de producción (`cajas_por_hora`, `peso_neto_kg`), activo. |
 | `turno` / `turno_horario` | T1, T2, T3 y sus horarios por día de la semana con vigencia. `cruza_medianoche` para T3. Desde el 2026-09-18 son los del DPP de PepsiCo, iguales todos los días. |
-| `grupo` | Quien pone el personal del turno (LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX). Antes `proveedor`; renombrada el 2026-09-21. Lleva `descripcion` (el proveedor real, a mano) y `personas_esperadas`. |
+| `grupo` | Quien pone el personal del turno (LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX). Antes `proveedor`; renombrada el 2026-09-21. Lleva `descripcion` (el proveedor real, a mano). |
+| `grupo_esperadas_turno` | Personas que el grupo debería enviar a cada turno (PK grupo + turno). Sin fila = no se espera en ese turno. Reemplazó a `grupo.personas_esperadas` el 2026-10-03 (la migración copió ese número a cada turno). |
+| `ajuste_esperadas` | Ajuste de un día a las esperadas de un grupo en un turno, con motivo y autor (única por fecha + turno + grupo). Manda sobre lo fijo. |
 | `lugar` | MAQUILA PEPSICO SANTO DOMINGO. |
 
 ### MFR
@@ -66,7 +68,18 @@ Una tabla por tipo (2026-09-29): el PT es `producto` (en pantalla se llama "PT")
 | `movimiento_inventario` | Kardex: `ENTRADA`/`SALIDA`/`AJUSTE`, cantidad con signo, saldo que dejó, fecha operativa, turno, usuario, referencia, motivo (obligatorio en ajustes), `entrada_id` si viene de una entrada de mercancía, `remision_id` si es el consumo por receta al aprobar esa remisión, `conteo_texto` con lo digitado si fue un conteo mixto ("10 ROLLO (1 ROLLO = 50 METRO)"). Nunca se borra. |
 | `receta` | Una **versión** de la receta de un PT: `version` (única por PT, > 0), `vigente_desde`, quién la creó (con copia del nombre). Nunca se edita: guardar crea la siguiente; la vigente es la de número más alto. |
 | `receta_componente` | Un PI o insumo de esa versión: `item_id` (su ítem de inventario, único por receta), `cantidad` que gasta UNA caja de PT, en la medida del componente (`DECIMAL(14,3)` > 0, CHECK `receta_componente_cantidad_positiva`). |
+| `cierre_inventario` | Cierre del día operativo (conteo físico): `fecha_operativa` **única**, quién y cuándo, observación. Sus ajustes del kardex llevan `cierre_id`. |
+| `cierre_inventario_linea` | Foto de cada material contado: sistema, en tránsito, esperado, contado, merma (esperado − contado), consumo teórico del periodo y % de merma, lo digitado. Única por (cierre, ítem). |
 | `entrada_mercancia` | Encabezado de lo que llega en un documento (documento de soporte, quién entrega, observación, quién recibe). Sus líneas son los movimientos con su `entrada_id`. |
+
+### Correo
+
+| Tabla | Qué guarda |
+|---|---|
+| `lista_distribucion` | Lista de destinatarios: nombre, `recibe` (`REMISIONES` / `RESUMEN` / `AMBOS`: qué le llega al cerrar el turno), `turno_id` (lista de un turno: va cuando ese turno es el siguiente) o general con `incluir_en_cierres`, `correos` (arreglo de texto), activo. |
+| `firma_remision` | Firma electrónica de una casilla del formato (INLOTRANS, VERIFICADOR, RECIBE, VALIDACION) en una versión de la remisión (única por remisión + versión + tipo): firmante (id y copias de nombre, documento y rol), declaración, huella SHA-256 del contenido firmado, trazo (PNG data URL), user-agent, IP, fecha y hora. No se edita ni se borra. |
+| `resumen_turno` | Foto del turno (`tipo` TURNO) o del día (DIA) tomada al cerrar el turno: `anio` + `numero` (únicos por tipo; consecutivo RT-/RD-), fecha operativa, turno (null en el del día), código/versión/vigencia del formato SIG, `datos` (JSONB: producción, remisiones, personal, averías, inventario, novedades), quién cerró y cuándo. No se edita. |
+| `envio_correo` | Cada envío de remisiones: origen (`MANUAL` / `CIERRE_TURNO`), fecha y hora, fecha operativa, turno, destinatarios, ids de las remisiones, asunto, estado (`ENVIADO` / `FALLIDO`) y error, quién lo hizo. |
 
 ### Seguridad
 

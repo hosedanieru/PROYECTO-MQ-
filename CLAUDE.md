@@ -2,6 +2,16 @@
 
 Contexto del proyecto para continuar el desarrollo. Leer completo antes de escribir código.
 
+> **Mapa de documentos.** Este archivo guarda lo que se necesita en TODA tarea (reglas, arquitectura, negocio, pendientes, tarea en curso). El detalle va aparte, en `docs/claude/`: **leer cada archivo solo cuando la tarea toque ese tema**, sin importarlos todos.
+>
+> | Archivo | Contiene | Leer cuando |
+> |---|---|---|
+> | `docs/claude/estado-modulos.md` | Qué está hecho por módulo (Remisiones, MFR, Averías, Inventario, correo, resúmenes, firma electrónica) con las decisiones del usuario y su fecha; catálogos sembrados | Se toca o amplía ese módulo |
+> | `docs/claude/api.md` | Todos los endpoints con su permiso | Se agrega o consume un endpoint |
+> | `docs/claude/estructura-backend.md` | Árbol de carpetas del backend | Se crean archivos nuevos en el backend |
+> | `docs/claude/frontend-estructura.md` | Árbol del frontend | Se crean pantallas, hooks o componentes |
+> | `docs/claude/deuda-y-bugs.md` | Deuda técnica, bug de zona horaria (2026-09-28), bugs de 2026-09-16 | Se tocan fechas, mapeadores, auth o despliegue |
+
 ---
 
 ## 1. Qué es este proyecto
@@ -43,6 +53,23 @@ Vienen del documento maestro del proyecto. Se cumplen sin excepción:
 5. **Si se detecta un problema arquitectónico, detenerse y explicarlo** antes de seguir.
 6. **Señalar hallazgos en los datos.** Contradicciones, duplicados y valores inconsistentes se reportan al usuario para que los valide con el área; no se resuelven adivinando.
 
+### Método de trabajo: ciclos (usuario, 2026-10-05)
+
+Se trabaja **una tarea a la vez, en ciclos cerrados**. Hasta que una tarea no termine, no se pasa a la siguiente.
+
+```text
+1. DEFINIR     tarea + criterio de cierre, anotados en "Tarea en curso" (sección 11)
+2. LEVANTAR    si falta información del negocio, preguntar (regla 1) antes de codificar
+3. HACER       una fase pequeña (regla 4)
+4. VERIFICAR   backend: npm test + npm run build; frontend: npm run build (tsc + vite);
+               npm run test:e2e si se tocó la base de datos
+5. DOCUMENTAR  actualizar este CLAUDE.md (y docs/ si aplica) con lo hecho y lo decidido
+6. CERRAR      el usuario revisa y hace el commit (Claude nunca ejecuta git commit)
+   └─ si algo falla en 4, se vuelve a 3; no se abre otra tarea
+```
+
+**Trazabilidad de instrucciones:** toda instrucción o decisión nueva del usuario sobre el proyecto se escribe en este archivo **en el mismo turno en que se da, sin excepción**. Lo que no está aquí no se considera acordado.
+
 ### Reglas de código
 
 - No mezclar lógica de negocio con componentes visuales
@@ -55,6 +82,7 @@ Vienen del documento maestro del proyecto. Se cumplen sin excepción:
 - Reglas de negocio centralizadas en el dominio
 - Evitar `any` cuando exista alternativa tipada
 - Nunca secretos, credenciales ni tokens en el código fuente
+- **Toda conexión a PostgreSQL se crea con `crearAdaptadorPostgres()`** (fija `TimeZone=UTC`); nunca `new PrismaPg(...)` directo (ver `docs/claude/deuda-y-bugs.md`)
 
 ---
 
@@ -142,66 +170,7 @@ El dominio NO importa los enums generados por Prisma. Define los suyos (`EstadoR
 
 ### Estructura de carpetas
 
-```text
-backend/src/
-├── domain/
-│   ├── shared/
-│   │   ├── errores.ts                  ErrorDominio: base de TODOS los errores de negocio
-│   │   ├── fecha-operativa.ts          regla del corte 6:00 a 6:00
-│   │   └── unidad-de-trabajo.ts        puerto transaccional
-│   ├── remision/
-│   │   ├── remision.entity.ts          entidad + reglas + flujo de estados
-│   │   ├── remision.errors.ts          errores de negocio
-│   │   └── remision.repository.ts      interfaz
-│   ├── usuario/
-│   │   ├── usuario.entity.ts           entidad con tienePermiso()
-│   │   ├── usuario.errors.ts
-│   │   ├── usuario.repository.ts       interfaz
-│   │   ├── contrasena.ts               regla mín. 8 chars + puerto HashContrasena
-│   │   └── emisor-token.ts             puerto EmisorDeToken
-│   ├── producto/producto.repository.ts
-│   └── auditoria/auditoria.repository.ts
-│
-├── application/
-│   ├── remision/
-│   │   ├── crear-remision.use-case.ts
-│   │   └── flujo-remision.use-cases.ts las 5 transiciones
-│   ├── auth/
-│   │   ├── iniciar-sesion.use-case.ts
-│   │   └── crear-usuario.use-case.ts
-│   └── pruebas/dobles-en-memoria.ts    dobles compartidos por los specs
-│
-├── infrastructure/
-│   ├── database/prisma/                PrismaService, PrismaModule
-│   ├── persistence/prisma/
-│   │   ├── persistencia.module.ts      registra UoW + repositorios de lectura
-│   │   ├── cliente-prisma.ts           tipo compatible con transacciones
-│   │   ├── unidad-de-trabajo.prisma.ts
-│   │   ├── remision.mapper.ts
-│   │   ├── remision.prisma.repository.ts
-│   │   ├── usuario.prisma.repository.ts
-│   │   ├── producto.prisma.repository.ts
-│   │   └── auditoria.prisma.repository.ts
-│   ├── auth/
-│   │   ├── jwt-auth.guard.ts           guard global: exige token salvo @Publico()
-│   │   ├── permisos.guard.ts           guard global: exige @RequierePermisos()
-│   │   ├── decoradores.ts              @Publico, @RequierePermisos, @UsuarioActual
-│   │   ├── bcrypt-hash.service.ts
-│   │   └── jwt-emisor-token.service.ts
-│   ├── http/filters/error-dominio.filter.ts   tabla ErrorDominio → HTTP
-│   └── shared/reloj-sistema.ts
-│
-└── modules/
-    ├── remision/
-    │   ├── remision.module.ts          wiring (DI)
-    │   ├── remision.controller.ts
-    │   └── dto/
-    └── auth/
-        ├── auth.module.ts              JwtModule + guards globales (APP_GUARD)
-        ├── auth.controller.ts          login, perfil
-        ├── usuarios.controller.ts      crear usuario
-        └── dto/auth.dto.ts
-```
+Árbol completo en `docs/claude/estructura-backend.md`. Capas: `domain/` (entidades, reglas, interfaces), `application/` (casos de uso), `infrastructure/` (Prisma, Firestore, auth, HTTP, PDF, correo) y `modules/` (controladores, DTOs y wiring de DI por módulo).
 
 ### Inyección de dependencias
 
@@ -242,7 +211,7 @@ Tokens existentes: `REMISION_REPOSITORY`, `PRODUCTO_REPOSITORY`, `USUARIO_REPOSI
 |---|---|---|---|
 | Coordinador MQ en turno | Inlotrans | Sí | Crea la remisión; valida/concilia |
 | Patinador (auxiliar logístico) | Inlotrans | Sí | Entrega al OPA, firma como verificador, ingresa el PT al WMS |
-| **OPA** (facturador de PepsiCo) | PepsiCo | **No** | Aprueba o rechaza |
+| **OPA** (facturador de PepsiCo) | PepsiCo | **Sí, desde el 2026-10-05** (rol `OPA_PEPSICO`, piloto de firma electrónica); antes solo como dato | Aprueba firmando o rechaza |
 | Contacto de conciliación | PepsiCo | **No** | Contraparte del cuaderno virtual |
 
 Los actores de PepsiCo se registran como **dato** (nombre, cargo, fecha), no como cuenta. El contacto de conciliación se modela como rol, nunca por nombre fijo.
@@ -339,175 +308,9 @@ El bloqueo de fila del consecutivo es la otra razón de la transacción: sin `FO
 
 ## 6. Estado actual
 
-### Terminado
-
-- Base de datos: 30 tablas (`schema.prisma`), migraciones aplicadas
-- Seed idempotente: 23 permisos, 4 roles, 3 turnos con 21 horarios (7 días × 3), 1 lugar, 4 grupos, 9 líneas de producción, 12 causales de avería
-- Dominio de Remisión completo: entidad, reglas, flujo de estados, errores, interfaces
-- Regla `fecha_operativa` con pruebas de casos borde
-- 6 casos de uso: crear + las 5 transiciones
-- Infraestructura: unidad de trabajo, mapeador, 4 repositorios Prisma, reloj
-- API HTTP completa con validación y traducción de errores de dominio
-- Autenticación JWT + permisos por endpoint (B1 del ROADMAP), verificada por HTTP
-- Catálogos de referencia, productos (crear/editar/desactivar) y usuarios (listar/editar/restablecer clave)
-- Frontend: login, sesión, listado/detalle/creación de remisiones, las 5 acciones de flujo, administración de usuarios y productos
-- Edición de remisiones en BORRADOR / EN_RECTIFICACION (backend + pantalla), con lo que rectificar sí corrige
-- Historial de versiones y auditoría en el detalle; "Recordar sesión" (localStorage / sessionStorage)
-- PDF (Puppeteer, dos por hoja, marca de estado) y exportación a Excel (exceljs) con los filtros del listado
-- **MFR regido por el DPP de PepsiCo** (2026-09-18): bloques por línea y hora (producto, **cajas/hora**, E) con `Mx = cajasPorHora × h`, `T = Mx × E` (decisión 2026-09-19: el ritmo se maneja por hora, no en BPM; al importar el PDF, cajas/h = Mx ÷ horas del bloque, así T queda exacto; el estándar del producto —hoja TIEMPOS— es solo el valor por defecto para bloques a mano y se puede dar al crear el producto); 8 líneas físicas con tipo y capacidad kg/h; importador del PDF del DPP (`pdf-parse`, lector puro en `domain/mfr/dpp-pepsico.ts`), copiar día, corregir con motivo, cerrar turno; tablero con MFR por SKU, turnos (eficiencia planeada/real) y vista horaria en kg (Target/Instant/Capacity/Overpull). Decisiones: cajas; cuenta al aprobar el OPA; meta 95 %; la remisión NO registra línea. Ver `docs/modules/mfr.md`.
-- **Tope "ni más ni menos"** (2026-09-18): al crear, editar y aprobar se verifica contra el DPP del día; sin DPP o con SKU fuera del DPP se bloquea; al cerrar el turno, los faltantes exigen motivo. Excepción: remisión extraoficial con motivo
-- **Personal del turno** (2026-09-21): grupos (antes proveedores) con personas esperadas, asistencia por turno y grupo, asignación de grupos a líneas con la regla de no asignar más personas de las que llegaron
-- **DPP de N días** (área, 2026-09-22: PepsiCo también lo manda semanal, y podría mandarlo mensual): no hay camino "semanal"; el sistema carga **N días** y el diario es N = 1. El día de cada bloque sale de su propia fecha y hora con el corte de las 06:00 (`fechaOperativaDeHoraLocal`), no de la pantalla. Una transacción **por día** (límite de 500 escrituras en Firestore + un turno cerrado no debe frenar la semana); la respuesta dice qué pasó con cada día: CARGADO / OMITIDO / ERROR. Falta verificar con un PDF semanal real
-- **Carga de estándares en lote** (2026-09-22): `PUT /mfr/estandares` y pantalla `/admin/pesos` para confirmar de una pasada el peso neto por caja (sin él el tablero no muestra kilos). Una sola transacción con un motivo común; lo que no se envía no se toca. `EstandarRepository.actualizarVarios` es escritura pura por la regla de Firestore (lecturas antes que escrituras)
-- **Rediseño visual del frontend** (2026-09-24): barra lateral + barra superior (`app/layout/navegacion.ts` define el menú), panel de inicio con KPIs, flujo de remisiones, líneas en vivo y avisos del día; tema claro/oscuro, textos en español/inglés, fuente Inter, animaciones con `animejs` y gráficas propias en SVG (sin librería de gráficas)
-- **Averías — completo** (2026-09-28), solo PT:
-  - Dominio `domain/averia/`: causales (catálogo en BD, 12 sembradas, sin valor por defecto); registro (3 fotos obligatorias UNIDAD / LOTE_FECHA / CONJUNTO, cantidad entera > 0, lote obligatorio, copia congelada del producto; **sin línea**: el área la descartó el 2026-09-28 porque las cajas averiadas a veces llegan sin saber de qué línea vienen, columna eliminada en `20260928190000_averia_sin_linea`); reporte (REGISTRADO → ANULADO con motivo, nunca se borra; máx. 30 registros, límite técnico); conversión Docena = 12, Six = 6, Bolsa `PENDIENTE DE DEFINIR` (se registra pero no suma); el total se calcula, no se guarda.
-  - Fecha, hora y **turno automáticos** (servidor: `registroActual` + `turnoDeHora(horaLocalDe(ahora))`); quien reporta sale del token (con copia del nombre); "Operador MQ" = grupo.
-  - Fotos: puerto `AlmacenDeEvidencias` (`ALMACEN_DE_EVIDENCIAS`), hoy `AlmacenEvidenciasDisco` en `EVIDENCIAS_DIR` (por defecto `backend/evidencias/`, fuera de git), independiente de `PERSISTENCIA`. Se guardan antes de la transacción y se borran si falla. El navegador las comprime (≤1600 px, JPEG). La respuesta nunca expone rutas; la foto se pide por reporte/registro/tipo.
-  - Permisos: `averia.reportar`, `averia.consultar`, `averia.corregir` (corregir registro sin tocar fotos, anular con motivo). **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final).
-  - Tablas `causal_averia`, `reporte_averia`, `registro_averia`, `evidencia_averia`; Firestore `causalesAveria`, `reportesAveria` (registros embebidos).
-  - Pantallas: `/averias` (listado con filtros en la URL), `/averias/nuevo` (formulario para celular, cámara directa), `/averias/:id` (detalle con fotos, corregir/anular), `/admin/causales`.
-  - **Indicador** (`domain/averia/indicador-averias.ts`, función pura): % = unidades averiadas (reportes vigentes) ÷ (Σ T del DPP × unidades por caja), sumando los días del periodo. **Máximo 1 % por contrato con PepsiCo** (`MAXIMO_AVERIAS_PORCENTAJE`); pasarlo genera alertas (por día y por periodo) que se ven en `/averias` y en los avisos del panel de inicio. Por día, turno, grupo (aporte de cada grupo al % sobre el mismo DPP) y SKU. Todas las averías cuentan; las de un producto que no estaba en el DPP **del día de la avería** se marcan aparte. El T sale de `calcularBloque` del MFR (no se duplica)
-- **Inventario — fase 1** (2026-09-29; regla del usuario: primero trazabilidad y control, los indicadores al final):
-  - **Kardex**: cada ENTRADA, SALIDA o AJUSTE queda con quién, fecha/hora, día operativo y turno (automáticos, `application/shared/momento-operativo.ts`, compartido con Averías) y el saldo que dejó. Nunca se borra; un error se corrige con AJUSTE con motivo.
-  - **Una tabla por tipo** (usuario, 2026-09-29; migración `20260929180000_pi_insumo_unidades`): `producto` (el PT; **en pantalla se llama "PT"**, por dentro la tabla y el código siguen diciendo `producto`), `pi` e `insumo`. Cada uno tiene su catálogo; `item_inventario` es solo el **eje de existencias**: apunta a exactamente uno de los tres (`producto_id` / `pi_id` / `insumo_id`, CHECK `item_inventario_una_referencia`) y guarda la existencia. Código, descripción, unidad y activo se leen del catálogo (no se duplican). El código es único entre PI e insumo. Crear un PT, PI o insumo crea su ítem en la misma transacción. Sin lote (usuario: no relevante).
-  - **Unidades de medida** (`unidad_medida`): lista desplegable que mantiene el administrador (sembrada: `UNIDAD`). PI e insumo tienen su **medida** (`unidadBase`: en qué se lleva la existencia y en qué se descuenta, ej. METRO), una **presentación opcional con su contenido** (`presentacion` + `contenidoPresentacion`: ROLLO con 50 METRO; van juntas, CHECK en la base) y escalones enteros opcionales **estiba → caja → presentación** (`cajasPorEstiba`, `unidadesPorCaja` = presentaciones por caja, o medidas si no hay presentación). El PT se cuenta en `CAJA`.
-  - **Decimales** (usuario, 2026-09-29, revierte "todo en enteros" del mismo día: un rollo no se gasta por caja y varía por producto): existencias, cantidades y saldos de PI e insumos con **hasta 3 decimales** (`Decimal(14,3)`; regla única en `domain/inventario/cantidad.ts`, que también redondea las sumas para quitar el ruido de coma flotante). El **PT sigue en cajas enteras**. Migración `20260929210000_inventario_decimales`.
-  - **Sin existencia negativa** (regla del usuario). `item_inventario.existencia` se guarda (excepción consciente a "lo derivado se calcula"): es la fila que se bloquea con `SELECT … FOR UPDATE` para que dos salidas simultáneas no saquen la misma existencia (probado en `test/inventario.e2e-spec.ts`), y en Firestore sumar el kardex crecería sin límite. Cuadra con Σ movimientos.
-  - **Entrada de mercancía** (2026-09-29): lo que llega en un mismo documento = encabezado (`entrada_mercancia`: documento de soporte obligatorio, quién entrega, observación; fecha/hora/turno/quién recibe automáticos) + líneas, que son los movimientos ENTRADA con `entradaId` (no se duplican). Todo o nada. Recibe INSUMOS y PI (el PT se produce, no llega de afuera); máx. 50 líneas (límite técnico). Los ítems se bloquean en orden de id (evita deadlock). PI = lo que llega de PepsiCo para reempaque (usuario, 2026-09-29).
-  - Permisos: `inventario.consultar`, `inventario.registrar`, `inventario.ajustar`, `inventario.catalogo`. **Por ahora solo el administrador** (usuario, 2026-09-29: los roles se reparten al final; lo mismo para averías). Entradas/salidas y ajustes van por rutas distintas.
-  - **Productos e inventario son UN SOLO MÓDULO** (usuario, 2026-09-29): en el menú hay una sola entrada **Inventario** con pestañas (`InventarioLayout`): Existencias · Entradas de mercancía · PT · PI · Insumos · Unidades. Se fusionó lo que ve el usuario, **no las tablas**: `producto` sigue aparte porque remisiones, DPP, tope y averías solo aceptan PT. **Crear un producto crea su ítem de PT** en la misma transacción (`CrearProductoUseCase`), y el PT toma código, descripción y **activo** de su producto (se activa/desactiva desde Productos; nunca se desincronizan). Los productos existentes recibieron su PT con la migración `20260929160000_pt_de_productos_existentes` (Firestore: `seed:firestore`).
-  - Pantallas: `/inventario` (existencias por tipo, registrar movimiento; el ajuste se pide como "existencia física contada"), `/inventario/:id` (kardex, con enlace a la entrada de origen), `/inventario/entradas` (listado, `/nueva` formulario, `/:id` detalle), `/inventario/pt` (antes `/admin/productos`), `/inventario/pi`, `/inventario/insumos`, `/inventario/unidades`. Las rutas viejas redirigen.
-  - **Fases acordadas** (usuario, 2026-09-29): A) tablas por tipo + unidades + "PT" en pantalla — **hecha**; B) conteo mixto — **hecha** (ver abajo); C) receta por PT — **hecha**; D) alertas — **hecha** (ver abajo).
-  - **Receta del PT** (fase C, 2026-09-29; migración `20260929194000_receta_pt`, tablas `receta` + `receta_componente`, Firestore `recetas/{productoId}_v{n}` con componentes embebidos): lista de PI e insumos existentes y activos, cada uno con la **cantidad exacta que gasta UNA caja**, en la medida del componente y con decimales ("1,8 METRO por caja"; se quitó "por N cajas"). Decisiones del usuario: **versionada** (cada guardado crea la versión siguiente con fecha y autor, nunca edita encima; la vigente es la de número más alto; motivo: el consumo teórico de una remisión pasada usa la receta que regía), **botón "Receta" aparte** en la lista de PT, y **obligatoria para PT nuevos** (`CrearProductoUseCase` crea la versión 1 en la misma transacción). Los PT que ya existían quedan "Sin receta" hasta digitarla. El componente apunta al **ítem de inventario** (para leer existencia en las alertas); la receta guarda solo referencia + equivalencia y el caso de uso completa código/descripción. Unicidad de versión: `@@unique(productoId, version)` en Postgres; id determinista + `crearNuevo` (create que falla si existe) en Firestore. Consecuencia: `npm run importar:tiempos` ya **no crea** PT nuevos (la hoja no trae receta): los reporta como excepción.
-  - **Consumo al aprobar la remisión** (usuario, 2026-09-29; migración `20260929220000_consumo_por_remision`): `AprobarRemisionUseCase` descuenta **cajas × receta vigente** en la MISMA transacción que la aprobación (o quedan los dos, o ninguno). Una SALIDA por componente en el kardex con `remisionId`, referencia "Remisión AAAA-NNNN" y la versión de receta en la observación; también las **extraoficiales**. **Se bloquea la aprobación (409)** si el PT no tiene receta (`INVENTARIO_PT_SIN_RECETA`) o si algún componente no alcanza (`INVENTARIO_CONSUMO_INSUFICIENTE`, lista todos los faltantes): se mantiene "sin existencia negativa". Reglas puras en `domain/inventario/consumo.ts`; lecturas (`prepararConsumo`, en el paso `antes`) y escrituras (`registrarConsumo`, en `despues`) separadas en `application/inventario/consumo-remision.ts` por la regla de Firestore. El turno del movimiento sale de `momentoOperativo` (por eso Aprobar recibe `HORARIO_REPOSITORY`). **Consecuencia operativa elegida por el usuario: ningún PT sin receta se puede aprobar.**
-  - **Conteo mixto (fase B, 2026-09-29; migración `20260929230000_conteo_mixto`)**: PI e insumos se digitan **como vienen** —estibas + cajas + presentaciones (rollos) + medida suelta— y el backend convierte a la medida con las equivalencias del ítem (`domain/inventario/conteo.ts`: 1 estiba = cajasPorEstiba cajas; 1 caja = unidadesPorCaja presentaciones; 1 presentación = contenidoPresentacion medidas). Escalones en enteros, lo suelto con 3 decimales; solo se usa un escalón definido. Aplica a entradas de mercancía (`lineas[].conteo`), entradas/salidas (`conteo`) y **ajustes** (el conteo es lo CONTADO físicamente; el ajuste = contado − existencia). El kardex guarda `conteo_texto` ("10 ROLLO (1 ROLLO = 50 METRO)"; en ajustes "Conteo físico: …") como copia de lo digitado y la equivalencia usada. `ItemInventario.equivalencias` (null en el PT, que sigue en cajas y no admite conteo). Pantalla: `CampoConteo` muestra solo los campos del ítem y el total en vivo (espejo en `modules/inventario/conteo.ts`).
-  - **Alertas (fase D, 2026-09-30)**: `GET /api/inventario/alertas?fecha=` calcula en el momento (no se guardan; regla pura `domain/inventario/alertas-inventario.ts`): **PT_SIN_RECETA** (crítica si el PT tiene cajas pendientes en el DPP del día: no se podrá aprobar), **COMPONENTE_INACTIVO** (receta vigente con PI/insumo desactivado), **AGOTADO** (PI/insumo activo en 0; crítico si una receta lo usa) y **NO_ALCANZA_DPP** (lo que falta producir hoy = Σ T del DPP − aprobadas oficiales, × receta vigente, contra la existencia; dice cuánto falta). Lo aprobado se resta porque ya descontó su consumo; las extraoficiales no restan del DPP. Si un ítem "no alcanza" no se repite como agotado. `RecetaRepository.vigentes()` trae las vigentes con componentes. Pantallas: pestaña **Alertas** (`/inventario/alertas?fecha=`) y un aviso por tipo en el panel de inicio (se refrescan cada 30 s). Sin umbrales de "stock bajo": el área no los ha definido (`PENDIENTE DE DEFINIR` si se quieren mínimos).
-  - `PENDIENTE DE DEFINIR` con el equipo: **reúso** de bolsas de PT averiadas (solo administrador cuando se implemente); equivalencia de la Bolsa (depende del PT al que pertenece).
-  - Pendiente con el área (ROADMAP D3): conteo físico, de quién son los insumos, WMS con número de remisión
-- 333 pruebas unitarias sin base de datos (`npm test`) + 18 de integración contra PostgreSQL (`npm run test:e2e`, base `mq_test`) + 5 contra Firestore (`npm run test:firestore`)
-- Despliegue: Dockerfiles, `infrastructure/docker-compose.yml`, usuario de BD limitado (`database/`), CI en GitHub Actions
-- Documentación en `docs/` (arquitectura, base de datos, roles, flujos, API, despliegue, módulos, preguntas abiertas)
-
-### Frontend — estructura
-
-```text
-frontend/src/
-├── app/            providers (Query → Sesión → Router), router, layout (BarraLateral, BarraSuperior, navegacion),
-│                   pages/InicioPage + inicio/ (AccesosRapidos, AvisosDia, FlujoRemisiones, LineasEnVivo, UltimasRemisiones)
-├── modules/
-│   ├── auth/       api, SesionContext (provider), useSesion, RutaProtegida, LoginPage
-│   ├── remisiones/ api, hooks (useRemisiones, useAccionRemision), pages (lista, detalle, crear), AccionesRemision
-│   ├── catalogo/   api, hooks (useTurnos, useGrupos, useLugares, useRoles, useProductos)
-│   ├── mfr/        api, hooks (useMfr, useFechaOperativa), TableroMfrPage, ProgramacionPage,
-│   │               componentes (LineasTurno, PersonalTurno, SelectorFecha, SemaforoBadge)
-│   ├── averias/    api, hooks (useAverias, useUrlDeArchivo), pages (lista, nuevo, detalle),
-│   │               componentes (AgregarAveria, CampoFoto, FotoEvidencia, CorregirRegistro/AnularReporte Dialogo),
-│   │               utils (comprimir-foto, totales)
-│   ├── inventario/ InventarioLayout (pestañas), api, hooks (useInventario), tonos, equivalencias, receta, MovimientoDialogo,
-│   │               EditorReceta, RecetaDialogo,
-│   │               pages (InventarioPage, KardexPage, EntradasPage, NuevaEntradaPage, EntradaDetallePage,
-│   │               ProductosPage [PT], MaterialesPage [PI / insumos], UnidadesPage)
-│   └── admin/      UsuariosPage, GruposPage, LineasPage, PesosPage, CausalesPage
-├── components/     Boton, Campo, Select, AreaTexto, Alerta, Dialogo, EstadoBadge, PantallaCargando,
-│                   Badge, Tarjeta, TarjetaKpi, Dato, Desplegable, Iconos, Logo, BotonTema, BotonIdioma,
-│                   graficas/ (Anillo, Barras, BarraProgreso, Dona)
-├── services/       http.ts (axios: token, 401 → cerrar sesión, ErrorApi), almacen-token.ts (localStorage)
-└── shared/         types (api, remision, catalogo, mfr), utils/fechas (fechaOperativaDe espejo del backend),
-                    tema/ (claro/oscuro), idioma/ (textos es/en), animacion/ (animejs), refresco.ts
-```
+Hechos: Remisiones (con firma electrónica fases 1–3), MFR, Averías, Inventario (fases A–D y cierre del día), correo fase 1 y resumen del turno/día fase 2a. Detalle por módulo y decisiones con fecha: `docs/claude/estado-modulos.md`. Endpoints: `docs/claude/api.md`. Estructura del frontend: `docs/claude/frontend-estructura.md`.
 
 Reglas del frontend: nada llama a axios fuera de `services/http.ts`; los permisos solo OCULTAN acciones (la autorización real es del backend); los filtros del listado viven en la URL; las mutaciones invalidan exactamente las claves de caché que tocan.
-
-### API existente
-
-```text
-POST   /api/auth/login                  público → { token, usuario }
-GET    /api/auth/perfil                 usuario del token con sus permisos
-
-GET    /api/usuarios                    admin.usuarios
-GET    /api/usuarios/:id                admin.usuarios
-POST   /api/usuarios                    admin.usuarios
-PATCH  /api/usuarios/:id                admin.usuarios  (nombre, email, rol, activo, contraseña)
-
-GET    /api/catalogos/turnos            catalogo.consultar
-GET    /api/grupos                      catalogo.consultar  (POST/PATCH con catalogo.editar: descripcion, personasEsperadas)
-GET    /api/catalogos/lugares           catalogo.consultar
-GET    /api/catalogos/roles             admin.usuarios
-
-GET    /api/productos?texto=&soloActivos=   catalogo.consultar
-GET    /api/productos/:id               catalogo.consultar
-POST   /api/productos                   catalogo.editar
-PATCH  /api/productos/:id               catalogo.editar  (datos, activo; NO estándares)
-
-POST   /api/remisiones                  remision.crear
-PATCH  /api/remisiones/:id              remision.editar  (solo BORRADOR / EN_RECTIFICACION → 409 si no)
-POST   /api/remisiones/:id/entregar     remision.entregar
-POST   /api/remisiones/:id/aprobar      remision.registrar_aprobacion   descuenta cajas × receta; 409 sin receta o sin existencia
-POST   /api/remisiones/:id/rechazar     remision.registrar_aprobacion
-POST   /api/remisiones/:id/rectificar   remision.rectificar
-POST   /api/remisiones/:id/validar      remision.validar
-
-GET    /api/remisiones?anio=&turnoId=&grupoId=&productoId=&estado=&desde=&hasta=&pagina=&porPagina=
-GET    /api/remisiones/resumen?desde=&hasta=…      remision.consultar  { porEstado, total } sin documentos
-GET    /api/remisiones/pdf?ids=a,b,c                  remision.consultar  (PDF, dos por hoja)
-GET    /api/remisiones/exportar?…filtros              remision.exportar   (.xlsx)
-GET    /api/remisiones/:id/pdf                        remision.consultar
-GET    /api/remisiones/consecutivo/:anio/:numero      remision.consultar
-GET    /api/remisiones/:id/versiones                  remision.consultar
-GET    /api/remisiones/:id/auditoria                  remision.consultar + admin.auditoria
-GET    /api/remisiones/:id                            remision.consultar
-
-GET    /mfr/dia?fecha=                  mfr.consultar             tablero del día
-GET    /mfr/bloques?fecha=              mfr.consultar
-PUT    /mfr/bloques                     mfr.cargar_programacion   crea o corrige (corregir exige motivo)
-DELETE /mfr/bloques/:id                 mfr.cargar_programacion   { motivo }
-POST   /mfr/bloques/dia                 mfr.cargar_programacion   carga un día completo
-POST   /mfr/bloques/periodo             mfr.cargar_programacion   carga N días (semanal/mensual), una transacción por día
-POST   /mfr/bloques/copiar              mfr.cargar_programacion
-POST   /mfr/dpp/analizar                mfr.cargar_programacion   multipart; PDF → propuesta, no escribe
-POST   /mfr/turno/cerrar                mfr.configurar_turno      irreversible
-GET    /mfr/asistencia?fecha=           mfr.consultar
-PUT    /mfr/asistencia                  mfr.configurar_turno      personas que llegaron por grupo
-GET    /mfr/asignaciones?fecha=         mfr.consultar
-PUT    /mfr/asignaciones                mfr.configurar_turno      grupo → línea, con personas
-DELETE /mfr/asignaciones/:id            mfr.configurar_turno
-GET    /mfr/lineas                      mfr.consultar             (POST/PATCH con catalogo.editar)
-GET    /mfr/estandares                  mfr.consultar             incluye pesoSugeridoKg
-PUT    /mfr/estandares                  catalogo.editar_estandares carga en lote { cambios[], motivo }, máx. 100
-PUT    /mfr/estandares/:productoId      catalogo.editar_estandares { cajasPorHora, pesoNetoKg, motivo }
-
-GET    /api/averias/causales        catalogo.consultar       (POST/PATCH con catalogo.editar; no se eliminan)
-GET    /api/averias?desde=&hasta=&turnoId=&grupoId=&estado=   averia.consultar  (rango máx. 93 días)
-GET    /api/averias/indicador?desde=&hasta=                   averia.consultar  % contra el DPP, máx. 1 %, con alertas
-GET    /api/averias/:id             averia.consultar
-GET    /api/averias/:id/registros/:registroId/fotos/:tipo    averia.consultar  (la imagen)
-POST   /api/averias                 averia.reportar          multipart: `datos` (JSON) + `foto_{fila}_{TIPO}`
-PATCH  /api/averias/:id/registros/:registroId               averia.corregir   (no cambia fotos)
-POST   /api/averias/:id/anular      averia.corregir          { motivo }
-
-GET    /api/inventario/items?tipo=&texto=&soloActivos=   inventario.consultar  existencias
-GET    /api/inventario/items/:id(/movimientos?limite=)   inventario.consultar  ítem / kardex
-GET    /api/inventario/unidades         inventario.consultar     (POST, PATCH /:id con inventario.catalogo: codigo, nombre, activo)
-GET    /api/inventario/catalogo/pi|insumos   inventario.consultar  (POST, PATCH /:id con inventario.catalogo:
-                                        codigo, descripcion, unidadBaseId, presentacionId?, contenidoPresentacion?,
-                                        unidadesPorCaja?, cajasPorEstiba?, activo)
-                                        (el PT se crea en POST /api/productos, con `receta` obligatoria; ya no hay POST/PATCH /inventario/items)
-GET    /api/inventario/recetas          inventario.consultar     versión vigente de cada PT con receta (resumen)
-GET    /api/inventario/recetas/:productoId   inventario.consultar  { vigente, versiones[] } con datos de cada componente
-PUT    /api/inventario/recetas/:productoId   inventario.catalogo   { componentes: [{ itemId, cantidad (por caja, decimal) }] } → versión nueva
-POST   /api/inventario/movimientos      inventario.registrar     { itemId, tipo: ENTRADA|SALIDA, cantidad (hasta 3 decimales; PT entero) | conteo, referencia?, observacion? }
-POST   /api/inventario/ajustes          inventario.ajustar       { itemId, cantidad (con signo) | conteo (lo contado), motivo, observacion? }
-                                        conteo = { estibas, cajas, presentaciones, medida } (enteros salvo medida); solo PI e insumos
-GET    /api/inventario/alertas?fecha=   inventario.consultar     PT sin receta, componente inactivo, agotado, no alcanza para el DPP
-GET    /api/inventario/movimientos?desde=&hasta=&tipo=   inventario.consultar  (rango máx. 93 días)
-POST   /api/inventario/entradas         inventario.registrar     { documento, remitente?, observacion?, lineas: [{ itemId, cantidad | conteo }] }
-GET    /api/inventario/entradas?desde=&hasta=            inventario.consultar  (/:id con sus líneas)
-
-GET    /api                             público                   comprobación de vida (healthcheck de Docker)
-```
-
-Detalle completo de la API en `docs/api.md`.
 
 ### Fechas: regla de formato
 
@@ -519,43 +322,11 @@ Decisión del usuario (2026-09-16). Requiere un Chrome/Chromium: `PUPPETEER_EXEC
 
 `GET /:id` va **al final** del controlador: si estuviera antes de `consecutivo/:anio/:numero`, NestJS interpretaría "consecutivo" como un id.
 
-### Catálogos sembrados
-
-- **Roles:** `ADMINISTRADOR`, `COORDINADOR_MQ`, `PATINADOR`, `CONSULTA`
-- **Grupos** (antes "proveedores"; renombrados el 2026-09-21 sin excepción, el proveedor real se escribe a mano en `descripcion`): LOGICMARD, MAXISERVICE, APOYOS MAXI, MIX. Cada grupo tiene `personasEsperadas` (personas que debe enviar por turno). En la programación se registra, por turno y grupo, cuántas llegaron (`asistencia_turno`); el tablero marca el personal como A_FIN / AFECTADA con **dos comparaciones** (usuario, 2026-09-30; antes era solo contra el grupo): **contra lo que pide el DPP** (Σ por línea del **máximo** de personas de sus bloques en el turno; cobertura % = llegaron ÷ requeridas, base del indicador de afectación) **y** contra las esperadas de cada grupo; basta que falle una para AFECTADA. El tablero trae también el personal del día (solo turnos ya registrados). Los grupos se asignan a líneas por día y turno con número de personas (`asignacion_linea`; CUBIERTA / INCOMPLETA contra la línea ideal) y **nunca más personas de las que llegaron** (asistencia primero; 409 si excede o si la asistencia baja de lo asignado). El coordinador tiene `catalogo.editar` para gestionar grupos. Ver `docs/modules/mfr.md`.
-- **Lugar:** MAQUILA PEPSICO SANTO DOMINGO
-- **Líneas de producción:** las 9 plataformas del DPP (L1–L4 MULTIPACK 306 kg/h; **L5 MANUAL 306 kg/h**, agregada el 2026-09-22 al aparecer en el DPP semanal; MANUAL-1/2 249 kg/h; REEMPAQU-2 y REEMPAQUES 203 kg/h). `PENDIENTE DE CONFIRMAR`: L5 es MANUAL pero con la capacidad de una MULTIPACK
-
 ---
 
-## 7. Deuda técnica conocida
+## 7. Deuda técnica y bugs corregidos
 
-### Resuelto — hueco de seguridad (2026-09-16)
-
-Los DTOs ya no reciben `*PorId` del cliente. El usuario sale del token y cada endpoint exige su permiso. Ver "Autenticación y permisos" en la sección 4.
-
-### Pendientes técnicos
-
-
-- Un JWT no se puede revocar antes de expirar (12 h). Si el área lo exige, habría que agregar refresh token o lista de revocación.
-- `infrastructure/docker-compose.yml` se escribió sin poder ejecutarlo (Docker sin plugin Compose en el equipo de desarrollo). Validar con `docker compose config` antes del primer despliegue.
-- La imagen del backend instala también las dependencias de desarrollo (la CLI de Prisma y `tsx` corren en el arranque para migrar y sembrar). Se puede adelgazar después.
-- Los usuarios no pueden cambiar su propia contraseña; solo el administrador la restablece.
-
-### Bug corregido el 2026-09-28: instantes corridos 5 horas
-
-La sesión de PostgreSQL estaba en `America/Bogota` y `@prisma/adapter-pg` envía las fechas como hora UTC **sin zona**: la base guardaba cada instante 5 h adelantado. La aplicación no lo notaba porque al leer se deshacía el error, pero lo que generaba la propia base (`now()`) se leía 5 h atrasado, y cualquier consulta SQL directa veía horas falsas.
-
-- **Regla:** toda conexión a PostgreSQL se crea con `crearAdaptadorPostgres()` (`infrastructure/database/prisma/adaptador-postgres.ts`), que fija `TimeZone=UTC` en la sesión. **Nunca** `new PrismaPg(...)` directo. La hora de Colombia se aplica solo al mostrar y al calcular la fecha operativa.
-- Datos corregidos con la migración `20260928200000_instantes_a_utc` (resta el desfase de la zona de la sesión a todas las columnas `timestamptz`; en una base ya en UTC no cambia nada).
-- Regresión cubierta por `test/zona-horaria.e2e-spec.ts` (mira la base por debajo de Prisma).
-
-### Bugs corregidos el 2026-09-16 (para no repetirlos)
-
-- El mapeador de remisión no persistía `motivo_ultimo_rechazo` ni los cambios de turno/grupo/lugar/producto.
-- El cliente Prisma generado estaba desactualizado respecto al schema (falta de `prisma generate`).
-- Un DTO con claves `undefined` pisaba valores reales al hacer spread (`sinIndefinidos` en los casos de uso de edición).
-- Fechas de solo día formateadas en zona Bogotá retrocedían un día en el PDF.
+Ver `docs/claude/deuda-y-bugs.md`. Antes del primer despliegue, validar `docker compose config` (el compose se escribió sin poder ejecutarlo).
 
 ---
 
@@ -641,10 +412,73 @@ Remisiones (B1–B5, B7) y MFR están cerrados. Lo que sigue, según el ROADMAP 
 |---|---|---|
 | ~~Averías (D1)~~ | **Hecho 2026-09-28** (reporte con fotos + indicador del 1 %) | Pendientes menores: equivalencia de la Bolsa; averías de PI e insumos llegan con Inventario |
 | **Inventario (D3)** | Cuánto hay de **insumos, PI y PT** (usuario, 2026-09-28). **Hecho (2026-09-29): catálogo por tipo + unidades + kardex + existencias + entrada de mercancía + receta versionada del PT.** | Fases A–D hechas (2026-09-30). Después: conteo físico, enlace con remisiones/averías, conciliación PT vs WMS. Indicadores al final |
-| **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y `personasEsperadas` de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
+| **Datos que faltan para el MFR** | Peso neto por caja (ya hay herramienta: `/admin/pesos`) y las personas esperadas **por turno** de los 4 grupos | Cuando el administrador los confirme; sin ellos no hay kilos ni semáforo de personal |
 | **Migración del histórico 2026 (B6)** | ~2.195 registros del Excel | Requiere la decisión del área: migrar, descartar, o migrar marcado `HISTORICO_EXCEL` |
 | **Importación del catálogo desde el Excel** | Hoy el catálogo se carga a mano; `npm run importar:tiempos` simula y reporta diferencias | Bloqueado por qué hoja manda cuando PRODUCTOS y TIEMPOS se contradicen |
 
 Pendientes del MFR que no dependen del área: cierre automático del turno al terminar su hora (hoy es manual) y la vista de estadística histórica por línea.
 
 Pendiente transversal: **vistas por rol × área**, que esperan a que el área defina áreas y roles.
+
+### Tarea en curso (método de ciclos, sección 2)
+
+**Ciclo 0 — Línea base** · Estado: `VERIFICADO 2026-10-05, falta el commit del usuario`
+- Backend: 364 pruebas en verde y `nest build` OK. Frontend: `tsc -b` + `vite build` OK; `npm run lint` (oxlint) sin errores, 3 advertencias previas.
+- El frontend NO usa ESLint sino **oxlint** (`npm run lint`).
+
+**Ciclo 1 — Rediseño visual del frontend** (usuario, 2026-10-05) · Estado: `EN CURSO`
+- Decisiones: mantener el **azul actual** (tokens de `index.css`; nada de colores en crudo); estilo **"tablero de planta"** (cifras grandes, franja de color al borde según estado, alto contraste, botones grandes); dispositivos: computador de MQ, tablet en piso, celular y TV; **modo TV** del tablero MFR (pantalla completa, sin menú, letra grande, refresco solo); orden: **base común primero**, luego módulo por módulo; más gráficas por módulo y guiar al usuario sobre qué hacer.
+- Hecho: componentes base (`EncabezadoPagina`, `Tabla`, `EstadoVacio`, `PanelFiltros`, `Paginacion`, `BarraSeleccion`, `CifraEstado`, `franjas.ts`); `RemisionesListaPage` ya los usa.
+- **Hecho 2026-10-05 — Tablero MFR (`/mfr`)**, pendiente de revisión visual del usuario: banda con `Medidor` (arco de 270° con la marca de la meta, `components/graficas/Medidor.tsx`), frase guía ("para llegar al 95 % faltan N cajas") y cinco cifras (programadas, producidas, faltan PT por PT, fuera del DPP, emergencia); `SelectorFecha` con variante `vidrio` (flechas día a día y "Hoy"). Debajo, **cuatro vistas** con `PestanasVista` (resúmenes en `modules/mfr/resumen-vistas.ts`): **Turnos** (`ColumnaTurno`, columnas abiertas separadas por líneas; reemplaza a `TarjetaTurno`), **Por PT** (`RankingPt`: filas a todo el ancho, primero lo que más falta u "Orden del DPP"), **Kilos** (`CurvaDia`: meta contra producido por hora, con cursor) y **Líneas** (mapa de calor por línea con las 4 series, o por familia). El semáforo → tono quedó en un solo lugar: `modules/mfr/semaforo.ts`.
+- **Hecho 2026-10-05 — Modo TV (`/mfr/tv`)**, fuera del `AppLayout`: día operativo en curso (cambia solo a las 06:00), reloj, refresco cada 10 s (`REFRESCO_TABLERO`), medidor grande, una columna por turno y los 6 PT con más cajas pendientes; botones discretos de pantalla completa y volver.
+- **Revisión del usuario (2026-10-05):** aprueba la estructura del tablero. Ningún título de sección queda "volando" y el título va junto a su información.
+- **Decisión del usuario (2026-10-05): fuera las tarjetas** ("muy repetitivo y genérico"). Se eligió **"Una vista a la vez"** entre cuatro opciones (secciones abiertas, sala de control oscura, una vista a la vez, mapa de la planta): debajo de la banda del módulo va una **barra de pestañas grandes** (`components/PestanasVista.tsx`, con ícono y un resumen vivo en cada pestaña) y **cada vista ocupa todo el ancho, sin cajas**: los datos van directo sobre el fondo, separados con líneas finas y franjas de color. La vista elegida vive en la URL (`?vista=`), como los filtros. Reemplaza al `PanelSeccion` (eliminado). Aplica a todas las pantallas rediseñadas; la banda `EncabezadoPagina` se conserva.
+- **Legibilidad (usuario, 2026-10-05: "las letras deberían ser más visibles sobre los fondos")**, aplicada en TODO el frontend y medida con la fórmula de contraste WCAG (mínimo 4,5:1 para texto pequeño): el degradado de la banda termina en `--hero-final` (#1e40af) y no en `--marca` (con --marca el blanco caía a 3,1:1, y en tema oscuro ni el blanco puro llegaba: 3,3:1); todo relleno azul con texto blanco usa `--marca-relleno` (#1d4ed8, 6,7:1 en los dos temas) y no `bg-marca`; sobre la banda, el vidrio o la barra de navegación el texto blanco va como mínimo al **80 %** (lo secundario al 90 %); **ningún texto por debajo de 12 px** (`text-xs`). La regla está escrita también en `index.css`.
+- **Hecho 2026-10-05 — Figura 3D (`HeroVisual3D`)**, pendiente de revisión visual del usuario. El usuario aprobó las librerías ("las herramientas que consideres óptimas… que vaya para todo el aplicativo"): `three`, `@react-three/fiber`, `@react-three/drei` (+ `@types/three`). Vive en `shared/visual3d/`: `Escena3D.tsx` es el **único** archivo que importa three/fiber/drei (como anime.js en `shared/animacion/`); `HeroVisual3D.tsx` es lo que usan las pantallas y la carga con `lazy` (three va en un archivo aparte de ~262 KB gzip que solo se descarga donde hay figura). Nudo toroidal de metal pulido en `--marca-relleno`, reflejos de `Lightformer` (sin descargar HDR) con aro de `--acento`; gira, flota y se inclina hacia el puntero (se escucha la ventana). No se dibuja en <640 px ni sin WebGL; queda quieta con "reducir movimiento"; se pausa fuera de pantalla; baja la resolución si el equipo no sostiene los FPS (`PerformanceMonitor`). Está en **`EncabezadoPagina`** (todas las pantallas con banda; en celular sigue el ícono en marca de agua) y en el **panel de marca del login** (el formulario no se tocó). **No va en el modo TV.** Verificado con capturas reales (Puppeteer) en claro, oscuro, 1440 y 820 px, sin errores de consola.
+- **Instrucción del usuario (2026-10-05): "migrar el modelado de los mockups a todos los apartados" y "enfocar el modelo 3D al tema del proyecto (productos de PepsiCo flotando o similar)".** Hecho el mismo día:
+  - **Escena 3D temática**: ya no es un nudo abstracto, flota **empaque**: bolsa tipo almohada (snack) en `--marca-relleno`, `--acento` y `--plata`, y una caja corrugada en `--carton` con cinta y etiqueta de código de barras (`shared/visual3d/productos3d.tsx`, modelado por código, sin descargar modelos). **Decisión de diseño: genéricos, sin logos ni marcas de PepsiCo** (son de PepsiCo y exigen su autorización; el aplicativo es de Inlotrans). Si el área consigue el aval y los artes, se cambia solo la textura. Tokens nuevos `--carton` y `--plata` (decoración, iguales en los dos temas).
+  - **Banda común en TODAS las pantallas**: los 15 encabezados escritos a mano pasaron a `EncabezadoPagina` (Inicio, Inventario —en su layout—, Averías lista/nuevo/detalle, Remisión nueva/editar/detalle, Programación, Correos, Usuarios, Grupos, Líneas, Pesos, Causales). Las acciones de cada pantalla quedaron en la banda con `Boton` `claro`/`vidrio`. `EncabezadoPagina` ganó `volver` (enlace encima del título) e `insignia` (estado/versión junto al título). En el detalle de la remisión, `AccionesRemision` (entregar, aprobar…) va **debajo** de la banda: sus botones son azules y se perderían en ella.
+  - **Formularios**: solo cambió su encabezado; los campos y su distribución NO se tocaron (regla de consultar antes).
+- **Instrucción del usuario (2026-10-05): "dale más detalle y sé más creativo con los apartados".** Hecho: **una escena 3D por módulo** (`EncabezadoPagina escena="…"`, ver `shared/visual3d/escenas.tsx`): `empaque` (Inicio, listado de remisiones, login), `remision` (tabla con la remisión firmada y sellada), `averia` (cono de seguridad + caja abollada + bolsa cayendo; también Causales), `inventario` (estiba con cajas), `produccion` (banda transportadora con bolsas en movimiento; MFR, Programación, Líneas), `correo` (sobres), `personas` (cascos + planilla; Usuarios, Grupos), `pesos` (báscula con caja). Más detalle: arrugas en las bolsas, tabla nutricional y hojuelas en el estampado; caja con vetas, solapas, flechas "este lado arriba", sello de reciclaje y etiqueta. Piezas en `shared/visual3d/piezas/` (empaque, oficina, planta, texturas con caché, medidas). Tokens nuevos `--madera` y `--papel`. Verificado con capturas de las 8 escenas y del login.
+  - **Incidente (2026-10-05):** al formatear se corrió `prettier --write` sin configuración y cambió comillas/punto y coma de 15 pantallas. Se restauró el estilo (`--no-semi --single-quote --print-width 110`); el código es el mismo pero los saltos de línea de esos archivos cambiaron. El proyecto **no tiene `.prettierrc`**: `PENDIENTE DE DEFINIR` si se agrega uno con ese estilo para que no vuelva a pasar.
+- **Siguiente (usuario, 2026-10-05): tableros de productividad.** Levantamiento hecho el mismo día (respuestas del usuario):
+  - **Indicador: cajas por persona-hora** = cajas aprobadas ÷ (personas que llegaron × horas). **Horas = las 7,5 h productivas del turno** (`turno_horario`), no las de los bloques.
+  - **Cortes:** turno, grupo (proveedor), línea y PT. **Periodos:** día en curso, tendencia de 7 días y mensual.
+  - **Meta:** la define el área → configurable por el administrador; sin semáforo hasta que exista (`PENDIENTE DE DEFINIR` el valor).
+  - **Hallazgo:** la remisión no guarda la línea y la asistencia es por turno × grupo, así que turno y grupo salen exactos, pero línea y PT no. **Decisión del usuario: agregar la línea a la remisión.** Toca un módulo cerrado (entidad, Prisma + Firestore, formulario); las remisiones anteriores quedan "sin línea".
+  - Plan por fases: **F1** dominio + endpoint de productividad por turno y grupo (con pruebas) y meta configurable · **F2** tablero (día, 7 días, mes) · **F3** línea en la remisión → cortes por línea y PT.
+  - Falta definir antes de F3: ¿la línea es obligatoria? ¿Debe ser una línea donde el DPP programó ese PT en ese turno, o cualquiera activa? ¿Cómo va en el formulario? (se consulta con boceto, regla de formularios). ¿De dónde salen las personas por línea (asignación de personas a líneas que ya existe)?
+- **Instrucción del usuario (2026-10-05): "mejora el diseño de todos los container… la información se ve saturada y no cabe bien dentro de los cards… cambiarlos por mejores alternativas".** Hecho el mismo día, en todas las pantallas de **consulta**:
+  - **Componentes base nuevos** (en `components/`, cada uno solo dibuja): `ListaRegistros` + `FilaRegistro` + `MetaDato` (reemplazo de la tabla apretada: franja de color, título legible, datos secundarios como etiquetas, **cifra principal grande a la derecha**, se acomoda hacia abajo en pantallas angostas); `Seccion` (reemplazo de `Tarjeta` con título: franja + contador + línea, sin caja); `Ficha` (datos de un documento en franja con separadores, reemplaza Tarjeta+rejilla de `Dato`); `LineaTiempo` (historia agrupada por día operativo: kardex, entradas, envíos, reportes); `EncabezadoDetalle` (registro dentro de un módulo con banda: título + cifra grande); `SelectorSegmentado`; `BarraProporcion`; `Iniciales`. Utilidades: `diaLargo` (día operativo, en UTC) y `hora` (instante, en Bogotá) en `shared/utils/fechas.ts`; `agruparEnOrden` en `shared/utils/agrupar.ts`. `PestanasVista` acomoda 2, 3 o 4 pestañas. `Tabla` y `PanelFiltros` quedaron **sin caja** (también afecta al listado de remisiones).
+  - **Inventario**: Existencias (filas con la existencia grande, selector de tipo), Kardex (línea de tiempo, entradas en verde y salidas en rojo, saldo de cada movimiento), Alertas (marcador grande + secciones por grupo con barra "hay vs necesita"), Entradas (línea de tiempo) y su detalle (ficha + filas), Cierre del día (solo el **resultado**: ficha + merma por material con barra contado/esperado), PT (eran 12 columnas → filas con estándares como etiquetas y "sin receta" en ámbar), PI/Insumos, Unidades.
+  - **Administración**: Usuarios (iniciales + rol), Grupos (personas/día grande, turnos como etiquetas, "sin proveedor" en ámbar), Causales (número de orden grande), Correos (listas con destinatarios + envíos en línea de tiempo).
+  - **Averías**: "una vista a la vez" con dos pestañas, **Reportes** (línea de tiempo) e **Indicador del 1 %** (marcador grande y desgloses por día/turno/grupo/PT como barras contra la línea del límite; el desglose por grupo va en azul porque el backend no le da semáforo). Detalle del reporte: ficha + cada avería con su número grande, cantidad, causal y fotos.
+  - **Remisión (detalle)**: cifras grandes (cajas, unidades, estibas, vencimiento), **recorrido del documento** en pasos (`RecorridoRemision`: Registrada → Entregada → Aprobada → Validada; rechazo en rojo), ficha de registro, **firmas como renglones de papel** e historial con selector. En celular el listado de remisiones usa filas abiertas.
+  - **Inicio**: las 4 cifras pasaron a la banda (tocar una lleva al módulo), **los avisos van primero** (filas con franja) y lo demás en 3 vistas con pestañas (Líneas en vivo · Remisiones de hoy · Turnos y kilos). Textos nuevos en `es.ts` y `en.ts`.
+  - **Programación**: turnos en columnas abiertas y cada línea con encabezado abierto y la meta grande (la tabla de bloques no cambió).
+  - **NO se tocaron (formularios, regla de consultar):** login, conteo del cierre, nueva entrada, nuevo reporte de averías, formulario de remisión, tabla editable de Líneas, edición en lote de Pesos, diálogos de crear/editar, la tabla de bloques de Programación por dentro. Tampoco los accesos rápidos del Inicio (son botones de navegación).
+  - Verificado: `tsc -b` + `vite build` + oxlint sin avisos nuevos; capturas con datos de ejemplo en computador, tablet y celular, claro y oscuro.
+- **Decisión del usuario (2026-10-05): la navegación pasa de la barra lateral a la parte SUPERIOR** ("en el lado nos quita espacio"), sin quitar nada y sin barra de desplazamiento. Hecho el mismo día (`app/layout/`):
+  - Una franja marina (`BarraSuperior`): `Inicio · Remisiones · Producción ▾ (MFR del día, Programación) · Averías · Inventario · Administración ▾ (6 enlaces en rejilla)` + chip del día operativo + menú de la cuenta. 6 elementos en vez de 12: los que van juntos se agrupan en desplegables (`MenuDesplegable`: cierra con clic afuera, Escape o al elegir; devuelve el foco con Escape).
+  - **Menú de la cuenta** (`MenuCuenta`): nombre, rol, planta, idioma y tema (sueltos en la barra solo desde 1536 px), cerrar sesión y el eslogan que estaba al pie de la lateral.
+  - **Chip del día operativo** (`ChipDiaOperativo`): reúne día operativo + turno en curso + hora; lo escrito crece con el ancho (fecha corta < 1280 px; "Día operativo dd/mm/aaaa" ≥ 1280; día de la semana ≥ 1536) y el título lo dice completo.
+  - Por anchos: logo solo con el símbolo < 1280 px; íconos del menú ≥ 1536 px. **Medido sin solapes** en 1024, 1280, 1440 y 1536 px (mínimo 71 px libres) y sin desborde horizontal en 390 px.
+  - **< 1024 px**: botón ☰ que abre un panel desde la barra (`MenuMovil`) con todo agrupado en dos columnas.
+  - `navegacion.ts` ahora tiene enlaces y grupos (`navegacionVisible`, `enlaceActivo`). El contenido gana el ancho: `max-w-[96rem]` (antes `max-w-7xl` junto a una lateral de 256 px). `BarraLateral.tsx` eliminado. `BotonIdioma`/`BotonTema` tienen `sobreOscuro` para fondos marina. Textos nuevos `nav.*` en `es.ts` y `en.ts`.
+- Falta: (1) la **revisión visual del usuario** con datos reales del rediseño sin tarjetas; (2) los **formularios**, que se consultan antes con bocetos (instrucción de abajo); (3) la capa `Tarjeta`/`TarjetaKpi` queda solo en formularios y en lo que falte revisar: se retira cuando ya no la use nadie.
+- **Instrucción del usuario (2026-10-05):** toda la interfaz debe presentar la información de forma **más creativa, dinámica e intuitiva**. **Los formularios NO se rediseñan sin consultar antes al usuario**: se le presentan opciones (boceto o descripción) para alinearlos con lo que le gusta ver al cliente, y se espera su respuesta. Las pantallas de consulta (tableros, listados, detalles) sí se pueden rediseñar directamente.
+
+**Ciclo 2 — Indicadores de producción** (usuario, 2026-10-06) · Estado: `LEVANTAMIENTO HECHO`, se abre cuando el usuario cierre el Ciclo 1 (revisión + commit)
+- Pedido: MFR, FR, OTIF, averías vs lo fabricado, PT con más y menos producción, ritmo del personal por hora (adelantado / en línea / retrasado) con horas productivas, efectividad por línea en % y cajas, cumplimiento esperado según las personas que llegaron. Absorbe el tablero de productividad (cajas por persona-hora) levantado el 2026-10-05.
+- **Definiciones acordadas (respuestas del usuario): ver `docs/modules/mfr.md` → "Indicadores nuevos".** En corto: FR = aprobado ÷ programado sin tope por SKU (el pedido es el DPP); OTIF por SKU = completo y aprobado antes del fin de su último bloque; averías ÷ (aprobado + averiado); ranking por PT; ritmo por hora de creación de la remisión con tolerancia ±5 %; 7,5 h productivas sin pausas; efectividad por línea = producido ÷ T; esperado por personas = T × asignadas ÷ línea ideal (máx. 100 %).
+- **Fases:** F1, lo que no necesita la línea (FR, OTIF, averías vs fabricado, ranking, ritmo y productividad por turno) · F2, la línea en la remisión (bocetos del formulario antes) · F3, lo de por línea.
+- Criterio de cierre de F1: funciones puras en `domain/` con pruebas de cada fórmula (casos borde: día sin DPP, SKU en varios bloques, remisión fuera del DPP, turno sin asistencia), endpoint con permiso, implementado en Prisma y Firestore si lee datos nuevos, y una vista en el frontend; `npm test` + `npm run build` + `npm run build` del frontend en verde.
+- Confirmado (usuario, 2026-10-06): el ritmo cuenta todas las remisiones creadas no extraoficiales; el ranking incluye los PT programados en 0; periodos día / 7 días / mes.
+- 2026-10-06: el usuario pidió arrancar la F1 y dijo haber hecho el commit del Ciclo 1, pero en el repositorio `main` sigue en `0c0a8f8` con 197 archivos sin commit. Se le avisó antes de empezar.
+
+### Cola (no se abre hasta cerrar el ciclo anterior; el usuario decide el orden)
+
+- Correo fase 2b: envío automático al cerrar el turno (resumen + aprobadas), reenviar, sin deshacer el cierre si falla.
+- Resumen 2c / MFR: cierre automático del turno a su hora.
+- MFR: estadística histórica por línea.
+- Calidad (D2): en levantamiento; falta si bloquea la remisión y la tabla de muestreo exacta.

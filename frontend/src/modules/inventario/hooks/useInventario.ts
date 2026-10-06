@@ -8,6 +8,7 @@
  *   ['inventario', 'entradas', …]       entradas de mercancía de un rango
  *   ['inventario', 'entrada', id]       una entrada con sus líneas
  *   ['inventario', 'alertas', fecha]    alertas del día (se refrescan solas)
+ *   ['inventario', 'cierre', fecha]     qué contar ese día, o el cierre registrado
  *   ['inventario', 'recetas']           resumen: versión vigente de cada PT con receta
  *   ['inventario', 'receta', productoId] vigente + historial de un PT
  *
@@ -19,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type {
   ComponenteReceta,
+  DatosCierre,
   DatosAjuste,
   DatosEntrada,
   DatosMaterial,
@@ -115,6 +117,18 @@ export function useGuardarUnidad() {
       id ? inventarioApi.actualizarUnidad(id, datos) : inventarioApi.crearUnidad(datos as { codigo: string; nombre: string }),
     onSuccess: refrescar,
   })
+}
+
+// ---------- Cierre del día ----------
+
+export function usePrepararCierre(fecha: string) {
+  return useQuery({ queryKey: ['inventario', 'cierre', fecha], queryFn: () => inventarioApi.prepararCierre(fecha) })
+}
+
+/** Ajusta existencias y crea movimientos: se refresca todo el módulo. */
+export function useRegistrarCierre() {
+  const refrescar = useRefrescarModulo()
+  return useMutation({ mutationFn: (datos: DatosCierre) => inventarioApi.registrarCierre(datos), onSuccess: refrescar })
 }
 
 // ---------- Alertas (fase D) ----------

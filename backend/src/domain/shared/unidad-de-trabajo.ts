@@ -25,6 +25,7 @@ import type { AuditoriaRepository } from '../auditoria/auditoria.repository.js';
 import type { CausalAveriaRepository } from '../averia/causal-averia.js';
 import type { ReporteAveriaRepository } from '../averia/reporte-averia.js';
 import type { GrupoRepository } from '../grupo/grupo.repository.js';
+import type { EnvioCorreoRepository, ListaDistribucionRepository } from '../correo/correo.js';
 import type { CierreInventarioRepository } from '../inventario/cierre-inventario.js';
 import type { EntradaMercanciaRepository } from '../inventario/entrada-mercancia.js';
 import type { ItemInventarioRepository } from '../inventario/item-inventario.js';
@@ -36,9 +37,12 @@ import type { AsignacionRepository } from '../mfr/asignacion-linea.js';
 import type { AsistenciaRepository } from '../mfr/asistencia-turno.js';
 import type { BloqueRepository } from '../mfr/bloque-programacion.js';
 import type { EstandarRepository } from '../mfr/estandar-produccion.js';
+import type { AjusteEsperadasRepository } from '../mfr/esperadas-personal.js';
 import type { LineaRepository } from '../mfr/linea-produccion.js';
 import type { ProductoRepository } from '../producto/producto.repository.js';
 import type { RemisionRepository } from '../remision/remision.repository.js';
+import type { FirmaRemisionRepository } from '../remision/firma-remision.js';
+import type { ResumenTurnoRepository } from '../resumen/resumen-turno.js';
 import type { UsuarioRepository } from '../usuario/usuario.repository.js';
 
 /**
@@ -50,6 +54,7 @@ import type { UsuarioRepository } from '../usuario/usuario.repository.js';
  */
 export interface ContextoTransaccional {
   remisiones: RemisionRepository;
+  firmasRemision: FirmaRemisionRepository;
   usuarios: UsuarioRepository;
   productos: ProductoRepository;
   grupos: GrupoRepository;
@@ -60,6 +65,7 @@ export interface ContextoTransaccional {
   estandares: EstandarRepository;
   asistencias: AsistenciaRepository;
   asignaciones: AsignacionRepository;
+  ajustesEsperadas: AjusteEsperadasRepository;
   // Averías
   causales: CausalAveriaRepository;
   reportesAveria: ReporteAveriaRepository;
@@ -71,6 +77,11 @@ export interface ContextoTransaccional {
   unidadesMedida: UnidadMedidaRepository;
   recetas: RecetaRepository;
   cierresInventario: CierreInventarioRepository;
+  // Correo
+  listasDistribucion: ListaDistribucionRepository;
+  enviosCorreo: EnvioCorreoRepository;
+  // Resumen del turno
+  resumenesTurno: ResumenTurnoRepository;
 }
 
 export interface UnidadDeTrabajo {

@@ -8,15 +8,18 @@
  *   /remisiones/nueva        crear   (va ANTES de /:id, igual que en el backend)
  *   /remisiones/:id          detalle + acciones de flujo
  *   /remisiones/:id/editar   corregir datos (BORRADOR / EN_RECTIFICACION)
+ *   /mfr/tv                  modo TV del tablero MFR (pantalla completa, SIN el layout)
  *   /admin/usuarios          administración
  *   /admin/pesos             pesos por caja en lote (estándar del MFR)
  *   /admin/causales          causales de avería (lista del formulario)
+ *   /admin/correos           listas de distribución de correo y registro de envíos
  *   /averias                 listado de reportes de averías
  *   /averias/nuevo           formulario (va ANTES de /:id)
  *   /averias/:id             detalle con fotos; corregir / anular (administrador)
  *   /inventario              UN SOLO MÓDULO (pestañas, `InventarioLayout`):
  *     (índice)               existencias de insumos, PI y PT; registrar movimiento
  *     /alertas               alertas del día: sin receta, agotado, no alcanza para el DPP…
+ *     /cierre                cierre del día: conteo físico de los materiales de las recetas y su merma
  *     /entradas              entradas de mercancía (listado; /nueva formulario; /:id detalle)
  *     /pt                    catálogo de PT (tabla `producto`; antes /admin/productos)
  *     /pi, /insumos          catálogo de PI y de insumos (una tabla cada uno)
@@ -31,8 +34,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { CausalesPage } from '../modules/admin/pages/CausalesPage'
+import { CorreosPage } from '../modules/correo/pages/CorreosPage'
 import { GruposPage } from '../modules/admin/pages/GruposPage'
 import { AlertasPage } from '../modules/inventario/pages/AlertasPage'
+import { CierrePage } from '../modules/inventario/pages/CierrePage'
 import { InventarioPage } from '../modules/inventario/pages/InventarioPage'
 import { EntradaDetallePage } from '../modules/inventario/pages/EntradaDetallePage'
 import { EntradasPage } from '../modules/inventario/pages/EntradasPage'
@@ -49,6 +54,7 @@ import { PesosPage } from '../modules/admin/pages/PesosPage'
 import { ProductosPage } from '../modules/inventario/pages/ProductosPage'
 import { ProgramacionPage } from '../modules/mfr/pages/ProgramacionPage'
 import { TableroMfrPage } from '../modules/mfr/pages/TableroMfrPage'
+import { TableroTvPage } from '../modules/mfr/pages/TableroTvPage'
 import { UsuariosPage } from '../modules/admin/pages/UsuariosPage'
 import { LoginPage } from '../modules/auth/pages/LoginPage'
 import { RutaProtegida } from '../modules/auth/RutaProtegida'
@@ -64,6 +70,8 @@ export const router = createBrowserRouter([
   {
     element: <RutaProtegida />,
     children: [
+      // Modo TV: fuera del AppLayout a propósito (sin menú ni barra superior).
+      { path: 'mfr/tv', element: <TableroTvPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -86,6 +94,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <InventarioPage /> },
               { path: 'alertas', element: <AlertasPage /> },
+              { path: 'cierre', element: <CierrePage /> },
               { path: 'entradas', element: <EntradasPage /> },
               { path: 'entradas/nueva', element: <NuevaEntradaPage /> },
               { path: 'entradas/:id', element: <EntradaDetallePage /> },
@@ -108,6 +117,7 @@ export const router = createBrowserRouter([
           { path: 'admin/grupos', element: <GruposPage /> },
           { path: 'admin/pesos', element: <PesosPage /> },
           { path: 'admin/causales', element: <CausalesPage /> },
+          { path: 'admin/correos', element: <CorreosPage /> },
         ],
       },
     ],

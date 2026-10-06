@@ -2,9 +2,14 @@
  * LISTADO DE REMISIONES
  * =====================
  *
- * Filtros por fecha operativa, estado, turno y grupo; tabla
- * paginada. Las remisiones APROBADAS (sin conciliar) se destacan porque
- * son la fuente probable de descuadres.
+ * Arriba, una cifra por estado (con los filtros puestos): dice cuántas
+ * hay y, al tocarla, filtra por ese estado. Debajo, filtros con atajos de
+ * fecha y la tabla, con una franja del color del estado en cada fila.
+ * Las APROBADAS (sin conciliar) se ven en ámbar porque son la fuente
+ * probable de descuadres.
+ *
+ * Las acciones sobre varias remisiones (correo, PDF) aparecen en una
+ * barra flotante solo cuando hay alguna marcada.
  *
  * Los filtros viven en la URL (`?estado=...&desde=...`): así se pueden
  * compartir y sobreviven a recargar la página.
@@ -14,10 +19,19 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Alerta } from '../../../components/Alerta'
+import { BarraSeleccion } from '../../../components/BarraSeleccion'
 import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
+import { CifraEstado } from '../../../components/CifraEstado'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { EstadoBadge } from '../../../components/EstadoBadge'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoRemision } from '../../../components/Iconos'
+import { Paginacion } from '../../../components/Paginacion'
+import { PanelFiltros } from '../../../components/PanelFiltros'
 import { Select } from '../../../components/Select'
+import { Celda, FilaTabla, Tabla } from '../../../components/Tabla'
+import { TONO_ESTADO } from '../../../components/tonos-estado'
 import { abrirPdf, descargarArchivo } from '../../../services/archivos'
 import { comoErrorApi } from '../../../services/http'
 import {
@@ -26,12 +40,32 @@ import {
   type EstadoRemision,
   type FiltroRemisiones,
 } from '../../../shared/types/remision'
+import { useAparecer } from '../../../shared/animacion/useAnimacion'
 import { fechaCorta } from '../../../shared/utils/fechas'
+import { miles } from '../../../shared/utils/numeros'
 import { useSesion } from '../../auth/useSesion'
 import { useGrupos, useTurnos } from '../../catalogo/hooks/useCatalogos'
-import { useRemisiones } from '../hooks/useRemisiones'
+import { EnviarCorreoDialogo } from '../../correo/components/EnviarCorreoDialogo'
+import { TarjetaRemision } from '../components/TarjetaRemision'
+import { useRemisiones, useResumenRemisiones } from '../hooks/useRemisiones'
 
 const POR_PAGINA = 20
+
+/** Claves de filtro que viven en la URL (la página no cuenta como filtro). */
+const CLAVES_FILTRO = ['desde', 'hasta', 'estado', 'turnoId', 'grupoId'] as const
+
+const COLUMNAS = [
+  { texto: '', clave: 'seleccion' },
+  { texto: 'Consecutivo' },
+  { texto: 'Fecha op.' },
+  { texto: 'Turno' },
+  { texto: 'Grupo' },
+  { texto: 'PT' },
+  { texto: 'Cajas', derecha: true },
+  { texto: 'Unidades', derecha: true },
+  { texto: 'Estibas' },
+  { texto: 'Estado' },
+]
 
 function leerFiltro(params: URLSearchParams): FiltroRemisiones {
   const estado = params.get('estado')
@@ -54,11 +88,21 @@ export function RemisionesListaPage() {
   const { tienePermiso } = useSesion()
 
   const remisiones = useRemisiones(filtro)
+  // Las cifras usan los mismos filtros, salvo el estado: muestran el reparto completo.
+  const resumen = useResumenRemisiones({
+    desde: filtro.desde,
+    hasta: filtro.hasta,
+    turnoId: filtro.turnoId,
+    grupoId: filtro.grupoId,
+  })
   const turnos = useTurnos()
   const grupos = useGrupos()
+  // Celular: las tarjetas entran en cascada al llegar los datos y al cambiar de filtro o página.
+  const listaMovil = useAparecer<HTMLDivElement>(`${remisiones.isLoading}|${params.toString()}`)
 
-  // Selección para imprimir por lote (dos por hoja).
+  // Selección para enviar por correo o ver el PDF por lote (dos por hoja).
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
+  const [enviando, setEnviando] = useState(false)
   const [ocupado, setOcupado] = useState<'pdf' | 'excel' | null>(null)
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null)
 
@@ -100,66 +144,111 @@ export function RemisionesListaPage() {
       ),
     )
 
-  const cambiar = (clave: string, valor: string) => {
+  /** Cambia uno o varios filtros a la vez; un filtro nuevo vuelve a la página 1. */
+  const cambiar = (cambios: Record<string, string | undefined>) => {
     const siguiente = new URLSearchParams(params)
-    if (valor) siguiente.set(clave, valor)
-    else siguiente.delete(clave)
-    if (clave !== 'pagina') siguiente.delete('pagina') // filtro nuevo → página 1
+    for (const [clave, valor] of Object.entries(cambios)) {
+      if (valor) siguiente.set(clave, valor)
+      else siguiente.delete(clave)
+    }
+    if (!('pagina' in cambios)) siguiente.delete('pagina')
     setParams(siguiente)
   }
 
-  const nombreDe = (lista: { id: string; codigo: string }[] | undefined, id: string) =>
-    lista?.find((i) => i.id === id)?.codigo ?? '—'
+  const hayFiltros = CLAVES_FILTRO.some((c) => params.get(c))
+  const turnoDe = (id: string) => turnos.data?.find((t) => t.id === id)?.codigo ?? '—'
+  const grupoDe = (id: string) => grupos.data?.find((g) => g.id === id)?.nombre ?? '—'
 
-  const total = remisiones.data?.total ?? 0
-  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA))
+  const items = remisiones.data?.items ?? []
+  const todasMarcadas = items.length > 0 && items.every((r) => seleccion.has(r.id))
+
+  const vacio = hayFiltros ? (
+    <EstadoVacio
+      Icono={IconoRemision}
+      titulo="No hay remisiones con estos filtros"
+      texto="Pruebe con otro rango de fechas u otro estado."
+      accion={
+        <Boton variante="secundario" onClick={() => setParams(new URLSearchParams())}>
+          Limpiar filtros
+        </Boton>
+      }
+    />
+  ) : (
+    <EstadoVacio
+      Icono={IconoRemision}
+      titulo="Todavía no hay remisiones"
+      texto="Cada entrega de producto terminado a PepsiCo empieza con una remisión."
+      accion={
+        tienePermiso('remision.crear') && (
+          <Link to="/remisiones/nueva">
+            <Boton>+ Nueva remisión</Boton>
+          </Link>
+        )
+      }
+    />
+  )
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-tinta">Remisiones</h1>
-        <div className="flex flex-wrap gap-2">
-          <Boton
-            variante="secundario"
-            disabled={seleccion.size === 0}
-            cargando={ocupado === 'pdf'}
-            onClick={() => void imprimirSeleccion()}
-          >
-            Imprimir seleccionadas{seleccion.size > 0 && ` (${seleccion.size})`}
-          </Boton>
-          {tienePermiso('remision.exportar') && (
-            <Boton variante="secundario" cargando={ocupado === 'excel'} onClick={() => void exportar()}>
-              Exportar a Excel
-            </Boton>
-          )}
-          {tienePermiso('remision.crear') && (
-            <Link to="/remisiones/nueva">
-              <Boton>Nueva remisión</Boton>
-            </Link>
-          )}
+    <section className="space-y-5 pb-24">
+      <EncabezadoPagina
+        Icono={IconoRemision}
+        titulo="Remisiones"
+        descripcion="Documentos de entrega del PT a PepsiCo: se crean, se entregan, el OPA los aprueba y se concilian."
+        acciones={
+          <>
+            {tienePermiso('remision.exportar') && (
+              <Boton variante="vidrio" cargando={ocupado === 'excel'} onClick={() => void exportar()}>
+                Exportar a Excel
+              </Boton>
+            )}
+            {tienePermiso('remision.crear') && (
+              <Link to="/remisiones/nueva">
+                <Boton variante="claro">+ Nueva remisión</Boton>
+              </Link>
+            )}
+          </>
+        }
+      >
+        {/* Una cifra por estado, en el orden del flujo. Tocarla filtra; tocarla otra vez quita el filtro. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {ESTADOS_REMISION.map((estado) => (
+            <CifraEstado
+              key={estado}
+              variante="vidrio"
+              etiqueta={ETIQUETA_ESTADO[estado]}
+              valor={resumen.porEstado?.[estado] ?? null}
+              total={resumen.total}
+              tono={TONO_ESTADO[estado]}
+              detalle={estado === 'APROBADA' ? 'sin conciliar' : undefined}
+              activo={filtro.estado === estado}
+              onClick={() => cambiar({ estado: filtro.estado === estado ? undefined : estado })}
+            />
+          ))}
         </div>
-      </header>
+      </EncabezadoPagina>
 
       {errorArchivo && <Alerta tipo="error">{errorArchivo}</Alerta>}
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg bg-base p-4 shadow-sm md:grid-cols-5">
+      <PanelFiltros
+        desde={filtro.desde}
+        hasta={filtro.hasta}
+        cambiarRango={({ desde, hasta }) => cambiar({ desde, hasta })}
+        hayFiltros={hayFiltros}
+        limpiar={() => setParams(new URLSearchParams())}
+      >
         <Campo
           etiqueta="Desde (fecha operativa)"
           type="date"
           value={filtro.desde ?? ''}
-          onChange={(e) => cambiar('desde', e.target.value)}
+          onChange={(e) => cambiar({ desde: e.target.value })}
         />
         <Campo
           etiqueta="Hasta"
           type="date"
           value={filtro.hasta ?? ''}
-          onChange={(e) => cambiar('hasta', e.target.value)}
+          onChange={(e) => cambiar({ hasta: e.target.value })}
         />
-        <Select
-          etiqueta="Estado"
-          value={filtro.estado ?? ''}
-          onChange={(e) => cambiar('estado', e.target.value)}
-        >
+        <Select etiqueta="Estado" value={filtro.estado ?? ''} onChange={(e) => cambiar({ estado: e.target.value })}>
           <option value="">Todos</option>
           {ESTADOS_REMISION.map((e) => (
             <option key={e} value={e}>
@@ -167,11 +256,7 @@ export function RemisionesListaPage() {
             </option>
           ))}
         </Select>
-        <Select
-          etiqueta="Turno"
-          value={filtro.turnoId ?? ''}
-          onChange={(e) => cambiar('turnoId', e.target.value)}
-        >
+        <Select etiqueta="Turno" value={filtro.turnoId ?? ''} onChange={(e) => cambiar({ turnoId: e.target.value })}>
           <option value="">Todos</option>
           {turnos.data?.map((t) => (
             <option key={t.id} value={t.id}>
@@ -179,140 +264,142 @@ export function RemisionesListaPage() {
             </option>
           ))}
         </Select>
-        <Select
-          etiqueta="Grupo"
-          value={filtro.grupoId ?? ''}
-          onChange={(e) => cambiar('grupoId', e.target.value)}
-        >
+        <Select etiqueta="Grupo" value={filtro.grupoId ?? ''} onChange={(e) => cambiar({ grupoId: e.target.value })}>
           <option value="">Todos</option>
-          {grupos.data?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
+          {grupos.data?.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.nombre}
             </option>
           ))}
         </Select>
-      </div>
+      </PanelFiltros>
 
-      {remisiones.isError && (
-        <Alerta tipo="error">{comoErrorApi(remisiones.error).mensaje}</Alerta>
-      )}
+      {remisiones.isError && <Alerta tipo="error">{comoErrorApi(remisiones.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-            <tr>
-              <th className="px-3 py-2">
+      {/* Computador y tablet: tabla. */}
+      <div className="hidden md:block">
+        <Tabla
+          columnas={COLUMNAS.map((c) =>
+            c.clave === 'seleccion'
+              ? {
+                  ...c,
+                  texto: (
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todas las de esta página"
+                      className="h-4 w-4 accent-marca pointer-coarse:h-5 pointer-coarse:w-5"
+                      checked={todasMarcadas}
+                      onChange={(e) => setSeleccion(e.target.checked ? new Set(items.map((r) => r.id)) : new Set())}
+                    />
+                  ),
+                }
+              : c,
+          )}
+          cargando={remisiones.isLoading}
+          estaVacia={items.length === 0}
+          claveAnimacion={params.toString()}
+          vacio={vacio}
+        >
+          {items.map((r) => (
+            <FilaTabla key={r.id} tono={TONO_ESTADO[r.estado]} marcada={seleccion.has(r.id)}>
+              <Celda className="w-10">
                 <input
                   type="checkbox"
-                  aria-label="Seleccionar todas las de esta página"
-                  checked={
-                    (remisiones.data?.items.length ?? 0) > 0 &&
-                    remisiones.data!.items.every((r) => seleccion.has(r.id))
-                  }
-                  onChange={(e) =>
-                    setSeleccion(
-                      e.target.checked
-                        ? new Set(remisiones.data?.items.map((r) => r.id))
-                        : new Set(),
-                    )
-                  }
+                  aria-label={`Seleccionar ${r.consecutivo}`}
+                  className="h-4 w-4 accent-marca pointer-coarse:h-5 pointer-coarse:w-5"
+                  checked={seleccion.has(r.id)}
+                  onChange={() => alternar(r.id)}
                 />
-              </th>
-              <th className="px-4 py-2">Consecutivo</th>
-              <th className="px-4 py-2">Fecha op.</th>
-              <th className="px-4 py-2">Turno</th>
-              <th className="px-4 py-2">Grupo</th>
-              <th className="px-4 py-2">PT</th>
-              <th className="px-4 py-2 text-right">Cajas</th>
-              <th className="px-4 py-2 text-right">Unidades</th>
-              <th className="px-4 py-2">Estibas</th>
-              <th className="px-4 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-borde">
-            {remisiones.isLoading && (
-              <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-tinta-suave">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {remisiones.data?.items.length === 0 && (
-              <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-tinta-suave">
-                  No hay remisiones con esos filtros.
-                </td>
-              </tr>
-            )}
-            {remisiones.data?.items.map((r) => (
-              <tr
-                key={r.id}
-                className={r.estaPendienteDeConciliar ? 'bg-alerta-claro/60' : 'hover:bg-velo'}
-              >
-                <td className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    aria-label={`Seleccionar ${r.consecutivo}`}
-                    checked={seleccion.has(r.id)}
-                    onChange={() => alternar(r.id)}
-                  />
-                </td>
-                <td className="px-4 py-2 font-medium">
-                  <Link to={`/remisiones/${r.id}`} className="text-marca hover:underline">
-                    {r.consecutivo}
-                  </Link>
-                  {r.version > 1 && (
-                    <span className="ml-1 text-xs text-tinta-suave">v{r.version}</span>
-                  )}
-                  {r.extraoficial && (
-                    <span className="ml-1 rounded bg-alerta-claro px-1 text-[10px] font-semibold uppercase text-alerta" title={r.motivoExtraoficial ?? ''}>
-                      extraoficial
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2">{fechaCorta(r.fechaOperativa)}</td>
-                <td className="px-4 py-2">{nombreDe(turnos.data, r.turnoId)}</td>
-                <td className="px-4 py-2">
-                  {grupos.data?.find((p) => p.id === r.grupoId)?.nombre ?? '—'}
-                </td>
-                <td className="px-4 py-2">
-                  <div className="cifra text-xs text-tinta-suave">{r.producto.codigo}</div>
-                  <div className="max-w-xs truncate">{r.producto.descripcion}</div>
-                </td>
-                <td className="px-4 py-2 text-right">{r.cantidadCajas}</td>
-                <td className="px-4 py-2 text-right">{r.cantidadUnidades}</td>
-                <td className="px-4 py-2">{r.descripcionEstibas}</td>
-                <td className="px-4 py-2">
-                  <EstadoBadge estado={r.estado} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </Celda>
+              <Celda className="whitespace-nowrap">
+                <Link to={`/remisiones/${r.id}`} className="codigo font-extrabold text-marca hover:underline">
+                  {r.consecutivo}
+                </Link>
+                {r.version > 1 && <span className="ml-1 text-xs text-tinta-suave">v{r.version}</span>}
+                {r.extraoficial && (
+                  <span
+                    className="ml-1.5 rounded bg-alerta-claro px-1.5 py-0.5 text-xs font-bold uppercase text-alerta"
+                    title={r.motivoExtraoficial ?? ''}
+                  >
+                    extraoficial
+                  </span>
+                )}
+              </Celda>
+              <Celda className="whitespace-nowrap">{fechaCorta(r.fechaOperativa)}</Celda>
+              <Celda>
+                <span className="rounded-md bg-velo px-2 py-0.5 text-xs font-bold text-tinta">{turnoDe(r.turnoId)}</span>
+              </Celda>
+              <Celda>{grupoDe(r.grupoId)}</Celda>
+              <Celda>
+                <div className="codigo text-xs text-tinta-suave">{r.producto.codigo}</div>
+                <div className="max-w-xs truncate font-medium">{r.producto.descripcion}</div>
+              </Celda>
+              <Celda derecha className="text-base font-bold">
+                {miles(r.cantidadCajas)}
+              </Celda>
+              <Celda derecha>{miles(r.cantidadUnidades)}</Celda>
+              <Celda className="text-tinta-suave">{r.descripcionEstibas}</Celda>
+              <Celda>
+                <EstadoBadge estado={r.estado} />
+              </Celda>
+            </FilaTabla>
+          ))}
+        </Tabla>
       </div>
 
-      <footer className="flex items-center justify-between text-sm text-tinta-suave">
-        <span>{total} remisiones</span>
-        <div className="flex items-center gap-2">
-          <Boton
-            variante="secundario"
-            disabled={filtro.pagina! <= 1}
-            onClick={() => cambiar('pagina', String(filtro.pagina! - 1))}
-          >
-            Anterior
+      {/* Celular: filas abiertas con la franja del estado (sin cajas). */}
+      <div ref={listaMovil} className="divide-y divide-borde border-y border-borde md:hidden">
+        {remisiones.isLoading ? (
+          Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="my-2 h-20 animate-pulse rounded-xl bg-borde/60" aria-hidden="true" />
+          ))
+        ) : items.length === 0 ? (
+          <div>{vacio}</div>
+        ) : (
+          items.map((r) => (
+            <TarjetaRemision
+              key={r.id}
+              remision={r}
+              turno={turnoDe(r.turnoId)}
+              grupo={grupoDe(r.grupoId)}
+              seleccionada={seleccion.has(r.id)}
+              alternar={() => alternar(r.id)}
+            />
+          ))
+        )}
+      </div>
+
+      <Paginacion
+        pagina={filtro.pagina ?? 1}
+        porPagina={POR_PAGINA}
+        total={remisiones.data?.total ?? 0}
+        unidad="remisiones"
+        cambiar={(pagina) => cambiar({ pagina: String(pagina) })}
+      />
+
+      <BarraSeleccion
+        cantidad={seleccion.size}
+        unidad={['remisión seleccionada', 'remisiones seleccionadas']}
+        quitar={() => setSeleccion(new Set())}
+      >
+        <Boton
+          variante="vidrio"
+          tamano="sm"
+          cargando={ocupado === 'pdf'}
+          onClick={() => void imprimirSeleccion()}
+          title="Abre el PDF de las seleccionadas (para revisarlo o imprimirlo si hace falta)"
+        >
+          Ver PDF
+        </Boton>
+        {/* Usuario, 2026-10-03: las remisiones se envían por correo en lugar de imprimirse. */}
+        {tienePermiso('remision.enviar_correo') && (
+          <Boton variante="claro" tamano="sm" onClick={() => setEnviando(true)}>
+            Enviar por correo
           </Boton>
-          <span>
-            Página {filtro.pagina} de {totalPaginas}
-          </span>
-          <Boton
-            variante="secundario"
-            disabled={filtro.pagina! >= totalPaginas}
-            onClick={() => cambiar('pagina', String(filtro.pagina! + 1))}
-          >
-            Siguiente
-          </Boton>
-        </div>
-      </footer>
+        )}
+      </BarraSeleccion>
+
+      {enviando && <EnviarCorreoDialogo remisionIds={[...seleccion]} onCerrar={() => setEnviando(false)} />}
     </section>
   )
 }

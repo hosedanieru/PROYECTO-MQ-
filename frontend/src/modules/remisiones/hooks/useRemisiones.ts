@@ -12,6 +12,7 @@ import {
   type EditarRemisionDatos,
   type EstadoRemision,
   type FiltroRemisiones,
+  type TipoFirma,
 } from '../../../shared/types/remision'
 import { remisionesApi } from '../api/remisiones.api'
 
@@ -67,6 +68,25 @@ export function useConteoPorEstado(fecha: string, habilitado = true) {
     total: consulta.data?.total ?? 0,
     cargando: consulta.isLoading,
     error: consulta.error,
+  }
+}
+
+/**
+ * El mismo conteo por estado, pero con los filtros del listado (rango,
+ * turno, grupo). Alimenta las cifras sobre la tabla. Sin refresco
+ * automático: el listado tampoco lo tiene. La clave cuelga de 'conteo',
+ * así que las acciones del flujo ya la invalidan.
+ */
+export function useResumenRemisiones(filtro: Omit<FiltroRemisiones, 'pagina' | 'porPagina' | 'estado'>) {
+  const consulta = useQuery({
+    queryKey: [CLAVE, 'conteo', 'filtro', filtro],
+    queryFn: () => remisionesApi.resumen(filtro),
+    placeholderData: (anterior) => anterior,
+  })
+
+  return {
+    porEstado: consulta.data?.porEstado ?? null,
+    total: consulta.data?.total ?? null,
   }
 }
 
@@ -148,7 +168,60 @@ export function useAccionRemision(id: string) {
       void qc.invalidateQueries({ queryKey: [CLAVE, 'conteo'] })
       void qc.invalidateQueries({ queryKey: [CLAVE, 'auditoria', id] })
       void qc.invalidateQueries({ queryKey: [CLAVE, 'versiones', id] })
+      // Rectificar cambia la versión: las firmas vigentes cambian.
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'firmas', id] })
       void qc.invalidateQueries({ queryKey: ['mfr'] })
+    },
+  })
+}
+
+/** Casillas del formato con su firma vigente, más el historial de versiones anteriores. */
+export function useFirmasRemision(id: string) {
+  return useQuery({
+    queryKey: [CLAVE, 'firmas', id],
+    queryFn: () => remisionesApi.firmas(id),
+  })
+}
+
+/** Validar firmando cambia el estado: invalida lo mismo que una acción del flujo, más las firmas. */
+export function useValidarFirmando(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (datos: { concilidadoCon: string; trazo: string; contrasena: string }) => remisionesApi.validarFirmando(id, datos),
+    onSuccess: (remision) => {
+      qc.setQueryData([CLAVE, 'detalle', id], remision)
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'lista'] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'conteo'] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'auditoria', id] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'firmas', id] })
+    },
+  })
+}
+
+/** Aprobar firmando cambia el estado y descuenta inventario: invalida lo mismo que una acción del flujo, más las firmas. */
+export function useAprobarFirmando(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (datos: { trazo: string; contrasena: string }) => remisionesApi.aprobarFirmando(id, datos),
+    onSuccess: (remision) => {
+      qc.setQueryData([CLAVE, 'detalle', id], remision)
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'lista'] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'conteo'] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'auditoria', id] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'firmas', id] })
+      void qc.invalidateQueries({ queryKey: ['mfr'] })
+      void qc.invalidateQueries({ queryKey: ['inventario'] })
+    },
+  })
+}
+
+export function useFirmarRemision(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (datos: { tipo: TipoFirma; trazo: string; contrasena: string }) => remisionesApi.firmar(id, datos),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'firmas', id] })
+      void qc.invalidateQueries({ queryKey: [CLAVE, 'auditoria', id] })
     },
   })
 }

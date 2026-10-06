@@ -12,6 +12,8 @@ import { useState } from 'react'
 
 import { Alerta } from '../../../components/Alerta'
 import { Boton } from '../../../components/Boton'
+import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
+import { IconoLinea } from '../../../components/Iconos'
 import { Campo } from '../../../components/Campo'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
@@ -27,7 +29,13 @@ interface Form {
   orden: string
 }
 
-const VACIO: Form = { codigo: '', nombre: '', tipo: 'MANUAL', capacidadKgHora: '', orden: '0' }
+const VACIO: Form = {
+  codigo: '',
+  nombre: '',
+  tipo: 'MANUAL',
+  capacidadKgHora: '',
+  orden: '0',
+}
 
 export function LineasPage() {
   const qc = useQueryClient()
@@ -46,11 +54,20 @@ export function LineasPage() {
 
   const crear = useMutation({
     mutationFn: () => mfrApi.crearLinea(aDatos(nueva)),
-    onSuccess: () => { invalidar(); setNueva(VACIO) },
+    onSuccess: () => {
+      invalidar()
+      setNueva(VACIO)
+    },
   })
   const actualizar = useMutation({
     mutationFn: (l: LineaProduccion) => mfrApi.actualizarLinea(l.id, aDatos(edicion[l.id])),
-    onSuccess: (_, l) => { invalidar(); setEdicion((e) => { const { [l.id]: _q, ...r } = e; return r }) },
+    onSuccess: (_, l) => {
+      invalidar()
+      setEdicion((e) => {
+        const { [l.id]: _q, ...r } = e
+        return r
+      })
+    },
   })
   const cambiarActivo = useMutation({
     mutationFn: (l: LineaProduccion) => mfrApi.actualizarLinea(l.id, { activo: !l.activo }),
@@ -59,16 +76,48 @@ export function LineasPage() {
 
   const editor = (f: Form, cambiar: (c: Partial<Form>) => void) => (
     <>
-      <td className="px-2 py-1"><Campo etiqueta="" placeholder="MANUAL-1" value={f.codigo} onChange={(e) => cambiar({ codigo: e.target.value })} /></td>
-      <td className="px-2 py-1"><Campo etiqueta="" placeholder="MANUAL 1" value={f.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} /></td>
+      <td className="px-2 py-1">
+        <Campo
+          etiqueta=""
+          placeholder="MANUAL-1"
+          value={f.codigo}
+          onChange={(e) => cambiar({ codigo: e.target.value })}
+        />
+      </td>
+      <td className="px-2 py-1">
+        <Campo
+          etiqueta=""
+          placeholder="MANUAL 1"
+          value={f.nombre}
+          onChange={(e) => cambiar({ nombre: e.target.value })}
+        />
+      </td>
       <td className="px-2 py-1">
         <Select etiqueta="" value={f.tipo} onChange={(e) => cambiar({ tipo: e.target.value as TipoLinea })}>
           <option value="MULTIPACK">MULTIPACK</option>
           <option value="MANUAL">MANUAL</option>
         </Select>
       </td>
-      <td className="px-2 py-1"><Campo etiqueta="" type="number" min={0} step="0.01" placeholder="306" value={f.capacidadKgHora} onChange={(e) => cambiar({ capacidadKgHora: e.target.value })} /></td>
-      <td className="px-2 py-1"><Campo etiqueta="" type="number" min={0} value={f.orden} onChange={(e) => cambiar({ orden: e.target.value })} /></td>
+      <td className="px-2 py-1">
+        <Campo
+          etiqueta=""
+          type="number"
+          min={0}
+          step="0.01"
+          placeholder="306"
+          value={f.capacidadKgHora}
+          onChange={(e) => cambiar({ capacidadKgHora: e.target.value })}
+        />
+      </td>
+      <td className="px-2 py-1">
+        <Campo
+          etiqueta=""
+          type="number"
+          min={0}
+          value={f.orden}
+          onChange={(e) => cambiar({ orden: e.target.value })}
+        />
+      </td>
     </>
   )
 
@@ -76,10 +125,16 @@ export function LineasPage() {
 
   return (
     <section className="mx-auto max-w-4xl space-y-4">
-      <h1 className="text-2xl font-semibold text-tinta">Líneas de producción</h1>
+      <EncabezadoPagina
+        Icono={IconoLinea}
+        escena="produccion"
+        titulo="Líneas de producción"
+        descripcion="Las plataformas físicas de la planta, con el nombre que usa PepsiCo en el DPP y su capacidad."
+      />
       <Alerta tipo="info">
-        El <strong>nombre</strong> debe ser el mismo que usa PepsiCo en el DPP (“MANUAL 1”, “REEMPAQU 2”): así el importador del
-        PDF reconoce la línea. La capacidad en kg/h es la fila “Capacity” del schedule y da el “Pct Overpull”.
+        El <strong>nombre</strong> debe ser el mismo que usa PepsiCo en el DPP (“MANUAL 1”, “REEMPAQU 2”): así
+        el importador del PDF reconoce la línea. La capacidad en kg/h es la fila “Capacity” del schedule y da
+        el “Pct Overpull”.
       </Alerta>
 
       {error && <Alerta tipo="error">{comoErrorApi(error).mensaje}</Alerta>}
@@ -88,8 +143,13 @@ export function LineasPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
             <tr>
-              <th className="px-2 py-2 w-32">Código</th><th className="px-2 py-2">Nombre (PepsiCo)</th><th className="px-2 py-2 w-32">Tipo</th>
-              <th className="px-2 py-2 w-28">kg/h</th><th className="px-2 py-2 w-20">Orden</th><th className="px-2 py-2 w-24">Estado</th><th></th>
+              <th className="px-2 py-2 w-32">Código</th>
+              <th className="px-2 py-2">Nombre (PepsiCo)</th>
+              <th className="px-2 py-2 w-32">Tipo</th>
+              <th className="px-2 py-2 w-28">kg/h</th>
+              <th className="px-2 py-2 w-20">Orden</th>
+              <th className="px-2 py-2 w-24">Estado</th>
+              <th></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-borde">
@@ -97,7 +157,9 @@ export function LineasPage() {
               const e = edicion[l.id]
               return (
                 <tr key={l.id} className={l.activo ? '' : 'text-tinta-suave'}>
-                  {e ? editor(e, (c) => setEdicion({ ...edicion, [l.id]: { ...e, ...c } })) : (
+                  {e ? (
+                    editor(e, (c) => setEdicion({ ...edicion, [l.id]: { ...e, ...c } }))
+                  ) : (
                     <>
                       <td className="px-2 py-2 cifra">{l.codigo}</td>
                       <td className="px-2 py-2">{l.nombre}</td>
@@ -110,25 +172,70 @@ export function LineasPage() {
                   <td className="px-2 py-2 text-right whitespace-nowrap">
                     {e ? (
                       <>
-                        <button className="text-marca hover:underline" onClick={() => actualizar.mutate(l)}>Guardar</button>
-                        <button className="ml-3 text-tinta-suave hover:underline" onClick={() => setEdicion((x) => { const { [l.id]: _q, ...r } = x; return r })}>Cancelar</button>
+                        <button className="text-marca hover:underline" onClick={() => actualizar.mutate(l)}>
+                          Guardar
+                        </button>
+                        <button
+                          className="ml-3 text-tinta-suave hover:underline"
+                          onClick={() =>
+                            setEdicion((x) => {
+                              const { [l.id]: _q, ...r } = x
+                              return r
+                            })
+                          }
+                        >
+                          Cancelar
+                        </button>
                       </>
                     ) : (
                       <>
-                        <button className="text-marca hover:underline" onClick={() => setEdicion({ ...edicion, [l.id]: { codigo: l.codigo, nombre: l.nombre, tipo: l.tipo, capacidadKgHora: l.capacidadKgHora?.toString() ?? '', orden: String(l.orden) } })}>Editar</button>
-                        <button className="ml-3 text-tinta-suave hover:underline" onClick={() => cambiarActivo.mutate(l)}>{l.activo ? 'Desactivar' : 'Activar'}</button>
+                        <button
+                          className="text-marca hover:underline"
+                          onClick={() =>
+                            setEdicion({
+                              ...edicion,
+                              [l.id]: {
+                                codigo: l.codigo,
+                                nombre: l.nombre,
+                                tipo: l.tipo,
+                                capacidadKgHora: l.capacidadKgHora?.toString() ?? '',
+                                orden: String(l.orden),
+                              },
+                            })
+                          }
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="ml-3 text-tinta-suave hover:underline"
+                          onClick={() => cambiarActivo.mutate(l)}
+                        >
+                          {l.activo ? 'Desactivar' : 'Activar'}
+                        </button>
                       </>
                     )}
                   </td>
                 </tr>
               )
             })}
-            {lineas.data?.length === 0 && <tr><td colSpan={7} className="px-4 py-4 text-center text-tinta-suave">Sin líneas.</td></tr>}
+            {lineas.data?.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-4 text-center text-tinta-suave">
+                  Sin líneas.
+                </td>
+              </tr>
+            )}
             <tr className="bg-velo">
               {editor(nueva, (c) => setNueva({ ...nueva, ...c }))}
               <td className="px-2 py-1 text-xs text-tinta-suave">nueva</td>
               <td className="px-2 py-1 text-right">
-                <Boton cargando={crear.isPending} disabled={!nueva.codigo || !nueva.nombre} onClick={() => crear.mutate()}>Crear</Boton>
+                <Boton
+                  cargando={crear.isPending}
+                  disabled={!nueva.codigo || !nueva.nombre}
+                  onClick={() => crear.mutate()}
+                >
+                  Crear
+                </Boton>
               </td>
             </tr>
           </tbody>

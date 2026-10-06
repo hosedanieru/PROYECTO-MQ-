@@ -41,6 +41,10 @@ import {
 import { ProductoPrismaRepository } from './producto.prisma.repository.js';
 import { RemisionPrismaRepository } from './remision.prisma.repository.js';
 import { UsuarioPrismaRepository } from './usuario.prisma.repository.js';
+import { AjusteEsperadasPrismaRepository } from './ajuste-esperadas.prisma.repository.js';
+import { FirmaRemisionPrismaRepository } from './firma-remision.prisma.repository.js';
+import { ResumenTurnoPrismaRepository } from './resumen-turno.prisma.repository.js';
+import { EnvioCorreoPrismaRepository, ListaDistribucionPrismaRepository } from './correo.prisma.repositories.js';
 
 /**
  * Cuánto puede tardar el trabajo antes de que Prisma revierta la
@@ -79,6 +83,11 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
           unidadesMedida: new UnidadMedidaPrismaRepository(tx),
           recetas: new RecetaPrismaRepository(tx),
           cierresInventario: new CierreInventarioPrismaRepository(tx),
+          listasDistribucion: new ListaDistribucionPrismaRepository(tx),
+          enviosCorreo: new EnvioCorreoPrismaRepository(tx),
+          resumenesTurno: new ResumenTurnoPrismaRepository(tx),
+          firmasRemision: new FirmaRemisionPrismaRepository(tx),
+          ajustesEsperadas: new AjusteEsperadasPrismaRepository(tx),
         }),
       { timeout: TIEMPO_MAXIMO_MS },
     );

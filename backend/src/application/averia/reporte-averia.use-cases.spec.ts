@@ -63,7 +63,7 @@ describe('Reporte de averías — casos de uso', () => {
     causales.agregar({ id: 'C1', codigo: 'ESTALLADO', nombre: 'Estallado', orden: 1, activo: true });
     causales.agregar({ id: 'C2', codigo: 'VIEJA', nombre: 'Vieja', orden: 2, activo: false });
     const grupos = new GrupoRepositorioFalso();
-    grupos.agregar({ id: 'G1', codigo: 'MIX', nombre: 'MIX', descripcion: null, personasEsperadas: null, activo: true });
+    grupos.agregar({ id: 'G1', codigo: 'MIX', nombre: 'MIX', descripcion: null, esperadasPorTurno: {}, activo: true });
     const usuarios = new UsuarioRepositorioFalso();
     usuarios.agregar(
       Usuario.desdePersistencia({ id: 'u1', documento: '1', nombre: 'Ana Coordinadora', email: null, passwordHash: 'x', activo: true, rolId: 'r', rolCodigo: 'COORDINADOR_MQ', permisos: [] }),

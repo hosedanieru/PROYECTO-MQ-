@@ -122,18 +122,29 @@ export function useCopiarDia() {
   return useMutation({ mutationFn: mfrApi.copiarDia, onSuccess: invalidar })
 }
 
+/** Invalida todo el módulo, incluidos los resúmenes del día (misma clave raíz). */
 export function useCerrarTurno() {
   const invalidar = useInvalidarDia()
-  return useMutation({
-    mutationFn: ({ fechaOperativa, turnoId, motivoFaltante }: { fechaOperativa: string; turnoId: string; motivoFaltante?: string }) =>
-      mfrApi.cerrarTurno(fechaOperativa, turnoId, motivoFaltante),
-    onSuccess: invalidar,
+  return useMutation({ mutationFn: mfrApi.cerrarTurno, onSuccess: invalidar })
+}
+
+/** Resúmenes guardados del día (uno por turno cerrado y, al final, el del día). */
+export function useResumenes(fecha: string, habilitado = true) {
+  return useQuery({
+    queryKey: [CLAVE, 'resumenes', fecha],
+    queryFn: () => mfrApi.resumenes(fecha),
+    enabled: habilitado && Boolean(fecha),
   })
 }
 
 export function useRegistrarAsistencia() {
   const invalidar = useInvalidarDia()
   return useMutation({ mutationFn: mfrApi.registrarAsistencia, onSuccess: invalidar })
+}
+
+export function useAjustarEsperadas() {
+  const invalidar = useInvalidarDia()
+  return useMutation({ mutationFn: mfrApi.ajustarEsperadas, onSuccess: invalidar })
 }
 
 export function useAsignarGrupoLinea() {

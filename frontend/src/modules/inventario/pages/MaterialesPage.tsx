@@ -12,7 +12,12 @@
 import { useState } from 'react'
 
 import { Alerta } from '../../../components/Alerta'
+import { Badge } from '../../../components/Badge'
 import { Boton } from '../../../components/Boton'
+import { EstadoVacio } from '../../../components/EstadoVacio'
+import { IconoCaja } from '../../../components/Iconos'
+import { FilaRegistro, ListaRegistros, MetaDato } from '../../../components/ListaRegistros'
+import { Seccion } from '../../../components/Seccion'
 import { Campo } from '../../../components/Campo'
 import { Dialogo } from '../../../components/Dialogo'
 import { Select } from '../../../components/Select'
@@ -94,44 +99,56 @@ export function MaterialesPage({ tipo }: { tipo: TipoMaterial }) {
     unidades.data?.filter((u) => u.activo || u.id === actual).map((u) => <option key={u.id} value={u.id}>{u.nombre} ({u.codigo})</option>)
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave">{t.ayuda} Crear uno crea su existencia en el inventario.</p>
-        <Boton onClick={() => abrir('nuevo')}>Nuevo {t.nombre}</Boton>
-      </header>
-
+    <section className="space-y-5">
       {guardar.isError && editando === null && <Alerta tipo="error">{comoErrorApi(guardar.error).mensaje}</Alerta>}
 
-      <div className="overflow-x-auto rounded-lg bg-base shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-velo text-left text-xs uppercase text-tinta-suave">
-            <tr>
-              <th className="px-4 py-2">Código</th><th className="px-4 py-2">Descripción</th><th className="px-4 py-2">Medida</th>
-              <th className="px-4 py-2">Equivalencias</th><th className="px-4 py-2">Estado</th><th></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-borde">
-            {materiales.data?.map((m) => (
-              <tr key={m.id} className={m.activo ? '' : 'text-tinta-suave'}>
-                <td className="px-4 py-2 cifra">{m.codigo}</td>
-                <td className="px-4 py-2">{m.descripcion}</td>
-                <td className="px-4 py-2">{m.unidadBase}</td>
-                <td className="px-4 py-2 text-tinta-suave">{textoEquivalencia(m)}</td>
-                <td className="px-4 py-2">{m.activo ? 'Activo' : 'Inactivo'}</td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
-                  <button className="text-marca hover:underline" onClick={() => abrir(m)}>Editar</button>
-                  <button className="ml-3 text-tinta-suave hover:underline" onClick={() => guardar.mutate({ id: m.id, datos: { activo: !m.activo } })}>
+      <Seccion
+        titulo={tipo === 'PI' ? 'Catálogo de PI' : 'Catálogo de insumos'}
+        contador={materiales.data?.length}
+        tono={tipo === 'PI' ? 'acento' : 'neutro'}
+        descripcion={`${t.ayuda} Crear uno crea su existencia en el inventario.`}
+        accion={<Boton onClick={() => abrir('nuevo')}>+ Nuevo {t.nombre}</Boton>}
+      >
+        <ListaRegistros
+          cargando={materiales.isLoading}
+          estaVacia={materiales.data?.length === 0}
+          vacio={
+            <EstadoVacio
+              Icono={IconoCaja}
+              titulo={`Todavía no hay ${tipo === 'PI' ? 'PI' : 'insumos'}`}
+              texto="Créelos con su unidad de medida y, si vienen en rollos o cajas, con su presentación."
+              accion={<Boton onClick={() => abrir('nuevo')}>+ Nuevo {t.nombre}</Boton>}
+            />
+          }
+        >
+          {materiales.data?.map((m) => (
+            <FilaRegistro
+              key={m.id}
+              tono={m.activo ? (tipo === 'PI' ? 'acento' : 'neutro') : undefined}
+              apagada={!m.activo}
+              etiqueta={!m.activo && <Badge tono="neutro">Inactivo</Badge>}
+              titulo={m.descripcion}
+              detalle={<span className="cifra">{m.codigo}</span>}
+              meta={
+                <>
+                  <MetaDato etiqueta="Se lleva en">{m.unidadBase}</MetaDato>
+                  <MetaDato etiqueta="Empaque">{textoEquivalencia(m)}</MetaDato>
+                </>
+              }
+              acciones={
+                <>
+                  <Boton variante="secundario" tamano="sm" onClick={() => abrir(m)}>
+                    Editar
+                  </Boton>
+                  <Boton variante="sutil" tamano="sm" onClick={() => guardar.mutate({ id: m.id, datos: { activo: !m.activo } })}>
                     {m.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {materiales.data?.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-4 text-center text-tinta-suave">Todavía no hay {tipo === 'PI' ? 'PI' : 'insumos'}.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </Boton>
+                </>
+              }
+            />
+          ))}
+        </ListaRegistros>
+      </Seccion>
 
       <Dialogo abierto={editando !== null} titulo={editando === 'nuevo' ? `Nuevo ${t.nombre}` : `Editar ${t.nombre}`} onCerrar={() => setEditando(null)}>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (completo) enviar() }}>
