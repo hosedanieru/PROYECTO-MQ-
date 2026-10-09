@@ -27,7 +27,7 @@ export function EditarRemisionPage() {
   // En rectificación, el motivo del rechazo ya pasó al historial de versiones.
   const versiones = useVersionesRemision(id!, remision.data?.estado === 'EN_RECTIFICACION')
 
-  if (remision.isLoading) return <PantallaCargando />
+  if (remision.isLoading) return <PantallaCargando forma="detalle" />
   if (remision.isError) return <Alerta tipo="error">{comoErrorApi(remision.error).mensaje}</Alerta>
   const r = remision.data!
   const motivoRechazo = r.motivoUltimoRechazo ?? versiones.data?.at(-1)?.motivoRechazo ?? null

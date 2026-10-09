@@ -25,6 +25,29 @@ Los DTOs ya no reciben `*PorId` del cliente. El usuario sale del token y cada en
 - `@react-three/fiber` muestra el aviso "THREE.Clock: This module has been deprecated" en consola. Viene de la
   librería, no del código del proyecto; desaparece cuando fiber actualice.
 
+## Barrido del backend por caídas (2026-10-09)
+
+Pedido del usuario: "tiene dificultades para mantenerse arriba y en línea después de un rato". Se probó en una
+segunda instancia (puerto 3100) y contra el `start:dev` real:
+
+- **Resistió todo:** ~4.000 peticiones/min durante 1 min con 8 clientes (0 errores; memoria pico 693 MB que vuelve
+  a 225 MB en reposo: no hay fuga), corte de todas las conexiones de PostgreSQL en plena carga (falla 1 petición y
+  se recupera sola), 40 PDF en paralelo y Chromium matado a la fuerza (se relanza solo).
+- **Causa encontrada de las caídas:** el backend corre con `npm run start:dev` (`nest start --watch`). Cada vez que
+  se guarda algo en `src/`, el compilador hace una pasada completa (~24 s) y al terminar **mata y relanza** el
+  proceso: ~7–10 s con el puerto cerrado (medido: 12:08:48 → 12:08:55). Y si el proceso muere por un error, `--watch`
+  **no** lo levanta (`@nestjs/cli/actions/start.action.js`, líneas 93-95): queda caído hasta el próximo guardado.
+  `start:dev` es para programar, no para dejar el sistema en línea. `PENDIENTE DE DEFINIR` (usuario): cómo correrlo
+  en el equipo de MQ mientras llega Docker.
+- **Corregido:** el pool de PostgreSQL esperaba conexión para siempre (`pg-pool` sin `connectionTimeoutMillis`):
+  ahora falla a los 10 s y usa `keepAlive` (`adaptador-postgres.ts`). La ruta del middleware de registro pasó de
+  `'*'` a `'{*ruta}'` (quitaba la advertencia `LegacyRouteConverter` de cada arranque) y el registro usa
+  `originalUrl` (en un 404 escribía `undefined/api/...`). El comentario de `main.ts` decía que `--watch` relanza
+  tras una caída: corregido.
+- **Sin corregir (menores):** un corte de la base responde 500 y no 503 (el filtro de persistencia solo traduce
+  Firestore); Puppeteer no limita PDF simultáneos (40 a la vez = ~27 procesos de Chrome); los logs solo van a la
+  consola, así que tras una caída no queda rastro; `backend/tsconfig.build.tsbuildinfo` en la raíz es un sobrante.
+
 ## Bug corregido el 2026-09-28: instantes corridos 5 horas
 
 La sesión de PostgreSQL estaba en `America/Bogota` y `@prisma/adapter-pg` envía las fechas como hora UTC **sin zona**:

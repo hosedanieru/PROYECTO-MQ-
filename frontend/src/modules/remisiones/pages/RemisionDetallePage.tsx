@@ -45,7 +45,7 @@ export function RemisionDetallePage() {
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorPdf, setErrorPdf] = useState<string | null>(null)
 
-  if (remision.isLoading) return <PantallaCargando />
+  if (remision.isLoading) return <PantallaCargando forma="detalle" />
   if (remision.isError) {
     return <Alerta tipo="error">{comoErrorApi(remision.error).mensaje}</Alerta>
   }

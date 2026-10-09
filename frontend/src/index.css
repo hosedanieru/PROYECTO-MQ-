@@ -386,6 +386,62 @@ textarea:focus-visible {
 }
 
 /*
+ * Barrido de carga (ejemplo de Motion `react-skeleton-shimmer`; usuario,
+ * 2026-10-08). Al llegar los datos, `ConCarga` cambia el esqueleto por el
+ * contenido en una transición de vista marcada como "carga", que le pone
+ * la clase `barrido`: la imagen vieja (el esqueleto) queda ENCIMA y una
+ * máscara que se corre con `--barrido` (de 100 % a -100 %, 0,6 s, como el
+ * ejemplo) la va borrando desde la derecha: el contenido aparece de
+ * derecha a izquierda, con el borde suave. Cualquier otra transición no
+ * toca esta área (`default="none"` en `ConCarga`).
+ * `@property` deja animar `--barrido` como porcentaje (sin él, saltaría).
+ */
+@property --barrido {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: -100%;
+}
+@keyframes barrido {
+  from { --barrido: 100%; }
+  to { --barrido: -100%; }
+}
+/*
+ * Solo participa el área del contenido: la página entera (root) queda fuera.
+ * Si no, el navegador fotografía también la barra y la banda y las anima
+ * (se veían encogidas a mitad del barrido; 2026-10-08).
+ */
+:root {
+  view-transition-name: none;
+}
+/*
+ * El esqueleto y el contenido no miden lo mismo: las dos imágenes van en su
+ * tamaño natural, ancladas arriba a la izquierda, así nada se estira; el
+ * grupo anima su tamaño en el mismo tiempo que la cortina (crece del alto
+ * del esqueleto al del contenido). Sin fundido en las imágenes: solo la cortina.
+ */
+::view-transition-group(.barrido) {
+  overflow: hidden;
+  animation-duration: 0.6s;
+  animation-timing-function: ease-in-out;
+}
+::view-transition-image-pair(.barrido) {
+  mix-blend-mode: normal;
+}
+::view-transition-old(.barrido),
+::view-transition-new(.barrido) {
+  width: 100%;
+  height: auto;
+  object-fit: none;
+  object-position: left top;
+  animation: none;
+}
+::view-transition-old(.barrido) {
+  z-index: 2;
+  mask-image: linear-gradient(to right, black var(--barrido), transparent calc(var(--barrido) + 100%));
+  animation: barrido 0.6s ease-in-out both;
+}
+
+/*
  * Accesibilidad: quien pidió menos movimiento en su sistema operativo no
  * ve ninguna animación. anime.js respeta lo mismo por código, en
  * `prefiereMenosMovimiento()`.

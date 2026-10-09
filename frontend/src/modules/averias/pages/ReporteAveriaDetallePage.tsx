@@ -40,7 +40,7 @@ export function ReporteAveriaDetallePage() {
   const [corrigiendo, setCorrigiendo] = useState<RegistroAveria | null>(null)
   const [anulando, setAnulando] = useState(false)
 
-  if (reporte.isLoading) return <PantallaCargando />
+  if (reporte.isLoading) return <PantallaCargando forma="detalle" />
   if (reporte.isError || !reporte.data) {
     return (
       <Alerta tipo="error">

@@ -35,7 +35,8 @@ export class RegistroPeticionesMiddleware implements NestMiddleware {
     // `finish` se emite cuando la respuesta terminó de enviarse.
     respuesta.once('finish', () => {
       const ms = Date.now() - inicio;
-      const ruta = `${peticion.method} ${peticion.baseUrl}${peticion.path}`;
+      // `originalUrl` y no `baseUrl + path`: en una ruta inexistente (404) `baseUrl` llega vacío.
+      const ruta = `${peticion.method} ${peticion.originalUrl.split('?')[0]}`;
 
       this.conteo.set(ruta, (this.conteo.get(ruta) ?? 0) + 1);
 

@@ -20,7 +20,7 @@ import { CifraEstado } from '../../../components/CifraEstado'
 import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { IconoCalendario } from '../../../components/Iconos'
 import { FilaRegistro, ListaRegistros, MetaDato } from '../../../components/ListaRegistros'
-import { PantallaCargando } from '../../../components/PantallaCargando'
+import { ConCarga } from '../../../components/ConCarga'
 import { Seccion } from '../../../components/Seccion'
 import { comoErrorApi } from '../../../services/http'
 import { fechaCorta } from '../../../shared/utils/fechas'
@@ -91,8 +91,7 @@ export function TableroMetasPersonalPage() {
       </EncabezadoPagina>
 
       {dia.isError && <Alerta tipo="error">{comoErrorApi(dia.error).mensaje}</Alerta>}
-      {dia.isLoading && <PantallaCargando />}
-
+      <ConCarga cargando={dia.isLoading} forma="detalle" mensaje="Cargando las metas y el personal…" className="space-y-6">
       {d && (
         <>
           {d.advertencias.map((a) => (
@@ -169,6 +168,7 @@ export function TableroMetasPersonalPage() {
           </Seccion>
         </>
       )}
+      </ConCarga>
     </section>
   )
 }

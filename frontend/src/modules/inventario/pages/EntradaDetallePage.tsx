@@ -26,7 +26,7 @@ export function EntradaDetallePage() {
   const entrada = useEntrada(id)
   const turnos = useTurnos()
 
-  if (entrada.isLoading) return <PantallaCargando />
+  if (entrada.isLoading) return <PantallaCargando forma="detalle" />
   if (!entrada.data) return <Alerta tipo="error">{entrada.error ? comoErrorApi(entrada.error).mensaje : 'No se encontró la entrada.'}</Alerta>
   const e = entrada.data
 

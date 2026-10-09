@@ -56,6 +56,16 @@ frontend/src/
     └── admin/                     usuarios, grupos, líneas, pesos, causales
 ```
 
+## Carga de datos (2026-10-08)
+
+- **Nada durante el primer segundo**; si tarda más, esqueleto con brillo (`useDemora`, `Esqueleto`).
+- `PantallaCargando forma="tablero|lista|detalle"`: para cualquier pantalla (por defecto `lista`).
+- `ConCarga`: el área principal de un **tablero** (una por pantalla: el nombre de la transición es único). Al llegar
+  los datos con el esqueleto a la vista, barrido de 0,6 s (`<ViewTransition>` de React + `addTransitionType('carga')`;
+  CSS en `index.css`). Envolver el contenido protegido: `<ConCarga cargando={q.isLoading} forma="tablero">{datos && …}</ConCarga>`.
+- Para probarlo: demorar la API desde el navegador de prueba, filtrando **solo** `http://localhost:5199/api/` (los
+  archivos fuente viven en carpetas `api/` y se romperían), y sin `await` dentro del evento de Puppeteer (congela las capturas).
+
 ## Rutas de los tableros (2026-10-06)
 
 `/tableros/mfr`, `/fr`, `/otif`, `/ritmo`, `/pt`, `/productividad`, `/averias-fabricado`, `/averias-limite`,

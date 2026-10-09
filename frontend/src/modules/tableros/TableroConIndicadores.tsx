@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode, SVGProps } from 'react'
 
 import { Alerta } from '../../components/Alerta'
 import { EncabezadoPagina } from '../../components/EncabezadoPagina'
-import { PantallaCargando } from '../../components/PantallaCargando'
+import { ConCarga } from '../../components/ConCarga'
 import { comoErrorApi } from '../../services/http'
 import type { TemaEscena } from '../../shared/visual3d/HeroVisual3D'
 import type { IndicadoresPeriodo } from '../../shared/types/mfr'
@@ -51,8 +51,10 @@ export function TableroConIndicadores({ titulo, queMide, Icono, escena = 'produc
       </EncabezadoPagina>
 
       {consulta.isError && <Alerta tipo="error">{comoErrorApi(consulta.error).mensaje}</Alerta>}
-      {consulta.isLoading && <PantallaCargando />}
-      {consulta.data && children(consulta.data)}
+      {/* Pasado el primer segundo, esqueleto; al llegar el dato, el barrido (ConCarga). */}
+      <ConCarga cargando={consulta.isLoading} forma="detalle" mensaje={`Cargando ${titulo}…`}>
+        {consulta.data && children(consulta.data)}
+      </ConCarga>
     </section>
   )
 }

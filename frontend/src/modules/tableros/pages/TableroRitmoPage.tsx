@@ -11,7 +11,7 @@ import { Alerta } from '../../../components/Alerta'
 import { CifraEstado } from '../../../components/CifraEstado'
 import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { IconoReloj } from '../../../components/Iconos'
-import { PantallaCargando } from '../../../components/PantallaCargando'
+import { ConCarga } from '../../../components/ConCarga'
 import { comoErrorApi } from '../../../services/http'
 import { REFRESCO_TABLERO } from '../../../shared/refresco'
 import { fechaCorta } from '../../../shared/utils/fechas'
@@ -52,8 +52,9 @@ export function TableroRitmoPage() {
       </EncabezadoPagina>
 
       {ritmo.isError && <Alerta tipo="error">{comoErrorApi(ritmo.error).mensaje}</Alerta>}
-      {ritmo.isLoading && <PantallaCargando />}
-      {r && <VistaRitmo ritmo={r} esHoy={periodo.esHoy} />}
+      <ConCarga cargando={ritmo.isLoading} forma="detalle" mensaje="Cargando el ritmo del día…">
+        {r && <VistaRitmo ritmo={r} esHoy={periodo.esHoy} />}
+      </ConCarga>
     </section>
   )
 }

@@ -35,7 +35,7 @@ import { Boton } from '../../../components/Boton'
 import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { EstadoVacio } from '../../../components/EstadoVacio'
 import { IconoBalanza, IconoCaja, IconoLinea, IconoReloj, IconoTablero } from '../../../components/Iconos'
-import { PantallaCargando } from '../../../components/PantallaCargando'
+import { ConCarga } from '../../../components/ConCarga'
 import { PestanasVista, type OpcionVista } from '../../../components/PestanasVista'
 import { comoErrorApi } from '../../../services/http'
 import { useAparecer } from '../../../shared/animacion/useAnimacion'
@@ -180,9 +180,10 @@ export function TableroMfrPage() {
         }
       />
 
-      {dia.isLoading && <PantallaCargando />}
       {dia.isError && <Alerta tipo="error">{comoErrorApi(dia.error).mensaje}</Alerta>}
 
+      {/* Pasado el primer segundo, esqueleto del tablero; al llegar el dato, el barrido. */}
+      <ConCarga cargando={dia.isLoading} forma="tablero" mensaje="Cargando el tablero del día…" className="space-y-6">
       {datos && sinDpp && (
         <EstadoVacio
           Icono={IconoTablero}
@@ -271,6 +272,7 @@ export function TableroMfrPage() {
           </div>
         </>
       )}
+      </ConCarga>
     </section>
   )
 }

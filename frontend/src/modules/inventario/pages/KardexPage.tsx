@@ -46,7 +46,7 @@ export function KardexPage() {
   const { tienePermiso } = useSesion()
   const [moviendo, setMoviendo] = useState(false)
 
-  if (item.isLoading) return <PantallaCargando />
+  if (item.isLoading) return <PantallaCargando forma="detalle" />
   if (!item.data) return <Alerta tipo="error">{item.error ? comoErrorApi(item.error).mensaje : 'No se encontró el ítem.'}</Alerta>
   const i = item.data
   const turno = (tid: string) => turnos.data?.find((t) => t.id === tid)?.codigo ?? '—'

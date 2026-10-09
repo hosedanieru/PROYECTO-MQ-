@@ -22,12 +22,32 @@
  *
  * Se fija en la conexión, no en la configuración del servidor, para que
  * no dependa de cómo se instaló PostgreSQL en cada equipo.
+ *
+ * Por qué el pool lleva límites de espera (hallado el 2026-10-09):
+ *
+ *   Sin `connectionTimeoutMillis`, `pg-pool` deja esperando PARA SIEMPRE
+ *   a una petición que no consigue conexión (base caída, pool agotado,
+ *   equipo que volvió de suspensión). El navegador se rinde a los 15 s,
+ *   pero en el backend la petición sigue viva y se acumula con las del
+ *   siguiente refresco: el servidor "está arriba" y no responde. Con el
+ *   límite falla rápido, responde error y se recupera solo.
+ *
+ *   `keepAlive` hace que el sistema operativo detecte las conexiones que
+ *   murieron sin avisar (red caída, suspensión) en vez de usarlas a ciegas.
  */
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
 export const OPCIONES_SESION_POSTGRES = '-c TimeZone=UTC';
 
+/** Cuánto espera una consulta por una conexión libre antes de fallar. */
+export const ESPERA_MAXIMA_CONEXION_MS = 10_000;
+
 export function crearAdaptadorPostgres(connectionString = process.env.DATABASE_URL): PrismaPg {
-  return new PrismaPg({ connectionString, options: OPCIONES_SESION_POSTGRES });
+  return new PrismaPg({
+    connectionString,
+    options: OPCIONES_SESION_POSTGRES,
+    connectionTimeoutMillis: ESPERA_MAXIMA_CONEXION_MS,
+    keepAlive: true,
+  });
 }

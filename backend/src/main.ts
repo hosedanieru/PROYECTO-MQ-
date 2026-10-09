@@ -55,7 +55,13 @@ function detallar(error: unknown): string {
  * `uncaughtException` sí termina el proceso: una excepción síncrona sin
  * capturar deja el estado en un punto desconocido, y seguir desde ahí
  * puede corromper datos. Se sale con código 1 para que el supervisor
- * (Docker, `--watch`) vuelva a levantar.
+ * vuelva a levantar.
+ *
+ * OJO (verificado el 2026-10-09 en `@nestjs/cli/actions/start.action.js`):
+ * `nest start --watch` (npm run start:dev) NO es un supervisor. Solo
+ * relanza el proceso cuando termina de recompilar; si el proceso muere,
+ * queda caído hasta que se guarde un archivo de `src/`. Docker, con
+ * `restart: unless-stopped`, sí lo vuelve a levantar.
  */
 function instalarRedDeSeguridad(): void {
   process.on('unhandledRejection', (razon) => {

@@ -22,7 +22,6 @@ export { animate, motionValue, press, type MotionValue } from 'motion'
 
 // Componentes y hooks de React.
 export { LayoutGroup, motion, MotionConfig, useReducedMotion, useSpring, useTransform } from 'motion/react'
-
 /**
  * Curva del ejemplo de referencia (js-three-orbit): arranca rápido y se
  * posa muy suave al final. Se usa para frenar el giro y para trazar curvas.

@@ -52,8 +52,12 @@ export class AppModule implements NestModule {
   /**
    * El registro va sobre TODAS las rutas: su valor está en ver el
    * volumen total, no el de una ruta suelta.
+   *
+   * `{*ruta}` y no `*`: la versión actual de path-to-regexp ya no acepta
+   * el comodín suelto (NestJS lo convertía con una advertencia en cada
+   * arranque). Las llaves lo hacen opcional, así que cubre también `/api`.
    */
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RegistroPeticionesMiddleware).forRoutes('*');
+    consumer.apply(RegistroPeticionesMiddleware).forRoutes('{*ruta}');
   }
 }
