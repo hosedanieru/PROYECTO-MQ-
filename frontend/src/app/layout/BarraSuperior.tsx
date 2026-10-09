@@ -26,18 +26,23 @@ interface Props {
  * de ancho a todas las pantallas. Ahora todo va arriba, en una sola
  * franja marina (oscura en los dos temas, como era la lateral):
  *
- *   [logo] Inicio · Remisiones · Producción ▾ · Averías · Inventario · Administración ▾   [día operativo · hora] [ES] [☾] [cuenta ▾]
+ *   [logo] Inicio · Remisiones · Programación · Averías · Inventario · Tableros ▾ · Administración ▾   [día · hora] [ES] [☾] [cuenta ▾]
  *
  * Para que quepa sin barra de desplazamiento, sin quitar nada:
  * - los enlaces que van juntos se agrupan en desplegables (ver `navegacion.ts`);
  * - planta, nombre, rol, salir y el eslogan pasan al menú de la cuenta;
  * - día operativo + turno en curso + hora se reúnen en un solo chip;
- * - lo que se escribe crece con el ancho: por debajo de 1280 px, logo solo
- *   con el símbolo y fecha corta; desde 1280 px, logo completo y
- *   "Día operativo …"; desde 1536 px, además los íconos del menú, el día
- *   de la semana e idioma/tema sueltos (por debajo viven en el menú de la
- *   cuenta). Medido sin solapes en 390, 1024, 1280, 1440 y 1536 px;
+ * - lo que se escribe crece con el ancho:
+ *     < 1280 px   símbolo "IN", fecha corta, botones del menú más juntos
+ *     ≥ 1280 px   "Día operativo …" en el chip
+ *     ≥ 1536 px   logo completo, día de la semana, idioma y tema sueltos
+ *     ≥ 1680 px   íconos en el menú
+ *   (por debajo, idioma y tema viven en el menú de la cuenta);
  * - por debajo de 1024 px, el menú se abre como panel desde la barra.
+ *
+ * MEDIR al agregar algo al menú: con la fuente Inter YA CARGADA (sin ella
+ * el texto es más angosto y la medida engaña), en 1024, 1280, 1440 y
+ * 1536 px. 2026-10-06, con 7 elementos: sin solapes en los cuatro anchos.
  */
 export function BarraSuperior({ menuAbierto, alternarMenu, cerrarMenu }: Props) {
   const { tienePermiso } = useSesion()
@@ -54,7 +59,7 @@ export function BarraSuperior({ menuAbierto, alternarMenu, cerrarMenu }: Props) 
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <span className="luz -left-16 -top-28 h-48 w-48 bg-marca opacity-40" />
       </div>
-      <div className="mx-auto flex h-16 max-w-[96rem] items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-[96rem] items-center gap-2 px-4 sm:px-6 xl:gap-3">
         <button
           type="button"
           onClick={alternarMenu}
@@ -66,11 +71,11 @@ export function BarraSuperior({ menuAbierto, alternarMenu, cerrarMenu }: Props) 
         </button>
 
         <NavLink to="/" onClick={cerrarMenu} aria-label={t('nav.irAlInicio')} className="shrink-0">
-          {/* Por debajo de 1280 px, solo el símbolo: el nombre completo no deja espacio al menú. */}
-          <span className="xl:hidden">
+          {/* Por debajo de 1536 px, solo el símbolo: con los 7 elementos del menú el nombre completo no deja espacio. */}
+          <span className="2xl:hidden">
             <Logo variante="claro" soloIsotipo />
           </span>
-          <span className="hidden xl:block">
+          <span className="hidden 2xl:block">
             <Logo variante="claro" />
           </span>
         </NavLink>

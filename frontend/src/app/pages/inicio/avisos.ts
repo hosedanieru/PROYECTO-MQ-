@@ -49,7 +49,7 @@ function algunosCodigos(alertas: AlertaInventario[]): string {
 
 /** Un aviso por tipo de alerta de inventario (no uno por ítem: pueden ser decenas). */
 function avisosDeInventario(inventario: AlertasInventarioDia, fecha: string): Aviso[] {
-  const a = `/inventario/alertas?fecha=${fecha}`
+  const a = `/tableros/alertas-inventario?fecha=${fecha}`
   const de = (tipo: TipoAlertaInventario, gravedad?: 'CRITICA' | 'ADVERTENCIA') =>
     inventario.alertas.filter((x) => x.tipo === tipo && (!gravedad || x.gravedad === gravedad))
   const avisos: Aviso[] = []
@@ -139,7 +139,7 @@ export function construirAvisos({ indicadores, porEstado, averias, inventario, f
         tono: 'alerta',
         titulo: `MFR en ${porcentaje(indicadores.mfr.cumplimiento)}`,
         texto: `Por debajo de la meta del ${indicadores.meta} %.`,
-        a: `/mfr?fecha=${fecha}`,
+        a: `/tableros/mfr?fecha=${fecha}`,
       })
     }
 

@@ -65,7 +65,7 @@ export function RemisionDetallePage() {
           <>
             <EstadoBadge estado={r.estado} />
             {r.version > 1 && (
-              <span className="text-base font-medium text-white/90">versión {r.version}</span>
+              <span className="text-[1rem] font-medium text-white/90">versión {r.version}</span>
             )}
             {r.estaPendienteDeConciliar && (
               <Badge tono="alerta">Aprobada por PepsiCo, pendiente de conciliar</Badge>

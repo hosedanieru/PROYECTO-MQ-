@@ -9,18 +9,25 @@ import type {
   DatosBloque,
   EstandarProducto,
   IndicadoresDia,
+  IndicadoresPeriodo,
   LineaProduccion,
   PropuestaDpp,
   ResultadoCierreTurno,
   ResultadoLoteEstandares,
   ResultadoPeriodo,
   ResumenGuardado,
+  RitmoDia,
   TipoLinea,
 } from '../../../shared/types/mfr'
 
 export const mfrApi = {
   dia: (fecha: string) =>
     http.get<IndicadoresDia>('/mfr/dia', { params: { fecha } }).then((r) => r.data),
+  /** FR, OTIF, averías vs lo fabricado, ranking de PT y productividad de un periodo (hasta 93 días). */
+  indicadores: (desde: string, hasta: string) =>
+    http.get<IndicadoresPeriodo>('/mfr/indicadores', { params: { desde, hasta } }).then((r) => r.data),
+  /** Ritmo por hora de un día: adelantado, en línea o retrasado, por turno. */
+  ritmo: (fecha: string) => http.get<RitmoDia>('/mfr/ritmo', { params: { fecha } }).then((r) => r.data),
 
   guardarBloque: (datos: DatosBloque & { fechaOperativa: string; id?: string; motivo?: string }) =>
     http.put<BloqueCalculado>('/mfr/bloques', datos).then((r) => r.data),

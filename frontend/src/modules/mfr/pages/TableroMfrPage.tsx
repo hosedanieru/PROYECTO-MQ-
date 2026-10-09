@@ -4,12 +4,15 @@
  *
  * Lo que un coordinador lee al empezar y al cerrar la jornada.
  *
- * Arriba, la banda responde "¿vamos bien?": medidor contra la meta,
- * frase que dice cuánto falta y las cifras del día.
+ * Arriba, la banda (título, día y acciones). Debajo, el RESUMEN DEL DÍA
+ * al estilo del tablero de Power BI del área (`ResumenDiaMfr`; usuario,
+ * 2026-10-07: los paneles de indicadores quedan como `MQ VISUAL J3.pdf`):
+ * tarjetas de color, avance del plan, cumplimiento por producto, medio
+ * arco con aguja, PT más atrasados y personal por turno.
  *
- * Debajo, "una vista a la vez" (decisión del usuario 2026-10-05: fuera
- * las tarjetas). Cuatro pestañas grandes con un resumen vivo y cada
- * vista a todo el ancho, sin cajas:
+ * Al final, el "Detalle del día": "una vista a la vez" (2026-10-05).
+ * Cuatro pestañas grandes con un resumen vivo y cada vista a todo el
+ * ancho, sin cajas:
  *
  *   Turnos   → una columna abierta por turno, separadas por líneas
  *   Por PT   → ranking, primero lo que más falta
@@ -29,28 +32,27 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Alerta } from '../../../components/Alerta'
 import { BarraVista } from '../../../components/BarraVista'
 import { Boton } from '../../../components/Boton'
-import { CifraEstado } from '../../../components/CifraEstado'
 import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { EstadoVacio } from '../../../components/EstadoVacio'
-import { Medidor } from '../../../components/graficas/Medidor'
 import { IconoBalanza, IconoCaja, IconoLinea, IconoReloj, IconoTablero } from '../../../components/Iconos'
 import { PantallaCargando } from '../../../components/PantallaCargando'
 import { PestanasVista, type OpcionVista } from '../../../components/PestanasVista'
 import { comoErrorApi } from '../../../services/http'
 import { useAparecer } from '../../../shared/animacion/useAnimacion'
 import type { FilaHoraria, IndicadoresDia } from '../../../shared/types/mfr'
-import { miles } from '../../../shared/utils/numeros'
+import { useIndicadorAverias } from '../../averias/hooks/useAverias'
 import { useSesion } from '../../auth/useSesion'
 import { useProductos } from '../../catalogo/hooks/useCatalogos'
 import { ColumnaTurno } from '../components/ColumnaTurno'
 import { CurvaDia } from '../components/CurvaDia'
 import { RankingPt } from '../components/RankingPt'
+import { ResumenDiaMfr } from '../components/ResumenDiaMfr'
 import { SelectorFecha } from '../components/SelectorFecha'
 import { TablaHoraria } from '../components/TablaHoraria'
 import { useFechaOperativa } from '../hooks/useFechaOperativa'
 import { useIndicadoresDia } from '../hooks/useMfr'
 import { resumenKilos, resumenPt, resumenTurnos } from '../resumen-vistas'
-import { textoSemaforo, tonoSemaforo } from '../semaforo'
+import { tonoSemaforo } from '../semaforo'
 
 /**
  * Las cuatro filas que el DPP de PepsiCo trae por línea y hora. El
@@ -98,27 +100,14 @@ const SERIES: Array<{
 type Vista = 'turnos' | 'pt' | 'kilos' | 'lineas'
 const VISTAS: Vista[] = ['turnos', 'pt', 'kilos', 'lineas']
 
-/** Cajas que faltan por PT, sumadas: lo que sobra de un PT no tapa lo que falta de otro. */
-function cajasFaltantes(mfr: IndicadoresDia['mfr']): number {
-  return mfr.porProducto.reduce((s, p) => s + Math.max(0, p.programadoCajas - p.producidoCajas), 0)
-}
-
-/** La frase guía junto al medidor: qué falta para llegar a la meta. */
-function fraseGuia(mfr: IndicadoresDia['mfr'], meta: number): string {
-  if (mfr.programadoCajas === 0) return 'Sin DPP cargado: no hay contra qué medir.'
-  const necesarias = Math.ceil((mfr.programadoCajas * meta) / 100)
-  const faltan = necesarias - mfr.producidoCajas
-  if (faltan <= 0)
-    return `Meta alcanzada: ${miles(mfr.producidoCajas)} cajas aprobadas de ${miles(mfr.programadoCajas)}.`
-  return `Para llegar al ${meta} % faltan ${miles(faltan)} cajas aprobadas por el OPA.`
-}
-
 export function TableroMfrPage() {
   const [fecha, setFecha] = useFechaOperativa()
   const [params, setParams] = useSearchParams()
   const { tienePermiso } = useSesion()
   const dia = useIndicadoresDia(fecha)
   const productos = useProductos()
+  // Unidades averiadas del día para la tarjeta "Averías" (solo si puede consultar averías).
+  const averias = useIndicadorAverias(fecha, fecha, tienePermiso('averia.consultar'))
 
   const vista: Vista = VISTAS.includes(params.get('vista') as Vista)
     ? (params.get('vista') as Vista)
@@ -132,7 +121,6 @@ export function TableroMfrPage() {
   const contenido = useAparecer<HTMLDivElement>(`${fecha}|${vista}|${dia.isSuccess}`)
 
   const datos = dia.data
-  const mfr = datos?.mfr
   const sinDpp = datos !== undefined && datos.bloques.length === 0
 
   const opciones: OpcionVista<Vista>[] = datos
@@ -190,66 +178,7 @@ export function TableroMfrPage() {
             </Link>
           </>
         }
-      >
-        {mfr && datos && (
-          <div className="grid items-center gap-5 lg:grid-cols-[auto_1fr]">
-            <div className="vidrio flex items-center gap-5 rounded-3xl p-4 pr-6">
-              <Medidor
-                valor={mfr.cumplimiento}
-                meta={datos.meta}
-                tono={tonoSemaforo(mfr.semaforo)}
-                variante="vidrio"
-                tamano={168}
-                leyenda={textoSemaforo(mfr.semaforo)}
-                titulo={`Cumplimiento del día: ${mfr.cumplimiento?.toFixed(1) ?? 'sin dato'} %, meta ${datos.meta} %`}
-              />
-              <p className="max-w-[14rem] text-sm font-medium leading-snug text-white/90">
-                {fraseGuia(mfr, datos.meta)}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-              <CifraEstado
-                variante="vidrio"
-                etiqueta="Programadas"
-                detalle="cajas en el DPP (T)"
-                valor={mfr.programadoCajas}
-                tono="marca"
-              />
-              <CifraEstado
-                variante="vidrio"
-                etiqueta="Producidas"
-                detalle="aprobadas por el OPA"
-                valor={mfr.producidoCajas}
-                total={mfr.programadoCajas}
-                tono="exito"
-              />
-              <CifraEstado
-                variante="vidrio"
-                etiqueta="Faltan"
-                detalle="sumando PT por PT"
-                valor={cajasFaltantes(mfr)}
-                total={mfr.programadoCajas}
-                tono="alerta"
-              />
-              <CifraEstado
-                variante="vidrio"
-                etiqueta="Fuera del DPP"
-                detalle={`${mfr.producidoSinProgramar.length} PT`}
-                valor={mfr.producidoSinProgramar.reduce((s, p) => s + p.cajas, 0)}
-                tono="neutro"
-              />
-              <CifraEstado
-                variante="vidrio"
-                etiqueta="Emergencia"
-                detalle="extraoficiales, no cuentan"
-                valor={mfr.extraoficialesCajas}
-                tono="acento"
-              />
-            </div>
-          </div>
-        )}
-      </EncabezadoPagina>
+      />
 
       {dia.isLoading && <PantallaCargando />}
       {dia.isError && <Alerta tipo="error">{comoErrorApi(dia.error).mensaje}</Alerta>}
@@ -277,6 +206,13 @@ export function TableroMfrPage() {
             </Alerta>
           ))}
 
+          <ResumenDiaMfr
+            datos={datos}
+            productos={productos.data}
+            averiadasUnidades={averias.data?.total.averiadasUnidades ?? null}
+          />
+
+          <h2 className="pt-4 text-lg font-black text-tinta">Detalle del día</h2>
           <PestanasVista
             etiqueta="Vistas del tablero"
             opciones={opciones}

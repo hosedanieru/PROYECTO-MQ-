@@ -86,7 +86,7 @@ export function CorreosPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge tono={e.estado === 'ENVIADO' ? 'exito' : 'critico'}>{e.estado === 'ENVIADO' ? 'Enviado' : 'Falló'}</Badge>
               <span className="cifra text-sm font-bold text-tinta">{hora(e.fechaHora)}</span>
-              <span className="text-base font-bold text-tinta">{e.asunto}</span>
+              <span className="text-[1rem] font-bold text-tinta">{e.asunto}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
               <MetaDato etiqueta="Origen">

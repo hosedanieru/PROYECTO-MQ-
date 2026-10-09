@@ -9,10 +9,12 @@ import { enlaceActivo, type ElementoNav, type EnlaceNav } from './navegacion'
  * Botón de la barra (fondo marina en los dos temas). Activo: relleno con
  * --marca-relleno, el único azul donde el blanco da 6,7:1. Inactivo:
  * blanco al 90 % (regla de legibilidad sobre fondos oscuros).
- * Los íconos solo aparecen desde 1536 px: por debajo, el texto es lo que
- * cabe y lo que se lee.
+ * Los íconos solo aparecen desde 1680 px y, por debajo de 1280 px, los
+ * botones van más juntos: con los 7 elementos del menú (2026-10-06) era
+ * lo que hacía falta para no montarse sobre el chip del día. Por debajo
+ * de 1680 px, el texto es lo que cabe y lo que se lee.
  */
-const BOTON = 'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition duration-150 whitespace-nowrap'
+const BOTON = 'flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-semibold transition duration-150 whitespace-nowrap xl:px-3'
 const ACTIVO = 'bg-marca-relleno text-white shadow-[0_8px_24px_-8px_var(--color-marca)]'
 const INACTIVO = 'text-white/90 hover:bg-white/10 hover:text-white'
 
@@ -22,13 +24,13 @@ export function MenuPrincipal({ elementos }: { elementos: ElementoNav[] }) {
   const { pathname } = useLocation()
 
   return (
-    <nav aria-label={t('nav.navegacionPrincipal')} className="hidden items-center gap-1 lg:flex">
+    <nav aria-label={t('nav.navegacionPrincipal')} className="hidden items-center gap-0.5 lg:flex xl:gap-1">
       {elementos.map((el) => {
         if ('enlace' in el) {
           const { a, texto, Icono, exacta } = el.enlace
           return (
             <NavLink key={a} to={a} end={exacta} className={({ isActive }) => `${BOTON} ${isActive ? ACTIVO : INACTIVO}`}>
-              <Icono className="hidden h-[18px] w-[18px] 2xl:block" />
+              <Icono className="hidden h-[18px] w-[18px] min-[1680px]:block" />
               {t(texto)}
             </NavLink>
           )
@@ -39,12 +41,12 @@ export function MenuPrincipal({ elementos }: { elementos: ElementoNav[] }) {
           <MenuDesplegable
             key={texto}
             ancho={enlaces.length > 3 ? 'w-[30rem]' : 'w-72'}
-            // El panel ancho (Administración, el último del menú) se abre hacia la izquierda: a 1024 px se salía por la derecha.
+            // Los paneles anchos (Tableros, Administración: los últimos del menú) se abren hacia la izquierda: a 1024 px se salían por la derecha.
             alinear={enlaces.length > 3 ? 'derecha' : 'izquierda'}
             claseBoton={(abierto) => `${BOTON} ${activo ? ACTIVO : abierto ? 'bg-white/10 text-white' : INACTIVO}`}
             boton={
               <>
-                <Icono className="hidden h-[18px] w-[18px] 2xl:block" />
+                <Icono className="hidden h-[18px] w-[18px] min-[1680px]:block" />
                 {t(texto)}
                 <IconoChevron className="h-4 w-4 rotate-90 opacity-80" />
               </>

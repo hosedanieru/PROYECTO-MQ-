@@ -1,7 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { COLOR_TONO, type TonoBadge } from '../../../components/Badge'
-import { crecerHasta } from '../../../shared/animacion/animaciones'
+import { motion, RESORTE_GRAFICA } from '../../../shared/animacion/movimiento'
 import type { Producto } from '../../../shared/types/catalogo'
 import type { IndicadoresDia, MfrPorProducto } from '../../../shared/types/mfr'
 import { miles, porcentaje } from '../../../shared/utils/numeros'
@@ -113,20 +113,18 @@ function FilaPt({
   descripcion: string
   retraso: number
 }) {
-  const barra = useRef<HTMLSpanElement>(null)
   const tono = tonoSemaforo(fila.semaforo)
   const avance = Math.min(fila.cumplimiento ?? 0, 100)
   const faltan = Math.max(0, fila.programadoCajas - fila.producidoCajas)
 
-  useLayoutEffect(() => {
-    const animacion = crecerHasta(barra.current, 'scaleX', 0, 1, retraso)
-    return () => {
-      animacion?.revert()
-    }
-  }, [avance, retraso])
-
   return (
-    <li className="relative grid items-center gap-x-6 gap-y-2 py-4 pl-5 pr-1 transition-colors hover:bg-marca-claro/30 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_7rem_9rem]">
+    // `layout`: al cambiar el orden (botones o un refresco que mueve un PT de puesto), la fila se
+    // DESLIZA a su nuevo lugar en vez de saltar; se ve qué PT subió y cuál bajó (Motion, 2026-10-07).
+    <motion.li
+      layout="position"
+      transition={RESORTE_GRAFICA}
+      className="relative grid items-center gap-x-6 gap-y-2 py-4 pl-5 pr-1 transition-colors hover:bg-marca-claro/30 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_7rem_9rem]"
+    >
       {/* Franja del semáforo a la izquierda de la fila. */}
       <span className="absolute inset-y-3 left-0 w-1.5 rounded-full" style={{ backgroundColor: COLOR_TONO[tono] }} aria-hidden="true" />
 
@@ -147,10 +145,13 @@ function FilaPt({
           aria-valuemax={100}
           aria-label={`${descripcion}: ${porcentaje(fila.cumplimiento)} de lo programado`}
         >
-          <span
-            ref={barra}
-            className="absolute inset-y-0 left-0 origin-left rounded-full"
-            style={{ width: `${avance}%`, backgroundColor: COLOR_TONO[tono] }}
+          {/* Entra creciendo en cascada; con cada refresco el resorte va del valor anterior al nuevo, sin volver a 0. */}
+          <motion.span
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{ backgroundColor: COLOR_TONO[tono] }}
+            initial={{ width: '0%' }}
+            animate={{ width: `${avance}%` }}
+            transition={{ ...RESORTE_GRAFICA, delay: retraso / 1000 }}
           />
           <span className="absolute -inset-y-1 w-0.5 rounded-full bg-tinta" style={{ left: `${meta}%` }} aria-hidden="true" />
         </div>
@@ -178,7 +179,7 @@ function FilaPt({
           <p className="text-sm font-bold text-exito">Completo</p>
         )}
       </div>
-    </li>
+    </motion.li>
   )
 }
 
@@ -199,7 +200,8 @@ function ListaAparte({
   return (
     <section>
       <div className="flex items-baseline justify-between gap-3 border-b-2 pb-2" style={{ borderColor: COLOR_TONO[tono] }}>
-        <h3 className="text-base font-black text-tinta">{titulo}</h3>
+        {/* text-[1rem] y no text-base: text-base también pinta de blanco (ver index.css). */}
+        <h3 className="text-[1rem] font-black text-tinta">{titulo}</h3>
         <span className="cifra text-lg font-black text-tinta">
           {miles(total)} <span className="text-xs font-semibold text-tinta-suave">cajas</span>
         </span>

@@ -28,7 +28,7 @@ export function BarraSeleccion({ cantidad, unidad, quitar, children }: Props) {
         {/* `key` relanza el rebote del contador cada vez que cambia la cantidad. */}
         <span
           key={cantidad}
-          className="subir-rebote cifra grid h-10 min-w-10 place-items-center rounded-full bg-white px-2 text-base font-black text-marina"
+          className="subir-rebote cifra grid h-10 min-w-10 place-items-center rounded-full bg-white px-2 text-[1rem] font-black text-marina"
         >
           {cantidad}
         </span>

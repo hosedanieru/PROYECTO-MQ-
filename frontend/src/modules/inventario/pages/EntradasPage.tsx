@@ -60,7 +60,7 @@ export function EntradasPage() {
           <div className="min-w-0 flex-1 basis-64">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="cifra text-sm font-bold text-tinta">{hora(e.fechaHoraRegistro)}</span>
-              <span className="text-base font-bold text-tinta">{e.documento}</span>
+              <span className="text-[1rem] font-bold text-tinta">{e.documento}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
               <MetaDato etiqueta="Turno">{turnos.data?.find((t) => t.id === e.turnoId)?.codigo ?? '—'}</MetaDato>

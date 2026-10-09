@@ -366,6 +366,115 @@ export interface ResumenGuardado extends ReferenciaResumen {
   fechaHora: string
 }
 
+// ------------------------------------------------------------
+// Indicadores de producción (Ciclo 2, fase 1) — espejo de
+// `backend/src/domain/mfr/indicadores-produccion.ts` y `ritmo-produccion.ts`.
+// Las fechas llegan como texto ISO.
+// ------------------------------------------------------------
+
+export interface NombreIndicador {
+  codigo: string
+  nombre: string
+}
+
+export interface MedidaFr {
+  programadoCajas: number
+  aprobadoCajas: number
+  porcentaje: number | null
+}
+
+export interface SkuOtif {
+  fechaOperativa: string
+  productoId: string
+  programadoCajas: number
+  aprobadoCajas: number
+  limite: string
+  completoEn: string | null
+  completo: boolean
+  aTiempo: boolean
+  sinFechaAprobacion: boolean
+}
+
+export interface FilaRanking {
+  productoId: string
+  programadoCajas: number
+  producidoCajas: number
+  cumplimiento: number | null
+  programado: boolean
+}
+
+export interface MedidaFabricado {
+  fabricadoUnidades: number
+  /** Parte de lo fabricado que viene de remisiones extraoficiales. */
+  extraoficialUnidades: number
+  averiadasUnidades: number
+  porcentaje: number | null
+}
+
+export interface MedidaProductividad {
+  cajas: number
+  personas: number
+  horasPersona: number
+  cajasPorPersonaHora: number | null
+}
+
+export interface IndicadoresPeriodo {
+  desde: string
+  hasta: string
+  fr: MedidaFr & { porDia: Array<MedidaFr & { fechaOperativa: string }> }
+  otif: {
+    skus: number
+    completos: number
+    cumplen: number
+    porcentaje: number | null
+    completosPorcentaje: number | null
+    detalle: SkuOtif[]
+  }
+  averiasVsFabricado: {
+    total: MedidaFabricado
+    porDia: Array<MedidaFabricado & { fechaOperativa: string }>
+    porTurno: Array<MedidaFabricado & { turnoId: string }>
+    porProducto: Array<MedidaFabricado & { productoId: string }>
+    bolsasSinConvertir: number
+  }
+  ranking: { filas: FilaRanking[]; mayor: FilaRanking | null; menor: FilaRanking | null }
+  productividad: {
+    total: MedidaProductividad
+    porTurno: Array<MedidaProductividad & { turnoId: string }>
+    porGrupo: Array<MedidaProductividad & { grupoId: string }>
+    cajasSinAsistencia: number
+  }
+  productos: Record<string, NombreIndicador>
+  turnos: Record<string, NombreIndicador>
+  grupos: Record<string, NombreIndicador>
+}
+
+export type EstadoRitmo = 'ADELANTADO' | 'EN_LINEA' | 'RETRASADO' | 'SIN_DATO'
+
+export interface PuntoRitmo {
+  hora: string
+  esperadoCajas: number
+  realCajas: number | null
+}
+
+export interface MedidaRitmo {
+  metaCajas: number
+  esperadoAhoraCajas: number
+  realAhoraCajas: number
+  desviacionPorcentaje: number | null
+  estado: EstadoRitmo
+  diferenciaCajas: number
+  serie: PuntoRitmo[]
+}
+
+export interface RitmoDia extends MedidaRitmo {
+  fechaOperativa: string
+  minutoActual: number
+  tolerancia: number
+  porTurno: Array<MedidaRitmo & { turnoId: string; empezo: boolean }>
+  turnos: Record<string, NombreIndicador>
+}
+
 /** Lo mismo que valida el backend (`validarNovedades`). */
 export const MINIMO_NOVEDADES = 10
 export const MAXIMO_NOVEDADES = 4000

@@ -12,6 +12,9 @@
  *   PI · Insumos     catálogo de cada uno, con unidad base y equivalencias
  *   Unidades         la lista desplegable de unidades base
  *
+ * Las Alertas salieron a su tablero (/tableros/alertas-inventario;
+ * usuario, 2026-10-06): aquí queda la operación.
+ *
  * Crear un PT, PI o insumo crea su existencia. Cada pestaña se muestra
  * solo con su permiso (hoy: el administrador).
  */
@@ -29,11 +32,6 @@ const PESTANAS = [
     texto: 'Existencias',
     permiso: 'inventario.consultar',
     exacta: true,
-  },
-  {
-    a: '/inventario/alertas',
-    texto: 'Alertas',
-    permiso: 'inventario.consultar',
   },
   {
     a: '/inventario/entradas',

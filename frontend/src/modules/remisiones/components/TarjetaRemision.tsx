@@ -39,7 +39,7 @@ export function TarjetaRemision({ remision: r, turno, grupo, seleccionada, alter
       />
       <Link to={`/remisiones/${r.id}`} className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <span className="codigo text-base font-extrabold text-tinta">
+          <span className="codigo text-[1rem] font-extrabold text-tinta">
             {r.consecutivo}
             {r.version > 1 && <span className="ml-1 text-xs font-semibold text-tinta-suave">v{r.version}</span>}
           </span>

@@ -43,7 +43,7 @@ import type {
 import { useSesion } from '../../auth/useSesion'
 import { useGrupos, useProductos, useTurnos } from '../../catalogo/hooks/useCatalogos'
 import { CerrarTurnoDialogo } from '../components/CerrarTurnoDialogo'
-import { PanelPersonalTurno, PersonalBadge, PersonalDiaResumen } from '../components/PersonalTurno'
+import { PanelPersonalTurno } from '../components/PersonalTurno'
 import { SelectorFecha } from '../components/SelectorFecha'
 import { useFechaOperativa } from '../hooks/useFechaOperativa'
 import {
@@ -78,9 +78,6 @@ const BORRADOR_VACIO: Borrador = {
   personas: '',
   motivo: '',
 }
-
-const num = (v: number | null | undefined, decimales = 0) =>
-  v === null || v === undefined ? '—' : v.toLocaleString('es-CO', { maximumFractionDigits: decimales })
 
 function diaAnterior(fecha: string): string {
   const d = new Date(`${fecha}T00:00:00.000Z`)
@@ -158,21 +155,14 @@ export function ProgramacionPage() {
       <EncabezadoPagina
         Icono={IconoCalendario}
         escena="produccion"
-        volver={{
-          a: `/mfr?fecha=${fecha}`,
-          texto: 'Volver al cumplimiento del día',
-        }}
         titulo="Programación del día"
-        descripcion={
-          <>
-            Qué PT corre en cada línea y en qué horas, tal como lo manda PepsiCo en el DPP. De cada bloque
-            salen el <strong className="font-semibold text-white">máximo teórico</strong> (cajas por hora ×
-            horas) y la <strong className="font-semibold text-white">meta</strong> (máximo × eficiencia).
-          </>
-        }
+        descripcion="Qué PT corre en cada línea y en qué horas, tal como lo manda PepsiCo en el DPP; el personal de cada turno y su cierre. Las metas y la cobertura de personal están en el tablero «Metas y personal»."
         acciones={
           <>
             <SelectorFecha fecha={fecha} onCambiar={setFecha} variante="vidrio" />
+            <Link to={`/tableros/metas-personal?fecha=${fecha}`}>
+              <Boton variante="vidrio">Ver metas y personal</Boton>
+            </Link>
             {puedeEditar && (
               <>
                 <Boton variante="vidrio" cargando={copiar.isPending} onClick={() => void copiarAnterior()}>
@@ -221,8 +211,6 @@ export function ProgramacionPage() {
             </Alerta>
           ))}
 
-          <PersonalDiaResumen personal={dia.data.personal} />
-
           {hayBloques && (
             // Turnos en columnas abiertas, separadas por líneas (sin cajas, usuario 2026-10-05).
             <div className="grid divide-borde border-y border-borde sm:grid-cols-2 lg:grid-cols-3 lg:divide-x">
@@ -249,15 +237,7 @@ export function ProgramacionPage() {
                     )}
                   </div>
 
-                  <p className="mt-2.5 text-sm text-tinta-suave">
-                    Meta del turno: <span className="cifra font-bold text-tinta">{num(t.targetCajas)}</span>{' '}
-                    cajas
-                  </p>
-
-                  <div className="mt-1.5">
-                    <PersonalBadge personal={t.personal} />
-                  </div>
-
+                  {/* La meta y el estado del personal del turno están en el tablero "Metas y personal" (usuario, 2026-10-06). */}
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-borde pt-3">
                     <button
                       type="button"
@@ -539,7 +519,7 @@ function TarjetaLinea({
           onChange={(e) => cambiar({ personas: e.target.value })}
         />
       </td>
-      <td className="px-2 py-1 text-right text-tinta-suave" colSpan={3}>
+      <td className="px-2 py-1 text-right text-tinta-suave">
         {esCorreccion && (
           <Campo
             etiqueta=""
@@ -553,34 +533,19 @@ function TarjetaLinea({
   )
 
   return (
-    // Sin caja (usuario, 2026-10-05): encabezado abierto con franja y la meta en grande; la tabla de bloques no cambia.
+    // Sin caja (usuario, 2026-10-05). Solo lo editable (2026-10-06): la meta y los kilos de la línea están en el tablero "Metas y personal".
     <section className="space-y-2">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex min-w-0 items-stretch gap-3">
-          <span
-            className={`w-1.5 shrink-0 rounded-full ${linea.bloques.length > 0 ? 'bg-marca' : 'bg-borde'}`}
-            aria-hidden="true"
-          />
-          <div className="min-w-0">
-            <p className="text-lg font-black tracking-tight text-tinta">{linea.nombre}</p>
-            <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">
-              {linea.tipo}
-              {linea.capacidadKgHora ? ` · hasta ${linea.capacidadKgHora} kg por hora` : ''} ·{' '}
-              <span className="cifra">{linea.horasProgramadas}</span> horas
-            </p>
-          </div>
-        </div>
-        <div className="flex items-end gap-6">
-          {linea.targetKg > 0 && (
-            <p className="text-right">
-              <span className="block text-xs font-bold uppercase tracking-wider text-tinta-suave">Kilos de meta</span>
-              <span className="cifra text-xl font-black text-tinta">{num(linea.targetKg)}</span>
-            </p>
-          )}
-          <p className="text-right">
-            <span className="block text-xs font-bold uppercase tracking-wider text-tinta-suave">Meta</span>
-            <span className="cifra text-3xl font-black leading-none text-tinta">{num(linea.targetCajas)}</span>
-            <span className="ml-1 text-xs font-semibold text-tinta-suave">cajas</span>
+      <div className="flex min-w-0 items-stretch gap-3">
+        <span
+          className={`w-1.5 shrink-0 rounded-full ${linea.bloques.length > 0 ? 'bg-marca' : 'bg-borde'}`}
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="text-lg font-black tracking-tight text-tinta">{linea.nombre}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+            {linea.tipo}
+            {linea.capacidadKgHora ? ` · hasta ${linea.capacidadKgHora} kg por hora` : ''} ·{' '}
+            <span className="cifra">{linea.horasProgramadas}</span> horas
           </p>
         </div>
       </div>
@@ -609,19 +574,8 @@ function TarjetaLinea({
               >
                 Personas
               </th>
-              <th
-                className="w-16 px-2 py-2 text-right"
-                title="Máximo teórico: cajas por hora × horas del bloque. En el DPP, «Mx»."
-              >
-                Máximo
-              </th>
-              <th
-                className="w-16 px-2 py-2 text-right"
-                title="Meta del bloque: máximo × eficiencia. En el DPP, «T»."
-              >
-                Meta
-              </th>
-              <th className="w-20 px-2 py-2 text-right">Kilos de meta</th>
+              {/* Columna del motivo al corregir (Máximo, Meta y Kilos pasaron al tablero "Metas y personal"). */}
+              <th className="px-2 py-2"></th>
               <th className="px-2 py-2"></th>
             </tr>
           </thead>
@@ -655,11 +609,7 @@ function TarjetaLinea({
                       <td className="cifra px-2 py-1">{b.eficienciaPorcentaje} %</td>
                       <td className="px-2 py-1 text-xs">{b.loop ?? ''}</td>
                       <td className="cifra px-2 py-1">{b.personasAsignadas ?? '—'}</td>
-                      <td className="cifra px-2 py-1 text-right text-tinta-suave">{num(b.maxCajas)}</td>
-                      <td className="cifra px-2 py-1 text-right font-bold text-tinta">
-                        {num(b.targetCajas)}
-                      </td>
-                      <td className="cifra px-2 py-1 text-right">{num(b.targetKg)}</td>
+                      <td className="px-2 py-1"></td>
                     </>
                   )}
                   <td className="px-2 py-1 text-right whitespace-nowrap">
@@ -702,7 +652,7 @@ function TarjetaLinea({
             })}
             {linea.bloques.length === 0 && !nuevo && (
               <tr>
-                <td colSpan={12} className="px-4 py-3 text-center text-tinta-suave">
+                <td colSpan={10} className="px-4 py-3 text-center text-tinta-suave">
                   Sin bloques programados.
                 </td>
               </tr>

@@ -68,8 +68,12 @@ export function Bolsa({ color }: { color: string }) {
   const geometria = obtenerGeometriaBolsa()
   return (
     <mesh geometry={geometria}>
-      {/* Metalizado: brilla como el empaque de snacks, sin llegar a espejo. */}
-      <meshPhysicalMaterial map={texturaBolsa(color)} metalness={0.55} roughness={0.28} clearcoat={1} clearcoatRoughness={0.15} />
+      {/*
+        Metalizado: brilla como el empaque de snacks, sin llegar a espejo.
+        Desde 2026-10-07 más metálico y liso: así se ven pasar por la bolsa
+        las lámparas de la nave (EntornoPlanta) cuando gira.
+      */}
+      <meshPhysicalMaterial map={texturaBolsa(color)} metalness={0.7} roughness={0.2} clearcoat={1} clearcoatRoughness={0.1} />
     </mesh>
   )
 }

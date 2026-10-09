@@ -7,24 +7,31 @@
  * `HeroVisual3D`, que carga esto de forma diferida: el resto del
  * aplicativo nunca descarga three.
  *
- *   Escena3D.tsx     lienzo, luces, inclinación hacia el puntero (este archivo)
- *   escenas.tsx      una composición por módulo
- *   piezas/          bolsa, caja, estiba, remisión, sobre, banda, cono, báscula, casco
+ *   Escena3D.tsx       lienzo, luces, inclinación hacia el puntero (este archivo)
+ *   EntornoPlanta.tsx  la nave de planta que reflejan las piezas
+ *   giro.ts            agarrar y soltar con inercia (Motion)
+ *   escenas.tsx        una composición por módulo
+ *   piezas/            bolsa, caja, estiba, remisión, sobre, banda, cono, báscula, casco, monograma
+ *
+ * Basado en el ejemplo de Motion `js-three-orbit` (usuario, 2026-10-07):
+ * entorno procedural como mapa de reflejos, metal pulido y giro con inercia.
  *
  * Decisiones:
- * - Los reflejos salen de paneles de luz (`Lightformer`) generados en la
- *   tarjeta gráfica, sin descargar imágenes HDR (la planta puede no
- *   tener internet estable). El entorno se dibuja una sola vez.
+ * - Los reflejos salen de un entorno dibujado por un shader en la tarjeta
+ *   gráfica, sin descargar imágenes HDR (la planta puede no tener
+ *   internet estable). Se captura una sola vez.
  * - La animación vive en `useFrame`, FUERA de React: mover refs 60 veces
  *   por segundo no provoca renders.
  */
 
-import { Environment, Lightformer, PerformanceMonitor } from '@react-three/drei'
+import { Environment, PerformanceMonitor } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { MathUtils, type Group } from 'three'
 
+import { EntornoPlanta } from './EntornoPlanta'
 import { EscenaDelTema, type Colores, type TemaEscena } from './escenas'
+import { GiroContexto, useArrastreConInercia, useGiro, type Giro } from './giro'
 
 /** Inclinación máxima del conjunto hacia el puntero, en radianes (~14°). */
 const INCLINACION_MAXIMA = 0.25
@@ -62,12 +69,16 @@ interface ConjuntoProps {
 }
 
 /** Toda la escena se inclina un poco hacia el puntero, como si siguiera la mirada. */
-function Conjunto({ tema, colores, animar, puntero }: ConjuntoProps) {
+function Conjunto({ tema, colores, animar, puntero, giro }: ConjuntoProps & { giro: Giro }) {
   const conjunto = useRef<Group>(null)
   const { viewport } = useThree()
 
   useFrame((_, delta) => {
     if (!animar || !conjunto.current) return
+    // Inercia: después de soltar, el impulso sigue girando las piezas mientras Motion lo frena.
+    // Igual que el ejemplo, el paso se acota a 0,05 s: al volver de otra pestaña no da un salto.
+    const impulso = giro.impulso.get()
+    if (!giro.arrastrando.actual && impulso !== 0) giro.angulo.set(giro.angulo.get() + impulso * Math.min(delta, 0.05))
     // damp depende del tiempo, no de los cuadros: igual a 60 Hz que a 144 Hz.
     const objetivoX = -puntero.current.y * INCLINACION_MAXIMA
     const objetivoY = puntero.current.x * INCLINACION_MAXIMA
@@ -96,10 +107,14 @@ export interface Escena3DProps {
   visible: boolean
   /** Se llama cuando el lienzo está listo, para aparecerlo con un fundido. */
   alEstarLista: () => void
+  /** El contenedor de la figura: donde se puede agarrar para girarla (su padre recibe el arrastre). */
+  zona: HTMLElement | null
 }
 
-export default function Escena3D({ tema, colores, animar, visible, alEstarLista }: Escena3DProps) {
+export default function Escena3D({ tema, colores, animar, visible, alEstarLista, zona }: Escena3DProps) {
   const puntero = usePunteroVentana()
+  const giro = useGiro()
+  useArrastreConInercia(giro, zona, animar && visible)
   // Más de 1,5× no se nota en piezas pequeñas y cuesta el doble de píxeles.
   const [dpr, setDpr] = useState(() => Math.min(window.devicePixelRatio, 1.5))
 
@@ -126,15 +141,19 @@ export default function Escena3D({ tema, colores, animar, visible, alEstarLista 
       <directionalLight position={[4, 5, 6]} intensity={1.6} />
       <ambientLight intensity={0.4} />
 
-      <Environment resolution={256} frames={1}>
-        <color attach="background" args={[colores.fondo]} />
-        <Lightformer form="rect" intensity={4} position={[0, 5, -3]} scale={[12, 2, 1]} />
-        <Lightformer form="rect" intensity={2.5} position={[-5, 1, 0]} scale={[10, 1.5, 1]} />
-        <Lightformer form="rect" intensity={2.5} position={[5, 2, 1]} scale={[10, 1, 1]} />
-        <Lightformer form="ring" intensity={3} color={colores.acento} position={[3, -1, 4]} scale={3} />
+      {/*
+        Reflejos: la nave de planta procedural (EntornoPlanta), capturada una
+        sola vez en un cubo, como el cielo del ejemplo de Motion. La clave lo
+        vuelve a capturar al cambiar de tema (cambian los colores).
+      */}
+      {/* 256 px por cara: los reflejos son difusos y a 512 costaba 4 veces más (se nota en la tablet de piso). */}
+      <Environment key={`${colores.fondo}${colores.marca}`} resolution={256} frames={1}>
+        <EntornoPlanta colores={colores} />
       </Environment>
 
-      <Conjunto tema={tema} colores={colores} animar={animar} puntero={puntero} />
+      <GiroContexto.Provider value={giro}>
+        <Conjunto tema={tema} colores={colores} animar={animar} puntero={puntero} giro={giro} />
+      </GiroContexto.Provider>
     </Canvas>
   )
 }

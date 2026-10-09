@@ -9,6 +9,18 @@
  *   /remisiones/:id          detalle + acciones de flujo
  *   /remisiones/:id/editar   corregir datos (BORRADOR / EN_RECTIFICACION)
  *   /mfr/tv                  modo TV del tablero MFR (pantalla completa, SIN el layout)
+ *   /mfr/programacion        programación del día (solo lo editable: bloques, personal, cierre de turno)
+ *   /tableros/…              UN TABLERO POR INDICADOR, aparte de los formularios (usuario, 2026-10-06):
+ *     mfr                    cumplimiento del día contra el DPP (antes /mfr)
+ *     fr, otif               FR y OTIF
+ *     ritmo                  ritmo del personal por hora
+ *     pt                     PT con más y menos producción
+ *     productividad          cajas por persona-hora
+ *     averias-fabricado      averías vs lo fabricado
+ *     averias-limite         averías contra el DPP, límite del 1 % (antes pestaña de Averías)
+ *     alertas-inventario     alertas de inventario (antes /inventario/alertas)
+ *     metas-personal         metas y personal del día (antes dentro de la programación)
+ *   /mfr, /mfr/indicadores, /inventario/alertas  redirigen a su tablero conservando ?fecha=
  *   /admin/usuarios          administración
  *   /admin/pesos             pesos por caja en lote (estándar del MFR)
  *   /admin/causales          causales de avería (lista del formulario)
@@ -18,7 +30,6 @@
  *   /averias/:id             detalle con fotos; corregir / anular (administrador)
  *   /inventario              UN SOLO MÓDULO (pestañas, `InventarioLayout`):
  *     (índice)               existencias de insumos, PI y PT; registrar movimiento
- *     /alertas               alertas del día: sin receta, agotado, no alcanza para el DPP…
  *     /cierre                cierre del día: conteo físico de los materiales de las recetas y su merma
  *     /entradas              entradas de mercancía (listado; /nueva formulario; /:id detalle)
  *     /pt                    catálogo de PT (tabla `producto`; antes /admin/productos)
@@ -36,7 +47,6 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { CausalesPage } from '../modules/admin/pages/CausalesPage'
 import { CorreosPage } from '../modules/correo/pages/CorreosPage'
 import { GruposPage } from '../modules/admin/pages/GruposPage'
-import { AlertasPage } from '../modules/inventario/pages/AlertasPage'
 import { CierrePage } from '../modules/inventario/pages/CierrePage'
 import { InventarioPage } from '../modules/inventario/pages/InventarioPage'
 import { EntradaDetallePage } from '../modules/inventario/pages/EntradaDetallePage'
@@ -53,6 +63,18 @@ import { LineasPage } from '../modules/admin/pages/LineasPage'
 import { PesosPage } from '../modules/admin/pages/PesosPage'
 import { ProductosPage } from '../modules/inventario/pages/ProductosPage'
 import { ProgramacionPage } from '../modules/mfr/pages/ProgramacionPage'
+import { TableroAlertasInventarioPage } from '../modules/tableros/pages/TableroAlertasInventarioPage'
+import { TableroAveriasLimitePage } from '../modules/tableros/pages/TableroAveriasLimitePage'
+import { TableroMetasPersonalPage } from '../modules/tableros/pages/TableroMetasPersonalPage'
+import { TableroRitmoPage } from '../modules/tableros/pages/TableroRitmoPage'
+import {
+  TableroAveriasFabricadoPage,
+  TableroFrPage,
+  TableroOtifPage,
+  TableroProductividadPage,
+  TableroPtPage,
+} from '../modules/tableros/pages/TablerosIndicadores'
+import { RedirigirConConsulta } from './RedirigirConConsulta'
 import { TableroMfrPage } from '../modules/mfr/pages/TableroMfrPage'
 import { TableroTvPage } from '../modules/mfr/pages/TableroTvPage'
 import { UsuariosPage } from '../modules/admin/pages/UsuariosPage'
@@ -80,8 +102,22 @@ export const router = createBrowserRouter([
           { path: 'remisiones/nueva', element: <CrearRemisionPage /> },
           { path: 'remisiones/:id', element: <RemisionDetallePage /> },
           { path: 'remisiones/:id/editar', element: <EditarRemisionPage /> },
-          { path: 'mfr', element: <TableroMfrPage /> },
           { path: 'mfr/programacion', element: <ProgramacionPage /> },
+          // Tableros: uno por indicador (usuario, 2026-10-06).
+          { path: 'tableros/mfr', element: <TableroMfrPage /> },
+          { path: 'tableros/fr', element: <TableroFrPage /> },
+          { path: 'tableros/otif', element: <TableroOtifPage /> },
+          { path: 'tableros/ritmo', element: <TableroRitmoPage /> },
+          { path: 'tableros/pt', element: <TableroPtPage /> },
+          { path: 'tableros/productividad', element: <TableroProductividadPage /> },
+          { path: 'tableros/averias-fabricado', element: <TableroAveriasFabricadoPage /> },
+          { path: 'tableros/averias-limite', element: <TableroAveriasLimitePage /> },
+          { path: 'tableros/alertas-inventario', element: <TableroAlertasInventarioPage /> },
+          { path: 'tableros/metas-personal', element: <TableroMetasPersonalPage /> },
+          { path: 'tableros', element: <Navigate to="/tableros/mfr" replace /> },
+          // Rutas anteriores de los tableros.
+          { path: 'mfr', element: <RedirigirConConsulta a="/tableros/mfr" /> },
+          { path: 'mfr/indicadores', element: <RedirigirConConsulta a="/tableros/fr" /> },
           // Ruta anterior de "configurar turno": ahora vive en la programación del día.
           { path: 'mfr/turno', element: <Navigate to="/mfr/programacion" replace /> },
           { path: 'averias', element: <AveriasListaPage /> },
@@ -93,7 +129,8 @@ export const router = createBrowserRouter([
             element: <InventarioLayout />,
             children: [
               { index: true, element: <InventarioPage /> },
-              { path: 'alertas', element: <AlertasPage /> },
+              // Las alertas pasaron a ser un tablero (usuario, 2026-10-06).
+              { path: 'alertas', element: <RedirigirConConsulta a="/tableros/alertas-inventario" /> },
               { path: 'cierre', element: <CierrePage /> },
               { path: 'entradas', element: <EntradasPage /> },
               { path: 'entradas/nueva', element: <NuevaEntradaPage /> },

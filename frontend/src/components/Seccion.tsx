@@ -29,7 +29,7 @@ export function Seccion({ titulo, contador, descripcion, accion, tono = 'marca',
           <div className="min-w-0">
             <h2 className="flex items-baseline gap-2 text-lg font-black tracking-tight text-tinta">
               {titulo}
-              {contador !== undefined && <span className="cifra text-base font-bold text-tinta-suave">{contador}</span>}
+              {contador !== undefined && <span className="cifra text-[1rem] font-bold text-tinta-suave">{contador}</span>}
             </h2>
             {descripcion && <p className="mt-0.5 max-w-3xl text-sm text-tinta-suave">{descripcion}</p>}
           </div>

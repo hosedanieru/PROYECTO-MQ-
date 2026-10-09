@@ -11,7 +11,10 @@
  * sin quitar nada y sin barra de desplazamiento. Para que quepa, los
  * enlaces que van juntos se agrupan en un menú desplegable:
  *
- *   Inicio · Remisiones · Producción ▾ · Averías · Inventario · Administración ▾
+ *   Inicio · Remisiones · Programación · Averías · Inventario · Tableros ▾ · Administración ▾
+ *
+ * (2026-10-06: "Producción ▾" se deshizo; el tablero MFR y los
+ * indicadores pasaron a "Tableros ▾", uno por indicador.)
  *
  * Solo aparecen los módulos que existen. Un módulo nuevo se agrega aquí
  * (suelto o dentro de un grupo) y aparece en el menú sin tocar ningún
@@ -27,14 +30,16 @@ import type { ClaveTexto } from '../../shared/idioma/textos/es'
 import {
   IconoAveria,
   IconoBalanza,
+  IconoCaja,
   IconoCalendario,
+  IconoIndicadores,
   IconoInicio,
   IconoInventario,
   IconoLinea,
   IconoCorreo,
   IconoLista,
   IconoPersonas,
-  IconoPlanta,
+  IconoReloj,
   IconoRemision,
   IconoTablero,
   IconoUsuario,
@@ -68,19 +73,30 @@ export type ElementoNav = { enlace: EnlaceNav } | { grupo: GrupoNav }
 export const NAVEGACION: ElementoNav[] = [
   { enlace: { a: '/', texto: 'nav.inicio', Icono: IconoInicio, exacta: true } },
   { enlace: { a: '/remisiones', texto: 'nav.remisiones', permiso: 'remision.consultar', Icono: IconoRemision } },
-  {
-    grupo: {
-      texto: 'nav.produccion',
-      Icono: IconoPlanta,
-      enlaces: [
-        { a: '/mfr', texto: 'nav.mfr', permiso: 'mfr.consultar', Icono: IconoTablero, exacta: true },
-        { a: '/mfr/programacion', texto: 'nav.programacion', permiso: 'mfr.consultar', Icono: IconoCalendario },
-      ],
-    },
-  },
+  // Solo lo editable del día: bloques, personal, cierre de turno (los tableros salieron a "Tableros", 2026-10-06).
+  { enlace: { a: '/mfr/programacion', texto: 'nav.programacion', permiso: 'mfr.consultar', Icono: IconoCalendario } },
   { enlace: { a: '/averias', texto: 'nav.averias', permiso: 'averia.consultar', Icono: IconoAveria } },
   // Un solo módulo (2026-09-29): productos, PI, insumos, entradas y existencias van en pestañas adentro.
   { enlace: { a: '/inventario', texto: 'nav.inventario', permiso: 'inventario.consultar', Icono: IconoInventario } },
+  {
+    // Un tablero por indicador, aparte de las pantallas con formularios (usuario, 2026-10-06).
+    grupo: {
+      texto: 'nav.tableros',
+      Icono: IconoIndicadores,
+      enlaces: [
+        { a: '/tableros/mfr', texto: 'nav.mfr', permiso: 'mfr.consultar', Icono: IconoTablero },
+        { a: '/tableros/fr', texto: 'nav.fr', permiso: 'mfr.consultar', Icono: IconoIndicadores },
+        { a: '/tableros/otif', texto: 'nav.otif', permiso: 'mfr.consultar', Icono: IconoRemision },
+        { a: '/tableros/ritmo', texto: 'nav.ritmo', permiso: 'mfr.consultar', Icono: IconoReloj },
+        { a: '/tableros/pt', texto: 'nav.produccionPt', permiso: 'mfr.consultar', Icono: IconoCaja },
+        { a: '/tableros/productividad', texto: 'nav.productividad', permiso: 'mfr.consultar', Icono: IconoPersonas },
+        { a: '/tableros/metas-personal', texto: 'nav.metasPersonal', permiso: 'mfr.consultar', Icono: IconoCalendario },
+        { a: '/tableros/averias-fabricado', texto: 'nav.averiasFabricado', permiso: 'mfr.consultar', Icono: IconoAveria },
+        { a: '/tableros/averias-limite', texto: 'nav.averiasLimite', permiso: 'averia.consultar', Icono: IconoAveria },
+        { a: '/tableros/alertas-inventario', texto: 'nav.alertasInventario', permiso: 'inventario.consultar', Icono: IconoInventario },
+      ],
+    },
+  },
   {
     grupo: {
       texto: 'nav.administracion',

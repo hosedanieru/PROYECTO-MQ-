@@ -247,6 +247,17 @@ Pedido del usuario: "modelar MFR, FR, OTIF, cantidad de averías vs lo fabricado
 
 **Orden acordado:** Fase 1, lo que no necesita la línea (FR, OTIF, averías vs fabricado, ranking de PT, ritmo y productividad por turno). Fase 2, la línea en la remisión (con bocetos del formulario antes). Fase 3, todo lo de por línea.
 
+### Fase 1 — implementada (2026-10-06)
+
+- **Dominio (funciones puras):** `domain/mfr/indicadores-produccion.ts` (`calcularFr`, `calcularOtif`, `calcularRankingPt`, `calcularAveriasVsFabricado`, `calcularProductividad`, `instanteOperativo`) y `domain/mfr/ritmo-produccion.ts` (`calcularRitmo`, `esperadoHasta`, `estadoRitmo`, `TOLERANCIA_RITMO_PORCENTAJE = 5`). 41 pruebas con los casos borde: día sin DPP, SKU en varios bloques (límite = fin del último), remisión fuera del DPP, turno sin asistencia, extraoficiales, aprobación tardía o justo en la hora límite, T3 que cruza la medianoche, turno que no ha empezado o que ya terminó.
+- **Casos de uso:** `application/mfr/indicadores-produccion.use-case.ts` (`IndicadoresPeriodoUseCase`, `RitmoDiaUseCase`), con su prueba. **No hay datos nuevos en la base**: todo sale de bloques, remisiones (hora de creación y de aprobación), reportes de averías y asistencia.
+- **API:** `GET /mfr/indicadores?desde=&hasta=` y `GET /mfr/ritmo?fecha=` (`mfr.consultar`).
+- **Pantallas — un tablero por indicador (decisión del usuario, 2026-10-06), menú Tableros ▾** (`frontend/src/modules/tableros/`): `/tableros/mfr` (el tablero MFR de antes), `/tableros/fr`, `/tableros/otif`, `/tableros/ritmo` (curva acumulada con franja ±5 %; el día en curso se refresca cada 10 s), `/tableros/pt` (más y menos producción + todos con barra), `/tableros/productividad` (por turno y grupo; avisa las cajas de turnos sin asistencia), `/tableros/averias-fabricado`, `/tableros/averias-limite` (el indicador del 1 % que estaba en Averías), `/tableros/alertas-inventario` (antes pestaña de Inventario) y `/tableros/metas-personal` (metas por turno y línea + personal, antes dentro de Programación). Periodo Día / 7 días / Mes (el mes va del día 1 a la fecha elegida) y fecha en la URL (`usePeriodoTablero`). Rutas viejas redirigen conservando la consulta: `/mfr` y `/mfr/indicadores` → `/tableros/mfr`; `/inventario/alertas` → `/tableros/alertas-inventario`; `/tableros` → `/tableros/mfr`.
+- **Criterios confirmados por el usuario (2026-10-07):**
+  1. En "averías vs lo fabricado" las remisiones **extraoficiales sí cuentan como fabricadas**, pero **se identifican aparte en las estadísticas**: `MedidaFabricado.extraoficialUnidades` (parte de `fabricadoUnidades`, en el total y en cada corte) y, en pantalla, barra apilada de tres colores (`BarraFabricado`: fabricado en azul, extraoficial en morado `--acento` —el mismo de "Emergencia" en el tablero MFR—, averiado en rojo) con leyenda, y la cifra "Extraoficiales" en la banda del tablero.
+  2. La productividad **solo toma los turnos con asistencia registrada**; las cajas de los demás se informan aparte.
+  3. En el ranking, el "producido" es **lo aprobado** (como el MFR); el ritmo usa **lo creado**.
+
 **Confirmado por el usuario (2026-10-06, "sí a las tres"):**
 1. Ritmo: cuentan **todas las remisiones creadas, en cualquier estado, sin las extraoficiales** (el ritmo mide producción; la aprobación llega después).
 2. Ranking "el de menos producción": **entre todos los PT programados del periodo, incluidos los que sacaron 0**.

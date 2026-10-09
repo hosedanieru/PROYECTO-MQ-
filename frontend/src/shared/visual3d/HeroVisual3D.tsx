@@ -11,11 +11,14 @@
  * - si el navegador no tiene WebGL (equipo viejo): no aparece, nada se rompe.
  *
  * Con "reducir movimiento" activado en el sistema, la figura queda quieta.
- * Fuera de pantalla se pausa. Es decoración pura: `aria-hidden` y sin
- * eventos, para no estorbar a un lector de pantalla ni a un clic.
+ * Fuera de pantalla se pausa. Es decoración: `aria-hidden` y sin eventos
+ * propios, para no estorbar a un lector de pantalla ni a un clic. Aun así
+ * se puede agarrar y girar con inercia: la escena escucha a su
+ * contenedor padre (la banda) y solo toma los toques que no caen sobre un
+ * botón, un enlace o un texto (ver `giro.ts`).
  */
 
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 // Solo el tipo: se borra al compilar y no arrastra three al archivo principal.
 import type { TemaEscena } from './escenas'
@@ -91,25 +94,25 @@ export function HeroVisual3D({ tema = 'empaque', className = '' }: Props) {
   const pantallaAmplia = useConsultaMedia('(min-width: 640px)')
   const menosMovimiento = useConsultaMedia('(prefers-reduced-motion: reduce)')
   const colores = useColoresFigura()
-  const contenedor = useRef<HTMLDivElement>(null)
+  // En estado (no en ref): la escena se carga después y necesita recibir el elemento ya montado.
+  const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(true)
   const [lista, setLista] = useState(false)
 
   const dibujar = pantallaAmplia && hayWebGL()
 
   useEffect(() => {
-    const nodo = contenedor.current
-    if (!nodo) return
+    if (!contenedor) return
     const observador = new IntersectionObserver(([entrada]) => setVisible(entrada.isIntersecting))
-    observador.observe(nodo)
+    observador.observe(contenedor)
     return () => observador.disconnect()
-  }, [dibujar])
+  }, [contenedor])
 
   if (!dibujar) return null
 
   return (
     <div
-      ref={contenedor}
+      ref={setContenedor}
       aria-hidden="true"
       className={`pointer-events-none transition-opacity duration-1000 ${lista ? 'opacity-100' : 'opacity-0'} ${className}`}
     >
@@ -120,6 +123,7 @@ export function HeroVisual3D({ tema = 'empaque', className = '' }: Props) {
           animar={!menosMovimiento}
           visible={visible}
           alEstarLista={() => setLista(true)}
+          zona={contenedor}
         />
       </Suspense>
     </div>

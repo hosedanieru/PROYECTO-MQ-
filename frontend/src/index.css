@@ -17,6 +17,13 @@
  * el color: así el cambio de tema es inmediato, sin recompilar y sin
  * duplicar una sola clase en las pantallas.
  *
+ * TRAMPA (encontrada el 2026-10-06): como existe el color `base`, la clase
+ * `text-base` NO es solo tamaño de letra: también pinta el texto con el
+ * blanco de `--base`. Si se usa sin otro color (`text-tinta`…), el texto
+ * queda invisible sobre fondo claro (pasó con los títulos de PestanasVista
+ * y con la columna de cajas del listado de remisiones). Para 16 px usar
+ * `text-[1rem]`.
+ *
  * REGLA: ninguna pantalla escribe un color en crudo (`bg-[#1d4ed8]`) ni
  * usa la paleta de Tailwind (`bg-blue-600`, `text-slate-500`). Si falta
  * un color, se agrega aquí. Un color escrito a mano queda ilegible en

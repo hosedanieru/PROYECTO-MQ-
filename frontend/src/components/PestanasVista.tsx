@@ -37,7 +37,13 @@ interface Props<T extends string> {
  * URL, `?vista=`, como los filtros).
  */
 /** Columnas en pantalla mediana según cuántas vistas hay: con 2 o 3 pestañas no queda espacio vacío. */
-const COLUMNAS: Record<number, string> = { 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }
+const COLUMNAS: Record<number, string> = {
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  // Cinco no caben en una fila de tablet: 3 + 2 en pantalla mediana, las 5 juntas desde 1280 px.
+  5: 'md:grid-cols-3 xl:grid-cols-5',
+}
 
 export function PestanasVista<T extends string>({ opciones, activa, cambiar, etiqueta }: Props<T>) {
   return (
@@ -69,7 +75,8 @@ export function PestanasVista<T extends string>({ opciones, activa, cambiar, eti
               <Icono className="h-6 w-6" />
             </span>
             <span className="min-w-0">
-              <span className="block text-base font-black tracking-tight sm:text-lg">{titulo}</span>
+              {/* text-[1rem] y no text-base: `text-base` aquí pinta de blanco (ver la nota en index.css). */}
+              <span className="block text-[1rem] font-black tracking-tight sm:text-lg">{titulo}</span>
               {resumen && (
                 <span className="flex items-center gap-1.5 truncate text-xs font-medium text-tinta-suave">
                   {tono && (

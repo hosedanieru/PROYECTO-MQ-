@@ -33,7 +33,7 @@ export function AvisosDia({ avisos }: { avisos: Aviso[] }) {
               aria-hidden="true"
             />
             <span className="min-w-0 flex-1">
-              <span className="block text-base font-bold text-tinta">{aviso.titulo}</span>
+              <span className="block text-[1rem] font-bold text-tinta">{aviso.titulo}</span>
               <span className="mt-0.5 block text-sm leading-relaxed text-tinta-suave">{aviso.texto}</span>
             </span>
             {aviso.a && (

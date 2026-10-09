@@ -117,7 +117,7 @@ export function FilaRegistro({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {etiqueta}
           {/* Inactivo: título en gris de texto secundario (no con transparencia, que bajaría el contraste por debajo de 4,5:1). */}
-          <span className={`text-base font-bold leading-snug ${apagada ? 'text-tinta-suave line-through decoration-1' : 'text-tinta'}`}>
+          <span className={`text-[1rem] font-bold leading-snug ${apagada ? 'text-tinta-suave line-through decoration-1' : 'text-tinta'}`}>
             {titulo}
           </span>
         </div>

@@ -334,7 +334,8 @@ export function RemisionesListaPage() {
                 <div className="codigo text-xs text-tinta-suave">{r.producto.codigo}</div>
                 <div className="max-w-xs truncate font-medium">{r.producto.descripcion}</div>
               </Celda>
-              <Celda derecha className="text-base font-bold">
+              {/* text-[1rem] y no text-base: `text-base` pinta de blanco (ver la nota en index.css). */}
+              <Celda derecha className="text-[1rem] font-bold text-tinta">
                 {miles(r.cantidadCajas)}
               </Celda>
               <Celda derecha>{miles(r.cantidadUnidades)}</Celda>

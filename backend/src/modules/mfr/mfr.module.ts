@@ -18,6 +18,8 @@ import {
   CrearLineaUseCase,
 } from '../../application/mfr/catalogos-mfr.use-cases.js';
 import { IndicadoresDiaUseCase } from '../../application/mfr/indicadores-dia.use-case.js';
+import { IndicadoresPeriodoUseCase, RitmoDiaUseCase } from '../../application/mfr/indicadores-produccion.use-case.js';
+import { REPORTE_AVERIA_REPOSITORY, type ReporteAveriaRepository } from '../../domain/averia/reporte-averia.js';
 import { RELOJ, type Reloj } from '../../application/remision/crear-remision.use-case.js';
 import { CATALOGO_REPOSITORY, type CatalogoRepository } from '../../domain/catalogo/catalogo.repository.js';
 import { GRUPO_REPOSITORY, type GrupoRepository } from '../../domain/grupo/grupo.repository.js';
@@ -60,6 +62,22 @@ import { MfrController } from './mfr.controller.js';
         r: RemisionRepository, cat: CatalogoRepository, a: AsistenciaRepository, g: GrupoRepository, asig: AsignacionRepository,
         aj: AjusteEsperadasRepository,
       ) => new IndicadoresDiaUseCase(b, l, e, h, r, cat, a, g, asig, aj),
+    },
+    {
+      provide: IndicadoresPeriodoUseCase,
+      inject: [
+        BLOQUE_REPOSITORY, REMISION_REPOSITORY, REPORTE_AVERIA_REPOSITORY, ASISTENCIA_REPOSITORY,
+        HORARIO_REPOSITORY, PRODUCTO_REPOSITORY, CATALOGO_REPOSITORY, GRUPO_REPOSITORY,
+      ],
+      useFactory: (
+        b: BloqueRepository, r: RemisionRepository, av: ReporteAveriaRepository, a: AsistenciaRepository,
+        h: HorarioRepository, p: ProductoRepository, cat: CatalogoRepository, g: GrupoRepository,
+      ) => new IndicadoresPeriodoUseCase(b, r, av, a, h, p, cat, g),
+    },
+    {
+      provide: RitmoDiaUseCase,
+      inject: [BLOQUE_REPOSITORY, REMISION_REPOSITORY, CATALOGO_REPOSITORY, RELOJ],
+      useFactory: (b: BloqueRepository, r: RemisionRepository, cat: CatalogoRepository, reloj: Reloj) => new RitmoDiaUseCase(b, r, cat, reloj),
     },
     {
       provide: RegistrarAsistenciaUseCase,

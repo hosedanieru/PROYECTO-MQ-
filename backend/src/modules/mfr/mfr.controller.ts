@@ -3,6 +3,8 @@
  * ===============
  *
  *   GET    /mfr/dia?fecha=YYYY-MM-DD        mfr.consultar             tablero del día (bloques, MFR, turnos, líneas, horario)
+ *   GET    /mfr/indicadores?desde=&hasta=   mfr.consultar             FR, OTIF, averías vs lo fabricado, ranking de PT y productividad del periodo
+ *   GET    /mfr/ritmo?fecha=                mfr.consultar             ritmo por hora del día: adelantado / en línea / retrasado, por turno
  *   GET    /mfr/bloques?fecha=              mfr.consultar             bloques del día con Mx/T/kg calculados
  *   PUT    /mfr/bloques                     mfr.cargar_programacion   crea o corrige un bloque (corregir exige motivo)
  *   DELETE /mfr/bloques/:id                 mfr.cargar_programacion   { motivo }
@@ -65,6 +67,7 @@ import {
 import { AsignarGrupoLineaUseCase, QuitarAsignacionUseCase } from '../../application/mfr/asignacion.use-cases.js';
 import { AjustarEsperadasUseCase, RegistrarAsistenciaUseCase } from '../../application/mfr/asistencia.use-case.js';
 import { IndicadoresDiaUseCase } from '../../application/mfr/indicadores-dia.use-case.js';
+import { IndicadoresPeriodoUseCase, RitmoDiaUseCase } from '../../application/mfr/indicadores-produccion.use-case.js';
 import { consecutivoResumen, type ResumenTurno } from '../../domain/resumen/resumen-turno.js';
 import {
   ASIGNACION_REPOSITORY,
@@ -135,6 +138,8 @@ const presentarAsignacion = (a: AsignacionLinea) => presentarConFecha(a);
 export class MfrController {
   constructor(
     private readonly indicadoresDia: IndicadoresDiaUseCase,
+    private readonly indicadoresPeriodo: IndicadoresPeriodoUseCase,
+    private readonly ritmoDia: RitmoDiaUseCase,
     private readonly guardarBloque: GuardarBloqueUseCase,
     private readonly eliminarBloque: EliminarBloqueUseCase,
     private readonly cargarDia: CargarDiaUseCase,
@@ -164,6 +169,20 @@ export class MfrController {
   async dia(@Query('fecha') f?: string) {
     const tablero = await this.indicadoresDia.ejecutar(fecha(f));
     return { ...tablero, fechaOperativa: tablero.fechaOperativa.toISOString().slice(0, 10) };
+  }
+
+  // ---------- Indicadores de producción (Ciclo 2, fase 1) ----------
+
+  @Get('indicadores')
+  @RequierePermisos('mfr.consultar')
+  async indicadores(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.indicadoresPeriodo.ejecutar(fecha(desde), fecha(hasta));
+  }
+
+  @Get('ritmo')
+  @RequierePermisos('mfr.consultar')
+  async ritmo(@Query('fecha') f?: string) {
+    return this.ritmoDia.ejecutar(fecha(f));
   }
 
   // ---------- Bloques ----------

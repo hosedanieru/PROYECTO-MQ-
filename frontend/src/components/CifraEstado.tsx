@@ -24,7 +24,11 @@ interface Props {
    * la banda oscura de `EncabezadoPagina`.
    */
   variante?: Variante
+  /** Cómo escribir el número. Por defecto, entero con separador de miles; los indicadores con decimales pasan el suyo. */
+  formato?: (n: number) => string
 }
+
+const ENTERO = (n: number) => miles(Math.round(n))
 
 const ANILLO_ACTIVO: Record<TonoBadge, string> = {
   neutro: 'ring-neutro',
@@ -54,8 +58,9 @@ export function CifraEstado({
   activo = false,
   detalle,
   variante = 'tarjeta',
+  formato = ENTERO,
 }: Props) {
-  const cifra = useConteo(valor ?? 0, (n) => miles(Math.round(n)))
+  const cifra = useConteo(valor ?? 0, formato)
   const color = COLOR_TONO[tono]
   const proporcion = valor !== null && total ? Math.min(100, (valor / total) * 100) : null
   const vidrio = variante === 'vidrio'
@@ -82,7 +87,7 @@ export function CifraEstado({
         ref={valor === null ? undefined : cifra}
         className={`cifra text-3xl font-black leading-none sm:text-4xl ${vidrio ? 'text-white' : 'text-tinta'}`}
       >
-        {valor === null ? '—' : miles(valor)}
+        {valor === null ? '—' : formato(valor)}
       </span>
       <span
         className={`mt-2 truncate text-xs font-bold uppercase tracking-wider ${vidrio ? 'text-white/90' : 'text-tinta-suave'}`}

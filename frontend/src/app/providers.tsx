@@ -1,6 +1,7 @@
 /**
  * Proveedores globales, de afuera hacia adentro:
- *   Idioma       español / inglés (va primero: cualquiera puede pedir un texto)
+ *   Motion       configuración de las animaciones (respeta "reducir movimiento")
+ *   Idioma       español / inglés (cualquiera puede pedir un texto)
  *   Tema         claro / oscuro
  *   QueryClient  caché de peticiones (TanStack Query)
  *   Sesión       usuario actual y permisos
@@ -11,6 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
 
 import { SesionProvider } from '../modules/auth/SesionContext'
+import { MotionConfig } from '../shared/animacion/movimiento'
 import { IdiomaProvider } from '../shared/idioma/IdiomaProvider'
 import { REFRESCO_NORMAL } from '../shared/refresco'
 import { TemaProvider } from '../shared/tema/TemaProvider'
@@ -40,14 +42,17 @@ const queryClient = new QueryClient({
 
 export function Providers() {
   return (
-    <IdiomaProvider>
-      <TemaProvider>
-        <QueryClientProvider client={queryClient}>
-          <SesionProvider>
-            <RouterProvider router={router} />
-          </SesionProvider>
-        </QueryClientProvider>
-      </TemaProvider>
-    </IdiomaProvider>
+    // Motion respeta "reducir movimiento" del sistema: sin animaciones de transformación, el dato aparece de una.
+    <MotionConfig reducedMotion="user">
+      <IdiomaProvider>
+        <TemaProvider>
+          <QueryClientProvider client={queryClient}>
+            <SesionProvider>
+              <RouterProvider router={router} />
+            </SesionProvider>
+          </QueryClientProvider>
+        </TemaProvider>
+      </IdiomaProvider>
+    </MotionConfig>
   )
 }

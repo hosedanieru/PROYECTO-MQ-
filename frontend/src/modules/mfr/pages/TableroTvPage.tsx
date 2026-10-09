@@ -83,7 +83,7 @@ export function TableroTvPage() {
           <Logo variante="claro" />
           <div>
             <p className="text-2xl font-black tracking-tight lg:text-3xl">Cumplimiento del día</p>
-            <p className="text-base text-white/90">Día operativo {fechaCorta(fecha)} · meta {datos?.meta ?? 95} %</p>
+            <p className="text-[1rem] text-white/90">Día operativo {fechaCorta(fecha)} · meta {datos?.meta ?? 95} %</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -97,7 +97,7 @@ export function TableroTvPage() {
             <button type="button" onClick={alternarPantalla} className="vidrio rounded-lg px-3 py-2 text-xs font-semibold">
               {pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
             </button>
-            <Link to="/mfr" className="vidrio rounded-lg px-3 py-2 text-xs font-semibold">
+            <Link to="/tableros/mfr" className="vidrio rounded-lg px-3 py-2 text-xs font-semibold">
               Volver
             </Link>
           </div>

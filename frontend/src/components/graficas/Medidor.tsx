@@ -1,6 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
-
-import { crecerHasta } from '../../shared/animacion/animaciones'
+import { motion, RESORTE_GRAFICA } from '../../shared/animacion/movimiento'
 import { COLOR_TONO, type TonoBadge } from '../Badge'
 
 type Variante = 'tarjeta' | 'vidrio'
@@ -35,8 +33,10 @@ const GIRO_INICIAL = 135
  * sin leer un solo número; el número grande está en el centro para
  * quien sí lo quiere.
  *
- * Mismo truco que `Anillo`: `stroke-dasharray` dibuja N píxeles del
- * trazo y salta el resto; animar `stroke-dashoffset` lo hace crecer.
+ * El arco es un `motion.circle` con `pathLength` (Motion, 2026-10-07):
+ * entra creciendo desde 0 y, cuando el tablero se refresca, un resorte
+ * lo lleva del valor anterior al nuevo SIN volver a cero; si llega otro
+ * dato a mitad de camino, sigue desde donde iba con su velocidad.
  */
 export function Medidor({
   valor,
@@ -47,7 +47,6 @@ export function Medidor({
   variante = 'tarjeta',
   titulo,
 }: Props) {
-  const arco = useRef<SVGCircleElement>(null)
   const vidrio = variante === 'vidrio'
 
   const grosor = Math.max(8, Math.round(tamano / 14))
@@ -56,14 +55,6 @@ export function Medidor({
   const perimetro = 2 * Math.PI * radio
   const recorrido = perimetro * ABERTURA
   const porcion = valor === null ? 0 : Math.min(Math.max(valor, 0), 100) / 100
-  const largo = recorrido * porcion
-
-  useLayoutEffect(() => {
-    const animacion = crecerHasta(arco.current, 'strokeDashoffset', largo, 0)
-    return () => {
-      animacion?.revert()
-    }
-  }, [largo])
 
   // Marca de la meta: un trazo radial que cruza el arco.
   const anguloMeta = meta === undefined ? null : ((GIRO_INICIAL + 360 * ABERTURA * (meta / 100)) * Math.PI) / 180
@@ -88,9 +79,9 @@ export function Medidor({
             strokeLinecap="round"
             strokeDasharray={`${recorrido} ${perimetro}`}
           />
-          {valor !== null && largo > 0 && (
-            <circle
-              ref={arco}
+          {valor !== null && porcion > 0 && (
+            // pathLength va de 0 a 1 sobre la vuelta entera: el arco lleno (270°) es ABERTURA.
+            <motion.circle
               cx={centro}
               cy={centro}
               r={radio}
@@ -98,8 +89,9 @@ export function Medidor({
               stroke={color}
               strokeWidth={grosor}
               strokeLinecap="round"
-              strokeDasharray={`${largo} ${perimetro}`}
-              strokeDashoffset={0}
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: ABERTURA * porcion }}
+              transition={RESORTE_GRAFICA}
               style={{ filter: vidrio ? `drop-shadow(0 0 10px ${color})` : undefined }}
             />
           )}

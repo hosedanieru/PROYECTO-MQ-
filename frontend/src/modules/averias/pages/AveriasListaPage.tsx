@@ -5,15 +5,12 @@
  * Filtros en la URL (igual que remisiones): se pueden compartir y
  * sobreviven a recargar. Por defecto, los últimos 7 días operativos.
  *
- * Rediseño (usuario, 2026-10-05: fuera las tarjetas, la información se
- * veía saturada): "una vista a la vez", como el tablero MFR. Debajo de
- * los filtros, dos pestañas grandes con su resumen vivo:
+ * Rediseño (usuario, 2026-10-05: fuera las tarjetas): línea de tiempo por
+ * día operativo, con las unidades en grande.
  *
- *   Reportes   línea de tiempo por día operativo, las unidades en grande
- *   Indicador  % de averías contra el DPP, con el máximo de 1 % del
- *              contrato (solo reportes vigentes), y sus desgloses
- *
- * La vista elegida vive en la URL (`?vista=`), como los filtros.
+ * Solo operación (usuario, 2026-10-06): el indicador del 1 % salió a su
+ * tablero (/tableros/averias-limite) para no mezclar estadística con los
+ * reportes y su formulario.
  */
 
 import { Link, useSearchParams } from 'react-router-dom'
@@ -24,27 +21,22 @@ import { Boton } from '../../../components/Boton'
 import { Campo } from '../../../components/Campo'
 import { EncabezadoPagina } from '../../../components/EncabezadoPagina'
 import { EstadoVacio } from '../../../components/EstadoVacio'
-import { IconoAveria, IconoLista, IconoTablero } from '../../../components/Iconos'
+import { IconoAveria } from '../../../components/Iconos'
 import { LineaTiempo, type GrupoTiempo } from '../../../components/LineaTiempo'
 import { MetaDato } from '../../../components/ListaRegistros'
 import { PantallaCargando } from '../../../components/PantallaCargando'
-import { PestanasVista, type OpcionVista } from '../../../components/PestanasVista'
+import { Seccion } from '../../../components/Seccion'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
-import { useAparecer } from '../../../shared/animacion/useAnimacion'
 import type { EstadoReporteAveria, FiltroAverias } from '../../../shared/types/averia'
 import { agruparEnOrden } from '../../../shared/utils/agrupar'
 import { diaLargo, fechaOperativaDe, hora } from '../../../shared/utils/fechas'
-import { miles, porcentaje } from '../../../shared/utils/numeros'
+import { miles } from '../../../shared/utils/numeros'
 import { useSesion } from '../../auth/useSesion'
 import { useGrupos, useTurnos } from '../../catalogo/hooks/useCatalogos'
-import { IndicadorAverias } from '../components/IndicadorAverias'
-import { useIndicadorAverias, useReportesAveria } from '../hooks/useAverias'
+import { useReportesAveria } from '../hooks/useAverias'
 
 const DIA_MS = 24 * 60 * 60 * 1000
-
-type Vista = 'reportes' | 'indicador'
-const VISTAS: Vista[] = ['reportes', 'indicador']
 
 function leerFiltro(params: URLSearchParams): FiltroAverias {
   const hoy = fechaOperativaDe(new Date())
@@ -61,16 +53,12 @@ function leerFiltro(params: URLSearchParams): FiltroAverias {
 export function AveriasListaPage() {
   const [params, setParams] = useSearchParams()
   const filtro = leerFiltro(params)
-  const vista: Vista = VISTAS.includes(params.get('vista') as Vista) ? (params.get('vista') as Vista) : 'reportes'
   const { tienePermiso } = useSesion()
   const reportes = useReportesAveria(filtro)
-  // El mismo indicador que pinta la vista: aquí solo da el resumen de la pestaña (react-query lo pide una vez).
-  const indicador = useIndicadorAverias(filtro.desde, filtro.hasta)
   const turnos = useTurnos()
   const grupos = useGrupos()
-  const contenido = useAparecer<HTMLDivElement>(vista)
 
-  const cambiar = (clave: keyof FiltroAverias | 'vista', valor: string) => {
+  const cambiar = (clave: keyof FiltroAverias, valor: string) => {
     const siguiente = new URLSearchParams(params)
     if (valor) siguiente.set(clave, valor)
     else siguiente.delete(clave)
@@ -80,23 +68,6 @@ export function AveriasListaPage() {
   const nombreTurno = (id: string) => turnos.data?.find((t) => t.id === id)?.codigo ?? '—'
   const nombreGrupo = (id: string) => grupos.data?.find((g) => g.id === id)?.nombre ?? '—'
   const lista = reportes.data ?? []
-  const total = indicador.data?.total
-
-  const opciones: OpcionVista<Vista>[] = [
-    {
-      clave: 'reportes',
-      titulo: 'Reportes',
-      Icono: IconoLista,
-      resumen: reportes.data ? `${lista.length} en el periodo` : 'Cargando…',
-    },
-    {
-      clave: 'indicador',
-      titulo: 'Indicador del 1 %',
-      Icono: IconoTablero,
-      resumen: total ? `${porcentaje(total.porcentaje, 'sin DPP', 2)} del programado` : 'Cargando…',
-      tono: !total || total.porcentaje === null ? undefined : total.excede ? 'critico' : 'exito',
-    },
-  ]
 
   const gruposReportes: GrupoTiempo[] = agruparEnOrden(lista, (r) => r.fechaOperativa.slice(0, 10)).map(
     (g): GrupoTiempo => ({
@@ -116,7 +87,7 @@ export function AveriasListaPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="cifra text-sm font-bold text-tinta">{hora(r.fechaHoraRegistro)}</span>
                   <Badge tono="marca">{nombreTurno(r.turnoId)}</Badge>
-                  <span className={`text-base font-bold ${anulado ? 'text-tinta-suave line-through decoration-1' : 'text-tinta'}`}>
+                  <span className={`text-[1rem] font-bold ${anulado ? 'text-tinta-suave line-through decoration-1' : 'text-tinta'}`}>
                     {nombreGrupo(r.grupoId)}
                   </span>
                   {anulado && <Badge tono="neutro">Anulado</Badge>}
@@ -165,7 +136,7 @@ export function AveriasListaPage() {
         }
       />
 
-      {/* Filtros: a la vista y sin caja. El indicador mide el periodo completo: turno, grupo y estado solo filtran los reportes. */}
+      {/* Filtros: a la vista y sin caja. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Campo etiqueta="Desde (día operativo)" type="date" value={filtro.desde} onChange={(e) => cambiar('desde', e.target.value)} />
         <Campo etiqueta="Hasta" type="date" value={filtro.hasta} onChange={(e) => cambiar('hasta', e.target.value)} />
@@ -192,31 +163,16 @@ export function AveriasListaPage() {
         </Select>
       </div>
 
-      <PestanasVista opciones={opciones} activa={vista} cambiar={(v) => cambiar('vista', v)} etiqueta="Vistas de averías" />
-
-      <div ref={contenido}>
-        {vista === 'reportes' && (
-          <div data-animar className="space-y-4">
-            {reportes.isError && <Alerta tipo="error">{comoErrorApi(reportes.error).mensaje}</Alerta>}
-            {reportes.isLoading ? (
-              <PantallaCargando />
-            ) : lista.length === 0 ? (
-              <EstadoVacio
-                Icono={IconoAveria}
-                titulo="No hay reportes de averías en este rango"
-                texto="Cambie las fechas o los filtros."
-              />
-            ) : (
-              <LineaTiempo grupos={gruposReportes} />
-            )}
-          </div>
+      <Seccion titulo="Reportes" contador={reportes.data ? lista.length : undefined} tono="alerta">
+        {reportes.isError && <Alerta tipo="error">{comoErrorApi(reportes.error).mensaje}</Alerta>}
+        {reportes.isLoading ? (
+          <PantallaCargando />
+        ) : lista.length === 0 ? (
+          <EstadoVacio Icono={IconoAveria} titulo="No hay reportes de averías en este rango" texto="Cambie las fechas o los filtros." />
+        ) : (
+          <LineaTiempo grupos={gruposReportes} />
         )}
-        {vista === 'indicador' && (
-          <div data-animar>
-            <IndicadorAverias desde={filtro.desde} hasta={filtro.hasta} />
-          </div>
-        )}
-      </div>
+      </Seccion>
     </section>
   )
 }

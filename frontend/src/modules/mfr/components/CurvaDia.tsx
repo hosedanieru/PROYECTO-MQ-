@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { FRENADO_SUAVE, motion } from '../../../shared/animacion/movimiento'
 import { miles } from '../../../shared/utils/numeros'
 
 interface Props {
@@ -105,9 +106,19 @@ export function CurvaDia({ horas, meta, producido }: Props) {
             ) : null,
           )}
 
-          <path d={area} fill="url(#curva-dia-relleno)" />
+          {/* Al entrar: lo producido se traza solo y el área aparece detrás (Motion). */}
+          <motion.path d={area} fill="url(#curva-dia-relleno)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.8 }} />
           <path d={trazo(meta)} fill="none" stroke="var(--color-neutro)" strokeWidth={2} strokeDasharray="5 4" />
-          <path d={trazo(producido)} fill="none" stroke="var(--color-marca)" strokeWidth={2} strokeLinejoin="round" />
+          <motion.path
+            d={trazo(producido)}
+            fill="none"
+            stroke="var(--color-marca)"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.4, ease: [...FRENADO_SUAVE] }}
+          />
 
           {indice !== null && (
             <g pointerEvents="none">

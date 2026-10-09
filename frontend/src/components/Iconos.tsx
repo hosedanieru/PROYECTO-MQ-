@@ -99,6 +99,17 @@ export function IconoTablero(props: Props) {
   )
 }
 
+/** Línea de tendencia que sube con su flecha: indicadores de producción. */
+export function IconoIndicadores(props: Props) {
+  return (
+    <Base {...props}>
+      <path d="M3 20h18" />
+      <path d="m4 16 5-5 4 3 7-7" />
+      <path d="M15 7h5v5" />
+    </Base>
+  )
+}
+
 export function IconoCalendario(props: Props) {
   return (
     <Base {...props}>

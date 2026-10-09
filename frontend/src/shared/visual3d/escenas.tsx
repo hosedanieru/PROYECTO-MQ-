@@ -22,11 +22,14 @@
 
 import { Float } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useRef, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Group } from 'three'
 
+import { animate, motionValue } from '../animacion/movimiento'
+import { GiroContexto } from './giro'
 import { Bolsa, Caja, Estiba } from './piezas/empaque'
 import { MEDIDAS } from './piezas/medidas'
+import { Monograma } from './piezas/monograma'
 import { Sobre, TablaRemision } from './piezas/oficina'
 import { BandaTransportadora, Bascula, Casco, Cono } from './piezas/planta'
 
@@ -63,13 +66,41 @@ interface FlotanteProps {
 
 function Flotante({ posicion, rotacion = [0, 0, 0], escala = 1, giro = 0, ritmo = 1.2, vaiven = 1, animar, children }: FlotanteProps) {
   const pieza = useRef<Group>(null)
+  const entrada = useRef<Group>(null)
+  const vueltasPropias = useRef(0)
+  // La mano (giro con inercia, ver giro.ts). Las piezas grandes (estiba, banda) giran menos.
+  const mano = useContext(GiroContexto)
+  const factorMano = Math.max(0.35, vaiven)
+
+  // Entrada con resorte: la pieza crece desde casi nada girando un cuarto de vuelta.
+  // Sin animación arranca ya llegada (1).
+  const [llegada] = useState(() => motionValue(animar ? 0 : 1))
+  const fondo = posicion[2]
+  useEffect(() => {
+    if (!animar) {
+      llegada.set(1)
+      return
+    }
+    // Las del fondo llegan después: la escena se arma de adelante hacia atrás.
+    const resorte = animate(llegada, 1, { type: 'spring', bounce: 0.38, visualDuration: 0.9, delay: 0.15 + Math.max(0, -fondo) * 0.35 })
+    return () => resorte.stop()
+  }, [animar, llegada, fondo])
+
   useFrame((_, delta) => {
-    if (animar && giro && pieza.current) pieza.current.rotation.y += delta * giro
+    if (!pieza.current || !entrada.current) return
+    if (animar) vueltasPropias.current += delta * giro
+    pieza.current.rotation.y = vueltasPropias.current + (mano ? mano.angulo.get() * factorMano : 0)
+    const p = llegada.get()
+    entrada.current.scale.setScalar(Math.max(0.001, p))
+    entrada.current.rotation.y = (1 - p) * -1.6
   })
+
   return (
     <Float enabled={animar} speed={ritmo} rotationIntensity={0.4 * vaiven} floatIntensity={0.7 * vaiven}>
       <group position={posicion} rotation={rotacion} scale={escala}>
-        <group ref={pieza}>{children}</group>
+        <group ref={entrada}>
+          <group ref={pieza}>{children}</group>
+        </group>
       </group>
     </Float>
   )
@@ -84,16 +115,25 @@ interface EscenaProps {
 function Empaque({ c, m, animar }: EscenaProps) {
   return (
     <>
-      <Flotante posicion={[m * 0.12, 0.15, 0]} rotacion={[0.1, -0.3, -0.22]} escala={1.25} giro={0.18} animar={animar}>
+      {/*
+        La pieza estrella: el monograma cromado, como el logo del ejemplo de Motion.
+        Sin giro propio (de canto no se lee "IN"): mira al frente, se mece y gira solo con la mano.
+        Va en la mitad derecha del lienzo: la banda funde la izquierda con una máscara y ahí el cromo se apagaba.
+      */}
+      {/* Inclinado un poco hacia arriba (x negativo): así el cromo refleja el ventanal y no el piso oscuro. */}
+      <Flotante posicion={[m * 0.5, 0, 0.4]} rotacion={[-0.14, -0.28, 0.04]} escala={0.8} ritmo={0.9} vaiven={0.6} animar={animar}>
+        <Monograma marca={c.marca} metal={c.plata} />
+      </Flotante>
+      <Flotante posicion={[m * 0.08, 0.7, -0.6]} rotacion={[0.1, -0.3, -0.22]} escala={0.85} giro={0.18} animar={animar}>
         <Bolsa color={c.marca} />
       </Flotante>
-      <Flotante posicion={[m * 0.58, -0.95, -0.4]} rotacion={[0.35, -0.65, 0.08]} escala={0.8} ritmo={0.9} animar={animar}>
+      <Flotante posicion={[m * 0.62, -1.0, -0.4]} rotacion={[0.35, -0.65, 0.08]} escala={0.7} ritmo={0.9} animar={animar}>
         <Caja color={c.carton} />
       </Flotante>
-      <Flotante posicion={[m * 0.62, 1.05, -0.8]} rotacion={[0.2, 0.4, 0.5]} escala={0.62} giro={-0.25} ritmo={1.6} animar={animar}>
+      <Flotante posicion={[m * 0.82, 0.2, -1.1]} rotacion={[0.2, 0.4, 0.5]} escala={0.5} giro={-0.25} ritmo={1.6} animar={animar}>
         <Bolsa color={c.acento} />
       </Flotante>
-      <Flotante posicion={[-m * 0.42, -0.95, -1]} rotacion={[-0.2, 0.5, -0.6]} escala={0.55} giro={0.3} ritmo={1.4} animar={animar}>
+      <Flotante posicion={[-m * 0.38, -0.95, -1]} rotacion={[-0.2, 0.5, -0.6]} escala={0.5} giro={0.3} ritmo={1.4} animar={animar}>
         <Bolsa color={c.plata} />
       </Flotante>
     </>

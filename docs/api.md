@@ -116,6 +116,8 @@ La programación es por **bloques del DPP de PepsiCo** (línea × franja horaria
 | Método | Ruta | Permiso | Notas |
 |---|---|---|---|
 | GET | `/mfr/dia?fecha=YYYY-MM-DD` | `mfr.consultar` | tablero: bloques calculados, MFR por SKU, turnos, líneas, vista horaria, familias, `personal`, advertencias |
+| GET | `/mfr/indicadores?desde=&hasta=` | `mfr.consultar` | (Ciclo 2) FR, OTIF con detalle por SKU, averías vs lo fabricado, ranking de PT y productividad (cajas por persona-hora) del periodo, más nombres de PT, turnos y grupos; rango máximo 93 días |
+| GET | `/mfr/ritmo?fecha=` | `mfr.consultar` | (Ciclo 2) ritmo por hora del día: esperado vs real acumulado (24 horas), estado ADELANTADO / EN_LINEA / RETRASADO / SIN_DATO con tolerancia ±5 %, por turno |
 | GET | `/mfr/bloques?fecha=` | `mfr.consultar` | bloques del día con Mx/T/kg |
 | PUT | `/mfr/bloques` | `mfr.cargar_programacion` | crea (sin `id`) o corrige (`id` + `motivo`): `{ fechaOperativa, lineaId, productoId, horaInicio, horaFin, cajasPorHora, eficienciaPorcentaje, loop?, personasAsignadas?, motivo? }` |
 | DELETE | `/mfr/bloques/:id` | `mfr.cargar_programacion` | `{ motivo }` |

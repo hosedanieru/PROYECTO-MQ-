@@ -58,7 +58,7 @@ export function Tarjeta({
       {tieneEncabezado && (
         <div className={`flex items-start justify-between gap-3 ${sinRelleno ? 'p-5 pb-0' : ''} ${children ? 'mb-4' : ''}`}>
           <div className="min-w-0">
-            {titulo && <h2 className={`text-base font-semibold tracking-tight ${TITULO[tono]}`}>{titulo}</h2>}
+            {titulo && <h2 className={`text-[1rem] font-semibold tracking-tight ${TITULO[tono]}`}>{titulo}</h2>}
             {descripcion && <p className={`mt-1 text-sm ${DESCRIPCION[tono]}`}>{descripcion}</p>}
           </div>
           {accion && <div className="shrink-0">{accion}</div>}

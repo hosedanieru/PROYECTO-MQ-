@@ -39,7 +39,7 @@ export function Dato({ etiqueta, sigla, valor, unidad, nota, destacado = false }
         )}
       </dt>
       <dd className="mt-0.5 flex items-baseline gap-1">
-        <span className={`cifra font-bold text-tinta ${destacado ? 'text-xl' : 'text-base'}`}>
+        <span className={`cifra font-bold text-tinta ${destacado ? 'text-xl' : 'text-[1rem]'}`}>
           {valor}
         </span>
         {unidad && <span className="text-xs text-tinta-suave">{unidad}</span>}

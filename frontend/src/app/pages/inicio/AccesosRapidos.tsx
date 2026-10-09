@@ -36,7 +36,7 @@ const ACCESOS: Acceso[] = [
     Icono: IconoRemision,
   },
   {
-    a: '/mfr',
+    a: '/tableros/mfr',
     titulo: 'MFR del día',
     descripcion: 'Cumplimiento contra el DPP, turnos y kilos por hora.',
     permiso: 'mfr.consultar',

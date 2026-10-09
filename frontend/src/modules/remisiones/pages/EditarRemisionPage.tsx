@@ -55,7 +55,7 @@ export function EditarRemisionPage() {
         }}
         titulo={`Editar remisión ${r.consecutivo}`}
         insignia={
-          r.version > 1 && <span className="text-base font-medium text-white/90">versión {r.version}</span>
+          r.version > 1 && <span className="text-[1rem] font-medium text-white/90">versión {r.version}</span>
         }
         descripcion={
           <>

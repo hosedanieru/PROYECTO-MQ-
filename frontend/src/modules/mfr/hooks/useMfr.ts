@@ -27,6 +27,25 @@ export function useIndicadoresDia(fecha: string, habilitado = true, refrescoMs?:
   })
 }
 
+/** Indicadores de producción de un periodo. Caen dentro de la clave `mfr`: cualquier cambio del módulo los refresca. */
+export function useIndicadoresProduccion(desde: string, hasta: string) {
+  return useQuery({
+    queryKey: [CLAVE, 'indicadores', desde, hasta],
+    queryFn: () => mfrApi.indicadores(desde, hasta),
+    enabled: Boolean(desde && hasta),
+  })
+}
+
+/** Ritmo por hora de un día. `refrescoMs`: el día en curso se refresca más seguido. */
+export function useRitmoDia(fecha: string, refrescoMs?: number) {
+  return useQuery({
+    queryKey: [CLAVE, 'ritmo', fecha],
+    queryFn: () => mfrApi.ritmo(fecha),
+    enabled: Boolean(fecha),
+    refetchInterval: refrescoMs,
+  })
+}
+
 export function useGuardarBloque() {
   const invalidar = useInvalidarDia()
   return useMutation({ mutationFn: mfrApi.guardarBloque, onSuccess: invalidar })
