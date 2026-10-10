@@ -34,6 +34,10 @@ export class CorreoNoEnviadoError extends ErrorDominio {
   readonly codigo = 'CORREO_NO_ENVIADO';
 }
 
+export class EnvioNoEncontradoError extends ErrorDominio {
+  readonly codigo = 'CORREO_ENVIO_NO_ENCONTRADO';
+}
+
 // ---------- Puerto: enviar ----------
 
 export interface AdjuntoCorreo {
@@ -129,20 +133,25 @@ export const LISTA_DISTRIBUCION_REPOSITORY = Symbol('ListaDistribucionRepository
 
 // ---------- Registro de envíos ----------
 
-export type OrigenEnvio = 'MANUAL' | 'CIERRE_TURNO';
+/** REENVIO (usuario, 2026-10-10): se vuelve a mandar un envío ya registrado. */
+export type OrigenEnvio = 'MANUAL' | 'CIERRE_TURNO' | 'REENVIO';
 export type EstadoEnvio = 'ENVIADO' | 'FALLIDO';
 
 export interface EnvioCorreo {
   id: string;
   origen: OrigenEnvio;
   fechaHora: Date;
-  /** Día operativo del envío (para listar por día, como todo el sistema). */
+  /** Día operativo del envío (en el del cierre, el del turno cerrado). */
   fechaOperativa: Date;
   /** Turno cerrado (envío automático); null en el manual. */
   turnoId: string | null;
   destinatarios: string[];
   remisionIds: string[];
+  /** Resúmenes (RT/RD) adjuntos; vacío si solo llevó remisiones. */
+  resumenIds: string[];
   asunto: string;
+  /** Cuerpo enviado; null en los envíos anteriores al 2026-10-10. Se reutiliza al reenviar. */
+  texto: string | null;
   estado: EstadoEnvio;
   /** Lo que respondió el servidor si falló. */
   error: string | null;
@@ -154,6 +163,7 @@ export type NuevoEnvio = Omit<EnvioCorreo, 'id'>;
 
 export interface EnvioCorreoRepository {
   crear(envio: NuevoEnvio): Promise<EnvioCorreo>;
+  buscarPorId(id: string): Promise<EnvioCorreo | null>;
   /** Fechas operativas, inclusive; más recientes primero. */
   listar(desde: Date, hasta: Date): Promise<EnvioCorreo[]>;
 }

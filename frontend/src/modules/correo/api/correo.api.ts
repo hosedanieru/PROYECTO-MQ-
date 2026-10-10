@@ -8,4 +8,6 @@ export const correoApi = {
     http.patch<ListaDistribucion>(`/correos/listas/${id}`, cambios).then((r) => r.data),
   enviarRemisiones: (datos: DatosEnvioRemisiones) => http.post<EnvioCorreo>('/correos/remisiones', datos).then((r) => r.data),
   envios: (desde: string, hasta: string) => http.get<EnvioCorreo[]>('/correos/envios', { params: { desde, hasta } }).then((r) => r.data),
+  // Genera los PDF y espera al servidor de correo: más que el tiempo por defecto.
+  reenviar: (id: string) => http.post<EnvioCorreo>(`/correos/envios/${id}/reenviar`, undefined, { timeout: 120_000 }).then((r) => r.data),
 }

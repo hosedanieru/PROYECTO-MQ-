@@ -13,7 +13,9 @@
  *   POST   /mfr/bloques/copiar              mfr.cargar_programacion   copia la programación de otro día
  *   POST   /mfr/dpp/analizar  (multipart)   mfr.cargar_programacion   PDF del DPP → propuesta de bloques
  *   POST   /mfr/turno/cerrar                mfr.configurar_turno      { fechaOperativa, turnoId, motivoFaltante?, novedades } (400 MFR_FALTANTE_SIN_MOTIVO con `faltantes` si hay SKU bajo target;
- *                                                                     400 RESUMEN_NOVEDADES_OBLIGATORIAS) → { bloques, resumenTurno, resumenDia }
+ *                                                                     400 RESUMEN_NOVEDADES_OBLIGATORIAS) → { bloques, resumenTurno, resumenDia, correos }
+ *                                                                     `correos`: resultado del RESUMEN y de las REMISIONES (ENVIADO | FALLIDO | SIN_DESTINATARIOS);
+ *                                                                     se envían después de guardar, un fallo no deshace el cierre
  *   GET    /mfr/asistencia?fecha=           mfr.consultar             asistencia registrada por turno y grupo
  *   PUT    /mfr/esperadas-dia               mfr.configurar_turno      { fechaOperativa, turnoId, grupoId, personas, motivo } ajuste del día
  *   PUT    /mfr/asistencia                  mfr.configurar_turno      { fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? } crea o corrige
@@ -49,6 +51,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { EnviarCorreosDelCierreUseCase } from '../../application/correo/correo-cierre.use-cases.js';
 import { AnalizarDppUseCase } from '../../application/mfr/analizar-dpp.use-case.js';
 import {
   CargarDiaUseCase,
@@ -146,6 +149,7 @@ export class MfrController {
     private readonly cargarPeriodo: CargarPeriodoUseCase,
     private readonly copiarDia: CopiarDiaUseCase,
     private readonly cerrarTurno: CerrarTurnoUseCase,
+    private readonly correosCierre: EnviarCorreosDelCierreUseCase,
     private readonly registrarAsistencia: RegistrarAsistenciaUseCase,
     private readonly ajustarEsperadas: AjustarEsperadasUseCase,
     private readonly asignarGrupoLinea: AsignarGrupoLineaUseCase,
@@ -300,11 +304,21 @@ export class MfrController {
       usuarioId: actual.id,
       usuarioNombre: actual.nombre,
     });
+    // Después de guardar el cierre: si un correo falla, el cierre queda (usuario, 2026-10-10).
+    const correos = await this.correosCierre.ejecutar({
+      fechaOperativa: fechaOperativaADate(dto.fechaOperativa),
+      turnoId: dto.turnoId,
+      resumenTurnoId: resultado.resumenTurno.id,
+      resumenDiaId: resultado.resumenDia?.id ?? null,
+      usuarioId: actual.id,
+      usuarioNombre: actual.nombre,
+    });
     const resumen = (r: ResumenTurno | null) => (r ? { id: r.id, consecutivo: consecutivoResumen(r.tipo, r.anio, r.numero) } : null);
     return {
       bloques: resultado.cerrados.map(presentarBloque),
       resumenTurno: resumen(resultado.resumenTurno),
       resumenDia: resumen(resultado.resumenDia),
+      correos,
     };
   }
 

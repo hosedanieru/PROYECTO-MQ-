@@ -64,7 +64,9 @@ const envioADominio = (s: DocumentSnapshot): EnvioCorreo => {
     turnoId: d.turnoId ?? null,
     destinatarios: d.destinatarios ?? [],
     remisionIds: d.remisionIds ?? [],
+    resumenIds: d.resumenIds ?? [],
     asunto: d.asunto,
+    texto: d.texto ?? null,
     estado: d.estado,
     error: d.error ?? null,
     usuarioId: d.usuarioId,
@@ -83,6 +85,11 @@ export class EnvioCorreoFirestoreRepository implements EnvioCorreoRepository {
     const id = this.cliente.nuevoId(COLECCION.enviosCorreo);
     await this.cliente.guardar(this.coleccion().doc(id), { ...envio, fechaOperativaTexto: claveFecha(envio.fechaOperativa) });
     return { id, ...envio };
+  }
+
+  async buscarPorId(id: string): Promise<EnvioCorreo | null> {
+    const s = await this.cliente.obtener(this.coleccion().doc(id));
+    return s.exists ? envioADominio(s) : null;
   }
 
   async listar(desde: Date, hasta: Date): Promise<EnvioCorreo[]> {

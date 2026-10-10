@@ -28,6 +28,15 @@ export function useEnviosCorreo(desde: string, hasta: string, habilitado = true)
   return useQuery({ queryKey: ['correo', 'envios', desde, hasta], queryFn: () => correoApi.envios(desde, hasta), enabled: habilitado })
 }
 
+/** El reenvío también queda en el registro, salga o falle. */
+export function useReenviarEnvio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => correoApi.reenviar(id),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['correo', 'envios'] }),
+  })
+}
+
 /** Un envío (salga o falle) queda en el registro: se refresca. */
 export function useEnviarRemisiones() {
   const qc = useQueryClient()

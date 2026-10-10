@@ -1,5 +1,7 @@
 /** Espejo de los tipos del dominio MFR y de lo que devuelve /api/mfr/*. */
 
+import type { ResultadoCorreoCierre } from './correo'
+
 export type Semaforo = 'VERDE' | 'AMARILLO' | 'ROJO'
 export type TipoLinea = 'MULTIPACK' | 'MANUAL'
 export type OrigenBloque = 'MANUAL' | 'DPP' | 'COPIA'
@@ -355,6 +357,8 @@ export interface ResultadoCierreTurno {
   resumenTurno: ReferenciaResumen
   /** Solo si este cierre terminó el día operativo. */
   resumenDia: ReferenciaResumen | null
+  /** Los dos correos del cierre; salen después de guardar, un fallo no deshace el cierre. */
+  correos: ResultadoCorreoCierre[]
 }
 
 export interface ResumenGuardado extends ReferenciaResumen {

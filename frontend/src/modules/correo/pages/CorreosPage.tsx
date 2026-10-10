@@ -3,13 +3,15 @@
  * ========================
  *
  * Listas de distribución (usuario, 2026-10-03): "Jefes", "PepsiCo",
- * "Turno T2"… Se eligen al enviar remisiones por correo y, en la fase 2,
- * arman el envío automático al cerrar el turno:
+ * "Turno T2"… Se eligen al enviar remisiones por correo y arman los dos
+ * correos que salen al cerrar el turno (desde 2026-10-10):
  *   - lista general con "incluir en cierres": va en todos;
  *   - lista de un turno: va cuando ese turno es el siguiente.
  * Cada lista dice QUÉ recibe: las remisiones aprobadas (PepsiCo), el
  * resumen del turno (jefes, coordinadores) o ambos.
- * Abajo, el registro de los envíos de los últimos 7 días (enviados y fallidos).
+ * Abajo, el registro de los envíos de los últimos 7 días (enviados y
+ * fallidos); cualquiera se puede REENVIAR igual (mismos destinatarios,
+ * adjuntos y texto) y queda como un envío nuevo.
  */
 
 import { useState } from 'react'
@@ -29,11 +31,17 @@ import { PantallaCargando } from '../../../components/PantallaCargando'
 import { Seccion } from '../../../components/Seccion'
 import { Select } from '../../../components/Select'
 import { comoErrorApi } from '../../../services/http'
-import { ETIQUETA_RECIBE, type ListaDistribucion, type RecibeLista } from '../../../shared/types/correo'
+import { ETIQUETA_RECIBE, type EnvioCorreo, type ListaDistribucion, type RecibeLista } from '../../../shared/types/correo'
 import { agruparEnOrden } from '../../../shared/utils/agrupar'
 import { diaLargo, fechaOperativaDe, hora } from '../../../shared/utils/fechas'
 import { useTurnos } from '../../catalogo/hooks/useCatalogos'
-import { useEnviosCorreo, useGuardarLista, useListasDistribucion } from '../hooks/useCorreo'
+import { useEnviosCorreo, useGuardarLista, useListasDistribucion, useReenviarEnvio } from '../hooks/useCorreo'
+
+const ORIGEN: Record<EnvioCorreo['origen'], (usuario: string) => string> = {
+  MANUAL: (u) => `a mano por ${u}`,
+  CIERRE_TURNO: (u) => `al cerrar el turno (${u})`,
+  REENVIO: (u) => `reenviado por ${u}`,
+}
 
 interface Form {
   nombre: string
@@ -67,6 +75,8 @@ export function CorreosPage() {
   const guardar = useGuardarLista()
   const hoy = fechaOperativaDe(new Date())
   const envios = useEnviosCorreo(haceSeisDias(hoy), hoy)
+  const reenviar = useReenviarEnvio()
+  const [confirmando, setConfirmando] = useState<string | null>(null)
   const [editando, setEditando] = useState<ListaDistribucion | 'nueva' | null>(null)
   const [form, setForm] = useState<Form>(VACIO)
 
@@ -89,12 +99,56 @@ export function CorreosPage() {
               <span className="text-[1rem] font-bold text-tinta">{e.asunto}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
-              <MetaDato etiqueta="Origen">
-                {e.origen === 'MANUAL' ? `a mano por ${e.usuarioNombre}` : 'automático al cerrar el turno'}
-              </MetaDato>
+              <MetaDato etiqueta="Origen">{ORIGEN[e.origen](e.usuarioNombre)}</MetaDato>
               <MetaDato etiqueta="Destinatarios">{e.destinatarios.length}</MetaDato>
             </div>
             {e.error && <p className="mt-1.5 text-sm text-critico">{e.error}</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              {confirmando === e.id ? (
+                // Sale a correos externos (PepsiCo): se confirma para no duplicarlo por un clic de más.
+                <>
+                  <span className="text-sm font-medium text-tinta">
+                    ¿Reenviar a {e.destinatarios.length} {e.destinatarios.length === 1 ? 'destinatario' : 'destinatarios'}?
+                  </span>
+                  <Boton
+                    tamano="sm"
+                    className="pointer-coarse:min-h-11"
+                    cargando={reenviar.isPending && reenviar.variables === e.id}
+                    disabled={reenviar.isPending}
+                    onClick={() => reenviar.mutate(e.id, { onSettled: () => setConfirmando(null) })}
+                  >
+                    Sí, reenviar
+                  </Boton>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    className="pointer-coarse:min-h-11"
+                    disabled={reenviar.isPending}
+                    onClick={() => setConfirmando(null)}
+                  >
+                    No
+                  </Boton>
+                </>
+              ) : (
+                <Boton
+                  variante={e.estado === 'ENVIADO' ? 'secundario' : 'primario'}
+                  tamano="sm"
+                  className="pointer-coarse:min-h-11"
+                  disabled={reenviar.isPending}
+                  onClick={() => setConfirmando(e.id)}
+                >
+                  Reenviar
+                </Boton>
+              )}
+              <span role="status" className="text-sm">
+                {reenviar.variables === e.id && reenviar.isSuccess && (
+                  <span className="font-medium text-exito">Reenviado: quedó arriba en el registro.</span>
+                )}
+                {reenviar.variables === e.id && reenviar.isError && (
+                  <span className="text-critico">{comoErrorApi(reenviar.error).mensaje}</span>
+                )}
+              </span>
+            </div>
           </div>
         ),
       })),

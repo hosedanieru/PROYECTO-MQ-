@@ -77,7 +77,7 @@ import {
   ItemInventarioNoEncontradoError,
 } from '../../../domain/inventario/inventario.errors.js';
 import { CierreYaRegistradoError } from '../../../domain/inventario/cierre-inventario.js';
-import { CorreoNoEnviadoError, DatosCorreoInvalidosError, ListaNoEncontradaError } from '../../../domain/correo/correo.js';
+import { CorreoNoEnviadoError, DatosCorreoInvalidosError, EnvioNoEncontradoError, ListaNoEncontradaError } from '../../../domain/correo/correo.js';
 import { NovedadesObligatoriasError, ResumenNoEncontradoError } from '../../../domain/resumen/resumen-turno.js';
 import {
   ContrasenaFirmaIncorrectaError,
@@ -182,6 +182,7 @@ const TRADUCCION: Array<[new (...args: never[]) => ErrorDominio, HttpStatus]> = 
   // Correo: el servidor externo rechazó el envío (queda registrado como FALLIDO).
   [DatosCorreoInvalidosError, HttpStatus.BAD_REQUEST],
   [ListaNoEncontradaError, HttpStatus.NOT_FOUND],
+  [EnvioNoEncontradoError, HttpStatus.NOT_FOUND],
   [CorreoNoEnviadoError, HttpStatus.BAD_GATEWAY],
   [NovedadesObligatoriasError, HttpStatus.BAD_REQUEST],
   [FirmaInvalidaError, HttpStatus.BAD_REQUEST],

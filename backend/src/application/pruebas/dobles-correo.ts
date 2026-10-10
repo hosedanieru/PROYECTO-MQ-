@@ -53,6 +53,10 @@ export class EnvioCorreoRepositorioFalso implements EnvioCorreoRepository {
     return Promise.resolve(creado);
   }
 
+  buscarPorId(id: string): Promise<EnvioCorreo | null> {
+    return Promise.resolve(this.envios.find((e) => e.id === id) ?? null);
+  }
+
   listar(desde: Date, hasta: Date): Promise<EnvioCorreo[]> {
     return Promise.resolve(this.envios.filter((e) => e.fechaOperativa >= desde && e.fechaOperativa <= hasta));
   }

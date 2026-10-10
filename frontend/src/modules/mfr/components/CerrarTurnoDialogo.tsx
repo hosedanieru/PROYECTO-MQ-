@@ -9,6 +9,8 @@
  *
  * Al cerrar, el servidor guarda la foto del turno (RT-…) y, si era el
  * último turno abierto, la del día (RD-…); aquí se ofrecen sus PDF.
+ * Después envía los dos correos del cierre (resumen y remisiones) y el
+ * coordinador ve cómo salió cada uno (usuario, 2026-10-10).
  */
 
 import { useState } from 'react'
@@ -20,6 +22,7 @@ import { Dialogo } from '../../../components/Dialogo'
 import { abrirPdf } from '../../../services/archivos'
 import { comoErrorApi } from '../../../services/http'
 import type { Producto } from '../../../shared/types/catalogo'
+import type { ResultadoCorreoCierre } from '../../../shared/types/correo'
 import { MAXIMO_NOVEDADES, MINIMO_NOVEDADES, type ResultadoCierreTurno } from '../../../shared/types/mfr'
 import { useCerrarTurno } from '../hooks/useMfr'
 
@@ -81,7 +84,8 @@ export function CerrarTurnoDialogo({ fecha, turno, productos, onCerrar }: Props)
   }
 
   return (
-    <Dialogo abierto titulo={`Cerrar el ${turno.codigo} · ${turno.nombre}`} onCerrar={onCerrar}>
+    // Bloqueado mientras cierra: si se cerrara, el coordinador no vería cómo salieron los correos.
+    <Dialogo abierto titulo={`Cerrar el ${turno.codigo} · ${turno.nombre}`} onCerrar={onCerrar} bloqueado={cerrar.isPending}>
       {resultado ? (
         <div className="space-y-3 text-sm">
           <Alerta tipo="exito">
@@ -93,6 +97,7 @@ export function CerrarTurnoDialogo({ fecha, turno, productos, onCerrar }: Props)
             )}
             .
           </Alerta>
+          <ResultadoCorreos correos={resultado.correos} />
           {errorPdf && <Alerta tipo="error">{errorPdf}</Alerta>}
           <div className="flex flex-wrap justify-end gap-2">
             <Boton variante="secundario" onClick={onCerrar}>Listo</Boton>
@@ -146,9 +151,12 @@ export function CerrarTurnoDialogo({ fecha, turno, productos, onCerrar }: Props)
           )}
 
           {cerrar.isError && <Alerta tipo="error">{comoErrorApi(cerrar.error).mensaje}</Alerta>}
+          {cerrar.isPending && (
+            <p role="status" className="text-tinta-suave">Cerrando el turno y enviando los correos del cierre; puede tardar hasta un minuto.</p>
+          )}
 
           <div className="flex justify-end gap-2">
-            <Boton variante="secundario" onClick={onCerrar}>Cancelar</Boton>
+            <Boton variante="secundario" disabled={cerrar.isPending} onClick={onCerrar}>Cancelar</Boton>
             <Boton variante="peligro" cargando={cerrar.isPending} disabled={!puedeCerrar} onClick={confirmar}>
               Cerrar el turno
             </Boton>
@@ -156,5 +164,37 @@ export function CerrarTurnoDialogo({ fecha, turno, productos, onCerrar }: Props)
         </div>
       )}
     </Dialogo>
+  )
+}
+
+const NOMBRE_CORREO: Record<ResultadoCorreoCierre['contenido'], string> = {
+  RESUMEN: 'El correo del resumen',
+  REMISIONES: 'El correo de las remisiones',
+}
+
+/** Qué pasó con cada correo del cierre. Un fallo no deshizo el cierre: se reenvía desde Correos. */
+function ResultadoCorreos({ correos }: { correos: ResultadoCorreoCierre[] }) {
+  return (
+    <ul className="space-y-2">
+      {correos.map((c) => (
+        <li key={c.contenido}>
+          {c.estado === 'ENVIADO' ? (
+            <Alerta tipo="exito">
+              {NOMBRE_CORREO[c.contenido]} se envió a <span className="cifra">{c.destinatarios}</span>{' '}
+              {c.destinatarios === 1 ? 'destinatario' : 'destinatarios'}.
+            </Alerta>
+          ) : c.estado === 'SIN_DESTINATARIOS' ? (
+            <Alerta tipo="info">
+              {NOMBRE_CORREO[c.contenido]} no se envió: ninguna lista lo recibe. Se configura en Administración › Correos.
+            </Alerta>
+          ) : (
+            <Alerta tipo="error">
+              {NOMBRE_CORREO[c.contenido]} no se pudo enviar{c.error ? ` (${c.error})` : ''}. El turno sí quedó cerrado;
+              {c.envioId ? ' reenvíelo desde Administración › Correos.' : ' avise al administrador para enviarlo a mano.'}
+            </Alerta>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }

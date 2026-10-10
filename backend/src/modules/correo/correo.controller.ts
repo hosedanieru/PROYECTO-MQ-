@@ -7,12 +7,16 @@
  *   PATCH /api/correos/listas/:id        admin.correos           nombre, recibe (REMISIONES|RESUMEN|AMBOS), turno, incluirEnCierres, correos, activo
  *   POST  /api/correos/remisiones        remision.enviar_correo  { remisionIds, listaIds, correos } → PDF adjunto
  *   GET   /api/correos/envios?desde=&hasta=  admin.correos       registro de envíos (máx. 93 días)
+ *   POST  /api/correos/envios/:id/reenviar   admin.correos       mismos destinatarios, adjuntos y texto (502 si vuelve a fallar)
+ *
+ * Los dos correos del cierre del turno salen desde POST /mfr/turno/cerrar.
  *
  * Por ahora todo es del administrador (usuario: los roles se reparten al final).
  */
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Patch, Post, Query } from '@nestjs/common';
 
+import { ReenviarEnvioUseCase } from '../../application/correo/correo-cierre.use-cases.js';
 import { ActualizarListaUseCase, CrearListaUseCase, EnviarRemisionesUseCase } from '../../application/correo/correo.use-cases.js';
 import {
   ENVIO_CORREO_REPOSITORY,
@@ -35,6 +39,7 @@ export class CorreoController {
     private readonly crearLista: CrearListaUseCase,
     private readonly actualizarLista: ActualizarListaUseCase,
     private readonly enviarRemisiones: EnviarRemisionesUseCase,
+    private readonly reenviar: ReenviarEnvioUseCase,
     @Inject(LISTA_DISTRIBUCION_REPOSITORY) private readonly listas: ListaDistribucionRepository,
     @Inject(ENVIO_CORREO_REPOSITORY) private readonly envios: EnvioCorreoRepository,
   ) {}
@@ -79,5 +84,12 @@ export class CorreoController {
     const hasta = fechaOperativaADate(rango.hasta);
     validarRango(desde, hasta);
     return (await this.envios.listar(desde, hasta)).map(presentarEnvio);
+  }
+
+  @Post('envios/:id/reenviar')
+  @HttpCode(HttpStatus.CREATED)
+  @RequierePermisos('admin.correos')
+  async reenviarEnvio(@Param('id') id: string, @UsuarioActual() actual: Usuario) {
+    return presentarEnvio(await this.reenviar.ejecutar({ envioId: id, usuarioId: actual.id }));
   }
 }

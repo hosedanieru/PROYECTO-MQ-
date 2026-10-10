@@ -106,6 +106,7 @@ Roles: `ADMINISTRADOR`, `COORDINADOR_MQ`, `PATINADOR`, `CONSULTA`, `OPA_PEPSICO`
 | PATCH | `/correos/listas/:id` | `admin.correos` |
 | POST | `/correos/remisiones` | `remision.enviar_correo` |
 | GET | `/correos/envios` | `admin.correos` |
+| POST | `/correos/envios/:id/reenviar` | `admin.correos` |
 
 ### inventario/catalogo-inventario.controller.ts
 

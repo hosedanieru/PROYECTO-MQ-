@@ -125,7 +125,7 @@ La programación es por **bloques del DPP de PepsiCo** (línea × franja horaria
 | POST | `/mfr/bloques/periodo` | `mfr.cargar_programacion` | **Carga de N días** (DPP semanal o mensual): `{ bloques[], origen, reemplazar, motivo? }`, donde cada bloque trae su `fechaOperativa`. Máximo 62 días |
 | POST | `/mfr/bloques/copiar` | `mfr.cargar_programacion` | `{ desde, hacia, reemplazar, motivo? }` |
 | POST | `/mfr/dpp/analizar` | `mfr.cargar_programacion` | multipart, campo `archivo` (PDF ≤ 5 MB) → propuesta cruzada con el catálogo; **no escribe** |
-| POST | `/mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante?, novedades }`; irreversible. 400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes[]` si hay SKU bajo su target · 400 `RESUMEN_NOVEDADES_OBLIGATORIAS` (mín. 10 caracteres). Responde `{ bloques, resumenTurno: { id, consecutivo }, resumenDia: { id, consecutivo } \| null }` |
+| POST | `/mfr/turno/cerrar` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, motivoFaltante?, novedades }`; irreversible. 400 `MFR_FALTANTE_SIN_MOTIVO` con `faltantes[]` si hay SKU bajo su target · 400 `RESUMEN_NOVEDADES_OBLIGATORIAS` (mín. 10 caracteres). Responde `{ bloques, resumenTurno: { id, consecutivo }, resumenDia: { id, consecutivo } \| null, correos[] }`. `correos`: un resultado por correo del cierre (`RESUMEN`, `REMISIONES`) con `estado` ENVIADO \| FALLIDO \| SIN_DESTINATARIOS, `envioId`, `destinatarios`, `error`; se envían después de guardar y un fallo no deshace el cierre (2026-10-10) |
 | GET | `/mfr/asistencia?fecha=` | `mfr.consultar` | personas que llegaron, por turno y grupo |
 | PUT | `/mfr/asistencia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personasLlegaron, observacion? }`; crea o corrige. Si llegan más de las esperadas, `observacion` es obligatoria (400 `MFR_DATOS_INVALIDOS`) |
 | PUT | `/mfr/esperadas-dia` | `mfr.configurar_turno` | `{ fechaOperativa, turnoId, grupoId, personas (0–500; 0 = no viene), motivo }`: ajuste de ese día, manda sobre lo fijo del grupo; crea o reemplaza, auditado |
@@ -260,7 +260,8 @@ Envío de remisiones por correo (2026-10-03). Por ahora solo el administrador.
 | POST | `/correos/listas` | `admin.correos` | `{ nombre, recibe? (REMISIONES por defecto \| RESUMEN \| AMBOS), turnoId?, incluirEnCierres?, correos[] }` (1 a 50 correos; se normalizan a minúscula y sin repetir) |
 | PATCH | `/correos/listas/:id` | `admin.correos` | mismos campos + `activo` |
 | POST | `/correos/remisiones` | `remision.enviar_correo` | `{ remisionIds (1–50), listaIds, correos }` → el PDF (dos por hoja) adjunto a las listas + correos sueltos (máx. 100 destinatarios). Responde el envío registrado · 502 `CORREO_NO_ENVIADO` si el servidor lo rechaza (queda registrado como FALLIDO) |
-| GET | `/correos/envios?desde=&hasta=` | `admin.correos` | registro de envíos del rango (máx. 93 días) |
+| GET | `/correos/envios?desde=&hasta=` | `admin.correos` | registro de envíos del rango (máx. 93 días); cada uno con `origen` MANUAL \| CIERRE_TURNO \| REENVIO, `remisionIds`, `resumenIds` y `texto` |
+| POST | `/correos/envios/:id/reenviar` | `admin.correos` | vuelve a mandar el envío (mismos destinatarios, adjuntos y texto) como envío nuevo `REENVIO`; 404 `CORREO_ENVIO_NO_ENCONTRADO`, 502 `CORREO_NO_ENVIADO` si vuelve a fallar |
 
 Sin `CORREO_HOST` en el `.env` no se envía nada: cada correo se guarda como `.eml` en `CORREO_SALIDA_DIR`.
 

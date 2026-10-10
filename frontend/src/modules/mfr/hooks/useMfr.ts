@@ -142,9 +142,17 @@ export function useCopiarDia() {
 }
 
 /** Invalida todo el módulo, incluidos los resúmenes del día (misma clave raíz). */
+/** El cierre también registra sus dos correos: se refresca el registro de envíos. */
 export function useCerrarTurno() {
+  const qc = useQueryClient()
   const invalidar = useInvalidarDia()
-  return useMutation({ mutationFn: mfrApi.cerrarTurno, onSuccess: invalidar })
+  return useMutation({
+    mutationFn: mfrApi.cerrarTurno,
+    onSuccess: () => {
+      invalidar()
+      void qc.invalidateQueries({ queryKey: ['correo', 'envios'] })
+    },
+  })
 }
 
 /** Resúmenes guardados del día (uno por turno cerrado y, al final, el del día). */

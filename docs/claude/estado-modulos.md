@@ -102,8 +102,14 @@ distribución administradas en el panel** (PepsiCo = correos en una lista, no us
 (ENVIADO / FALLIDO); sin `CORREO_HOST` se guarda un `.eml`. Envío por el buzón corporativo por SMTP (TI debe
 entregar la cuenta). "Ver PDF" quedó como botón secundario. Código: `domain/correo/`, `application/correo/`,
 `infrastructure/correo/enviador-nodemailer.ts`; pantalla `CorreosPage`, `EnviarCorreoDialogo`.
-Fase 2b (cola): envío automático al cerrar el turno (resumen a listas internas + aprobadas a quien las recibe),
-reenviar, y el envío nunca deshace el cierre (fuera de la transacción, FALLIDO + reintento).
+**Fase 2b hecha (2026-10-10, Ciclo 4 fase 1):** al cerrar el turno a mano salen dos correos, DESPUÉS de guardar
+el cierre (el coordinador espera el resultado; un fallo no deshace el cierre): **resumen** (RT y, si el cierre
+terminó el día, RD) → listas RESUMEN/AMBOS; **remisiones** aprobadas del turno en PDF, con las pendientes y
+rechazadas en el cuerpo → listas REMISIONES/AMBOS; sin aprobadas sale igual, sin adjunto. En los dos: listas
+generales con "incluir en cierres" + la del turno siguiente (T1→T2→T3→T1). Sin listas → `SIN_DESTINATARIOS`, no se
+envía. El envío guarda `resumenIds` y `texto` (migración `envio_correo_resumenes_y_texto`); **Reenviar** en Correos
+(`POST /correos/envios/:id/reenviar`, origen `REENVIO`). Código: `domain/correo/correo-cierre.ts` (reglas puras),
+`application/correo/correo-cierre.use-cases.ts`, `enviarYRegistrar` en `correo.use-cases.ts` (común a los tres).
 
 ### Resumen del turno y del día — fase 2a (2026-10-03)
 
@@ -113,7 +119,7 @@ cerrar el T3). PDF sin logo, identificado con código de formato del SIG + conse
 RD-AAAA-NNNN día); el código SIG aún no existe → va en `.env` y el PDF dice "pendiente de aprobación SIG". Un turno
 **sin DPP no se cierra** ni tiene resumen. Cada lista de correo dice qué recibe. Código: `domain/resumen/`,
 `application/resumen/armar-resumen.ts`, `infrastructure/pdf/plantilla-resumen.ts`; endpoints `/resumenes`.
-Fase 2c (cola): cierre automático del turno a su hora.
+Fase 2c (Ciclo 4 fase 2, en curso): cierre automático del turno a su hora, con aviso y tiempo de gracia configurable.
 
 ### Firma electrónica de remisiones — fases 1 a 3 (2026-10-03 a 2026-10-05), en piloto
 

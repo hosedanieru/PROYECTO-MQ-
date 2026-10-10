@@ -34,16 +34,31 @@ export interface DatosLista {
 
 export interface EnvioCorreo {
   id: string
-  origen: 'MANUAL' | 'CIERRE_TURNO'
+  origen: 'MANUAL' | 'CIERRE_TURNO' | 'REENVIO'
   fechaHora: string
   fechaOperativa: string
   turnoId: string | null
   destinatarios: string[]
   remisionIds: string[]
+  /** Resúmenes (RT/RD) adjuntos en el correo del cierre. */
+  resumenIds: string[]
   asunto: string
+  texto: string | null
   estado: 'ENVIADO' | 'FALLIDO'
   error: string | null
   usuarioNombre: string
+}
+
+/**
+ * Resultado de cada correo del cierre del turno (usuario, 2026-10-10).
+ * SIN_DESTINATARIOS: ninguna lista lo recibe; no se envió.
+ */
+export interface ResultadoCorreoCierre {
+  contenido: 'RESUMEN' | 'REMISIONES'
+  estado: 'ENVIADO' | 'FALLIDO' | 'SIN_DESTINATARIOS'
+  envioId: string | null
+  destinatarios: number
+  error: string | null
 }
 
 export interface DatosEnvioRemisiones {

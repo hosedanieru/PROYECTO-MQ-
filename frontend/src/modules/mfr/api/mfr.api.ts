@@ -58,7 +58,7 @@ export const mfrApi = {
     http.post<BloqueCalculado[]>('/mfr/bloques/copiar', datos).then((r) => r.data),
   /** Cierra el turno y guarda su resumen. Timeout largo: arma el resumen y lo guarda en la misma operación. */
   cerrarTurno: (datos: { fechaOperativa: string; turnoId: string; novedades: string; motivoFaltante?: string }) =>
-    http.post<ResultadoCierreTurno>('/mfr/turno/cerrar', datos, { timeout: 60_000 }).then((r) => r.data),
+    http.post<ResultadoCierreTurno>('/mfr/turno/cerrar', datos, { timeout: 120_000 }).then((r) => r.data),
   resumenes: (fecha: string) =>
     http.get<ResumenGuardado[]>('/resumenes', { params: { fecha } }).then((r) => r.data),
 

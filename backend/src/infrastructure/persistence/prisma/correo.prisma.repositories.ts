@@ -3,7 +3,7 @@
  * ==================================
  *
  *   lista_distribucion   listas de destinatarios (correos en un arreglo de texto)
- *   envio_correo         registro de cada envío de remisiones
+ *   envio_correo         registro de cada envío (manual, del cierre o reenvío)
  */
 
 import type {
@@ -47,6 +47,11 @@ export class EnvioCorreoPrismaRepository implements EnvioCorreoRepository {
 
   async crear(envio: NuevoEnvio): Promise<EnvioCorreo> {
     return aDominio(await this.cliente.envioCorreo.create({ data: envio }));
+  }
+
+  async buscarPorId(id: string): Promise<EnvioCorreo | null> {
+    const fila = await this.cliente.envioCorreo.findUnique({ where: { id } });
+    return fila ? aDominio(fila) : null;
   }
 
   async listar(desde: Date, hasta: Date): Promise<EnvioCorreo[]> {

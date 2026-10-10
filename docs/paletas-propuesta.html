@@ -1,0 +1,223 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Paletas MQ</title>
+<style>
+body{font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:24px;background:#ececec;color:#222}
+h1{margin:0 0 4px} .intro{margin:0 0 24px;max-width:70ch}
+.paleta{margin-bottom:40px} .paleta h2{margin:0} .paleta p{margin:4px 0 12px;max-width:80ch}
+.par{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media(max-width:900px){.par{grid-template-columns:1fr}}
+.tema{border:1px solid;border-radius:20px;overflow:hidden}
+.barra{display:flex;gap:24px;align-items:center;padding:12px 20px;color:#fff}
+.logo{font-size:18px;letter-spacing:.5px} .nav{display:flex;gap:16px;font-size:14px;opacity:.9}
+.nav .act{border-bottom:3px solid;padding-bottom:4px;opacity:1;font-weight:600}
+.cuerpo{padding:20px;display:grid;gap:12px}
+.tit{font-size:22px;font-weight:700}
+.pestanas{display:flex;gap:20px;border-bottom:1px solid;font-weight:600}
+.pestanas span{padding:6px 0} .pestanas .pa{border-bottom:3px solid}
+.fila{display:flex;align-items:center;gap:12px;border:1px solid;border-radius:16px;padding:12px 16px 12px 0;overflow:hidden}
+.franja{width:5px;align-self:stretch;border-radius:0 4px 4px 0}
+.fila>div{flex:1} .chip{border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
+.botones{display:flex;gap:10px} .b{border-radius:999px;padding:10px 20px;font-weight:600;font-size:14px}
+.alertas{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .alertas span{border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600}
+table{font-size:13px;border-collapse:collapse} td{padding:3px 10px 3px 0} .num{font-weight:700;font-variant-numeric:tabular-nums}
+.ok{color:#15803d} .mal{color:#b91c1c}
+</style></head><body>
+<h1>Paletas para el aplicativo MQ</h1>
+<p class="intro">Tres propuestas de azul, anaranjado y café, cada una en tema claro y oscuro. Azul = color principal; anaranjado = acento puntual (pestaña activa, logo, rayas); café = tinta, neutros y superficies cálidas. Las alertas no cambian. Debajo de cada muestra va el contraste medido (WCAG): verde si cumple 4,5:1 para texto (3:1 para lo decorativo).</p>
+<section class="paleta"><h2>A · Sitio web</h2><p>El azul y el anaranjado exactos del sitio inlotrans.com.co; el café hace de tinta y de neutros (en vez del gris azulado de hoy).</p><div class="par">
+<div class="tema" style="background:#f8f5f1;color:#2b211a;border-color:#e6dccf">
+  <div class="barra" style="background:#353f83">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#ff8800">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#ff8800">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#2b211a">Remisiones <small style="color:#6b5848">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#e6dccf">
+      <span class="pa" style="color:#353f83;border-color:#ff8800">Turnos</span><span style="color:#6b5848">Por PT</span><span style="color:#6b5848">Kilos</span>
+    </div>
+    <div class="fila" style="background:#ffffff;border-color:#e6dccf">
+      <span class="franja" style="background:#353f83"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#6b5848">T1 · Grupo 2 · <span style="color:#7a5233;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#e4e6f4;color:#353f83">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#f2ece5;border-color:#e6dccf">
+      <span class="franja" style="background:#7a5233"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#6b5848">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#a85600;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#353f83;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#e4e6f4;color:#353f83">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#dcfce7;color:#15a34a">Éxito</span>
+      <span style="background:#fef3c7;color:#d97706">Advertencia</span>
+      <span style="background:#fee2e2;color:#dc2626">Crítico</span>
+      <small style="color:#6b5848">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">14.5:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">6.2:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">9.6:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">9.6:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">5.3:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">6.8:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num mal">2.2:1</td></tr></table>
+  </div>
+</div>
+<div class="tema" style="background:#1b1612;color:#f1e9e1;border-color:#3d322a">
+  <div class="barra" style="background:#2a2f5e">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#ff8800">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#ff8800">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#f1e9e1">Remisiones <small style="color:#c2b2a3">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#3d322a">
+      <span class="pa" style="color:#aab3ee;border-color:#ff8800">Turnos</span><span style="color:#c2b2a3">Por PT</span><span style="color:#c2b2a3">Kilos</span>
+    </div>
+    <div class="fila" style="background:#251e19;border-color:#3d322a">
+      <span class="franja" style="background:#aab3ee"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#c2b2a3">T1 · Grupo 2 · <span style="color:#d1a27c;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#2c3160;color:#aab3ee">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#2e2620;border-color:#3d322a">
+      <span class="franja" style="background:#d1a27c"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#c2b2a3">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#ffb15c;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#2a2f5e;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#2c3160;color:#aab3ee">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#0f2e1f;color:#16a34a">Éxito</span>
+      <span style="background:#33240c;color:#d97706">Advertencia</span>
+      <span style="background:#3a1717;color:#ef4444">Crítico</span>
+      <small style="color:#c2b2a3">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">14.9:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">8.7:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">12.6:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">8.1:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">9.1:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">7.2:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num ok">7.5:1</td></tr></table>
+  </div>
+</div></div></section><section class="paleta"><h2>B · Azul medio</h2><p>Un azul más claro y vivo que el del sitio (lejos del marino); anaranjado un poco más cálido; café tostado.</p><div class="par">
+<div class="tema" style="background:#f7f6f3;color:#25201c;border-color:#e2ddd3">
+  <div class="barra" style="background:#2457a6">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#f28c28">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#f28c28">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#25201c">Remisiones <small style="color:#625a52">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#e2ddd3">
+      <span class="pa" style="color:#2457a6;border-color:#f28c28">Turnos</span><span style="color:#625a52">Por PT</span><span style="color:#625a52">Kilos</span>
+    </div>
+    <div class="fila" style="background:#ffffff;border-color:#e2ddd3">
+      <span class="franja" style="background:#2457a6"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#625a52">T1 · Grupo 2 · <span style="color:#8a5a3b;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#e1eaf7;color:#2457a6">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#efece6;border-color:#e2ddd3">
+      <span class="franja" style="background:#8a5a3b"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#625a52">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#a3540a;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#2457a6;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#e1eaf7;color:#2457a6">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#dcfce7;color:#15a34a">Éxito</span>
+      <span style="background:#fef3c7;color:#d97706">Advertencia</span>
+      <span style="background:#fee2e2;color:#dc2626">Crítico</span>
+      <small style="color:#625a52">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">14.9:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">6.3:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">7.0:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">7.0:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">5.5:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">5.8:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num mal">2.3:1</td></tr></table>
+  </div>
+</div>
+<div class="tema" style="background:#181614;color:#efebe6;border-color:#3a3632">
+  <div class="barra" style="background:#1f3f78">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#f28c28">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#f28c28">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#efebe6">Remisiones <small style="color:#bdb5ac">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#3a3632">
+      <span class="pa" style="color:#8fb4ec;border-color:#f28c28">Turnos</span><span style="color:#bdb5ac">Por PT</span><span style="color:#bdb5ac">Kilos</span>
+    </div>
+    <div class="fila" style="background:#22201d;border-color:#3a3632">
+      <span class="franja" style="background:#8fb4ec"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#bdb5ac">T1 · Grupo 2 · <span style="color:#d4a07c;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#1f3354;color:#8fb4ec">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#2b2825;border-color:#3a3632">
+      <span class="franja" style="background:#d4a07c"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#bdb5ac">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#f7ae66;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#1f3f78;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#1f3354;color:#8fb4ec">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#0f2e1f;color:#16a34a">Éxito</span>
+      <span style="background:#33240c;color:#d97706">Advertencia</span>
+      <span style="background:#3a1717;color:#ef4444">Crítico</span>
+      <small style="color:#bdb5ac">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">15.2:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">8.9:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">10.3:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">7.7:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">8.7:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">7.1:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num ok">7.4:1</td></tr></table>
+  </div>
+</div></div></section><section class="paleta"><h2>C · Tonal (end_4)</h2><p>Estilo Material 3: las superficies se tiñen levemente del azul de marca (capas tonales); el café va en títulos y detalles.</p><div class="par">
+<div class="tema" style="background:#f6f6fb;color:#1d1b26;border-color:#d9dbec">
+  <div class="barra" style="background:#3d55a8">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#ef8a1f">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#ef8a1f">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#1d1b26">Remisiones <small style="color:#565670">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#d9dbec">
+      <span class="pa" style="color:#3d55a8;border-color:#ef8a1f">Turnos</span><span style="color:#565670">Por PT</span><span style="color:#565670">Kilos</span>
+    </div>
+    <div class="fila" style="background:#ffffff;border-color:#d9dbec">
+      <span class="franja" style="background:#3d55a8"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#565670">T1 · Grupo 2 · <span style="color:#6e4a32;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#dfe3f8;color:#3d55a8">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#ecedf7;border-color:#d9dbec">
+      <span class="franja" style="background:#6e4a32"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#565670">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#a55500;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#3d55a8;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#dfe3f8;color:#3d55a8">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#dcfce7;color:#15a34a">Éxito</span>
+      <span style="background:#fef3c7;color:#d97706">Advertencia</span>
+      <span style="background:#fee2e2;color:#dc2626">Crítico</span>
+      <small style="color:#565670">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">15.8:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">6.6:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">6.9:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">6.9:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">5.4:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">7.8:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num mal">2.3:1</td></tr></table>
+  </div>
+</div>
+<div class="tema" style="background:#16161c;color:#e7e6f2;border-color:#373744">
+  <div class="barra" style="background:#2e3f80">
+    <span class="logo"><b style="color:#fff">INLO</b><b style="color:#ef8a1f">TRANS</b> · MQ</span>
+    <span class="nav"><span class="act" style="border-color:#ef8a1f">Inicio</span><span>Remisiones</span><span>Programación</span><span>Tableros</span></span>
+  </div>
+  <div class="cuerpo">
+    <div class="tit" style="color:#e7e6f2">Remisiones <small style="color:#b5b4cc">· día operativo 10/10/2026</small></div>
+    <div class="pestanas" style="border-color:#373744">
+      <span class="pa" style="color:#b4c2ff;border-color:#ef8a1f">Turnos</span><span style="color:#b5b4cc">Por PT</span><span style="color:#b5b4cc">Kilos</span>
+    </div>
+    <div class="fila" style="background:#1f1f27;border-color:#373744">
+      <span class="franja" style="background:#b4c2ff"></span>
+      <div><b>2026-0012 · SURTIDO 300058141</b><br><small style="color:#b5b4cc">T1 · Grupo 2 · <span style="color:#cfa284;font-weight:600">36 cajas</span></small></div>
+      <span class="chip" style="background:#2b3566;color:#b4c2ff">APROBADA</span>
+    </div>
+    <div class="fila" style="background:#282832;border-color:#373744">
+      <span class="franja" style="background:#cfa284"></span>
+      <div><b>Superficie cálida (café)</b><br><small style="color:#b5b4cc">capa secundaria, como los paneles de end_4</small></div>
+      <a style="color:#ffb066;font-weight:600">Ver detalle →</a>
+    </div>
+    <div class="botones">
+      <span class="b" style="background:#2e3f80;color:#ffffff">Nueva remisión</span>
+      <span class="b sec" style="background:#2b3566;color:#b4c2ff">Exportar</span>
+    </div>
+    <div class="alertas">
+      <span style="background:#0f2e1f;color:#16a34a">Éxito</span>
+      <span style="background:#33240c;color:#d97706">Advertencia</span>
+      <span style="background:#3a1717;color:#ef4444">Crítico</span>
+      <small style="color:#b5b4cc">(alertas sin cambios)</small>
+    </div>
+    <table><tr><td>Texto sobre el fondo</td><td class="num ok">14.6:1</td></tr><tr><td>Texto secundario sobre el fondo</td><td class="num ok">8.9:1</td></tr><tr><td>Blanco sobre la barra / botón</td><td class="num ok">9.8:1</td></tr><tr><td>Azul (enlaces) sobre la superficie</td><td class="num ok">9.4:1</td></tr><tr><td>Anaranjado para texto sobre la superficie</td><td class="num ok">9.1:1</td></tr><tr><td>Café sobre la superficie</td><td class="num ok">7.1:1</td></tr><tr><td>Anaranjado de raya vs. fondo (decorativo, mín. 3:1)</td><td class="num ok">7.1:1</td></tr></table>
+  </div>
+</div></div></section></body></html>

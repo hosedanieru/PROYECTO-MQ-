@@ -949,13 +949,17 @@ model ListaDistribucion {
 /// servidor lo aceptó (ENVIADO) o no (FALLIDO, con el error). Trazabilidad.
 model EnvioCorreo {
   id             String   @id @default(uuid())
-  origen         String // MANUAL | CIERRE_TURNO
+  origen         String // MANUAL | CIERRE_TURNO | REENVIO
   fechaHora      DateTime @map("fecha_hora") @db.Timestamptz(3)
   fechaOperativa DateTime @map("fecha_operativa") @db.Date
   turnoId        String?  @map("turno_id")
   destinatarios  String[]
   remisionIds    String[] @map("remision_ids")
+  /// Resúmenes (RT/RD) adjuntos en el correo del cierre (2026-10-10).
+  resumenIds     String[] @default([]) @map("resumen_ids")
   asunto         String
+  /// Cuerpo enviado, para reenviarlo igual; null en los envíos anteriores.
+  texto          String?
   estado         String // ENVIADO | FALLIDO
   error          String?
   usuarioId      String   @map("usuario_id")

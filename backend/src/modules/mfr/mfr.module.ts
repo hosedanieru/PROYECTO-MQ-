@@ -38,6 +38,7 @@ import { PersistenciaModule } from '../../infrastructure/persistence/persistenci
 import { RelojSistema } from '../../infrastructure/shared/reloj-sistema.js';
 import { ArmadorDeResumen } from '../../application/resumen/armar-resumen.js';
 import type { FormatoDocumento } from '../../domain/resumen/resumen-turno.js';
+import { CorreoModule } from '../correo/correo.module.js';
 import { FORMATO_RESUMEN, ResumenModule } from '../resumen/resumen.module.js';
 import { MfrController } from './mfr.controller.js';
 
@@ -46,7 +47,7 @@ import { MfrController } from './mfr.controller.js';
  * aquí solo se arman los casos de uso.
  */
 @Module({
-  imports: [PersistenciaModule, ResumenModule],
+  imports: [PersistenciaModule, ResumenModule, CorreoModule],
   controllers: [MfrController],
   providers: [
     { provide: RELOJ, useClass: RelojSistema },
